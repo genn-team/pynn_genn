@@ -1,8 +1,10 @@
 from itertools import repeat
+from copy import deepcopy
 try:
     from itertools import izip
 except ImportError:
     izip = zip  # Python 3 zip returns an iterator already
+import numpy as np
 from pyNN import common
 from pyNN.core import ezip
 from pyNN.space import Space
@@ -34,6 +36,10 @@ class Projection(common.Projection):
     def __init__(self, presynaptic_population, postsynaptic_population,
                  connector, synapse_type, source=None, receptor_type=None,
                  space=Space(), label=None):
+        if label is None:
+            if presynaptic_population.label and postsynaptic_population.label:
+                label = '{}_{}'.format( presynaptic_population.label,
+                                        postsynaptic_population.label )
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
                                    space, label)
@@ -41,6 +47,31 @@ class Projection(common.Projection):
         #  Create connections
         self.connections = []
         connector.connect(self)
+
+
+        prefixes = ('inh_', 'exc_')
+        if self.receptor_type == 'inhibitory':
+            prefix_idx = 0
+        else:
+            prefix_idx = 1
+        
+        self._postsyn_parameters = { ( k[len(prefixes[prefix_idx]):] 
+                        if k.startswith(prefixes[prefix_idx]) else k ) : 
+                    ( v[0] if isinstance( v, np.ndarray ) else v )
+                    for k, v in self.pre._postsyn_parameters.items()
+                    if not k.startswith( prefixes[1 - prefix_idx] ) }
+
+        self._wupdate_parameters = { 
+                k : ( v[0] if isinstance( v, np.ndarray ) else v )
+                for k, v in self.synapse_type.native_parameters.items()
+                if k != 'g' }
+        self._wupdate_ini = {
+                k : ( v[0] if isinstance( v, np.ndarray ) else v )
+                for k, v in self.synapse_type.default_initial_values.items() }
+
+        self._wupdate_ini['g'] = 0.0
+
+        self._simulator.state.projections.append( self )
 
     def __len__(self):
         return len(self.connections)
@@ -58,3 +89,44 @@ class Projection(common.Projection):
             self.connections.append(
                 Connection(pre_idx, postsynaptic_index, **other_attributes)
             )
+    def _set_initial_value_array( self, variable, initial_value ):
+        pass
+
+    def _create_native_projection(self):
+
+        matrixType = 'DENSE_INDIVIDUALG'
+
+        simulator.state.model.addSynapsePopulation(
+                self.label,
+                matrixType,
+                int( self.synapse_type.native_parameters['delaySteps'].base_value ),
+                self.pre.label,
+                self.post.label,
+                self.synapse_type.genn_weightUpdate,
+                self._wupdate_parameters,
+                self._wupdate_ini,
+                self.pre.celltype.genn_postsyn,
+                self._postsyn_parameters,
+                self.pre._postsyn_ini
+        )
+
+    def _initialize_native_projection( self ):
+        # TODO set values of the native projection to correct ones
+        #  for k, v in self.initial_values.items():
+        #      print( k, v )
+        #  for k, v in self.synapse_type.default_initial_values.items():
+        #      print( k, v )
+        #  for k, v in self.pre.celltype.default_initial_values.items():
+        #      print( k, v )
+        #  for k, v in self.pre.initial_values.items():
+        #      print( k, v )
+        connection_mask = []
+        connection_g = []
+        pre_size = self.pre.size
+        post_size = self.post.size
+        for conn in self.connections:
+            idx = conn.presynaptic_index * post_size + conn.postsynaptic_index
+            connection_mask.append( idx )
+            connection_g.append( conn.g )
+        self._simulator.state.model.initializeVarOnDevice( self.label, 'g',
+                connection_mask, connection_g )

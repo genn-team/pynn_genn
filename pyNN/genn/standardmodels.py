@@ -9,6 +9,8 @@ Standard cells for the mock module.
 from pyNN.standardmodels import cells, synapses, electrodes, build_translations, StandardCurrentSource
 from .simulator import state
 import logging
+import libgenn
+import GeNNModel
 
 logger = logging.getLogger("PyNN")
 
@@ -31,18 +33,30 @@ class IF_curr_alpha(cells.IF_curr_alpha):
 
 class IF_curr_exp(cells.IF_curr_exp):
     __doc__ = cells.IF_curr_exp.__doc__
+    
+    default_initial_values = cells.IF_curr_exp.default_initial_values
+    default_initial_values['RefracTime'] = 0.0
 
-    translations = build_translations(  # should add some computed/scaled parameters
-        ('tau_m',      'TAU_M'),
-        ('cm',         'CM'),
-        ('v_rest',     'V_REST'),
-        ('v_thresh',   'V_THRESH'),
-        ('v_reset',    'V_RESET'),
-        ('tau_refrac', 'T_REFRAC'),
-        ('i_offset',   'I_OFFSET'),
-        ('tau_syn_E',  'TAU_SYN_E'),
-        ('tau_syn_I',  'TAU_SYN_I'),
+    translations = build_translations(
+        ('v_rest',     'neuron_Vrest'),
+        ('v_reset',    'neuron_Vreset'),
+        ('cm',         'neuron_C'),  # C_m is in pF, cm in nF
+        ('tau_m',      'neuron_TauM'),
+        ('tau_refrac', 'neuron_TauRefrac'),
+        ('tau_syn_E',  'postsyn_exc_tau'),
+        ('tau_syn_I',  'postsyn_inh_tau'),
+        ('v_thresh',   'neuron_Vthresh'),
+        ('i_offset',   'neuron_Ioffset'),  # I_e is in pA, i_offset in nA
+        ('v',          'neuron_V'),
+        ('RefracTime', 'neuron_RefracTime')
     )
+    
+    # neuron_vars: V, RefracTime
+    # postsyn_vars: none
+
+
+    genn_neuron = libgenn.NeuronModels.LIF()
+    genn_postsyn = libgenn.PostsynapticModels.ExpCurr()
 
 
 class IF_cond_alpha(cells.IF_cond_alpha):
@@ -89,20 +103,35 @@ class HH_cond_exp(cells.HH_cond_exp):
     __doc__ = cells.HH_cond_exp.__doc__
 
     translations = build_translations(
-        ('gbar_Na',    'GBAR_NA'),
-        ('gbar_K',     'GBAR_K'),
-        ('g_leak',     'G_LEAK'),
-        ('cm',         'CM'),
+        ('gbar_Na',    'neuron_gNa'),
+        ('gbar_K',     'neuron_gK'),
+        ('g_leak',     'neuron_gl'),
+        ('cm',         'neuron_C'),
         ('v_offset',   'V_OFFSET'),
-        ('e_rev_Na',   'E_REV_NA'),
-        ('e_rev_K',    'E_REV_K'),
-        ('e_rev_leak', 'E_REV_LEAK'),
-        ('e_rev_E',    'E_REV_E'),
-        ('e_rev_I',    'E_REV_I'),
-        ('tau_syn_E',  'TAU_SYN_E'),
-        ('tau_syn_I',  'TAU_SYN_I'),
+        ('e_rev_Na',   'neuron_ENa'),
+        ('e_rev_K',    'neuron_EK'),
+        ('e_rev_leak', 'neuron_El'),
+        ('e_rev_E',    'postsyn_exc_E'),
+        ('e_rev_I',    'postsyn_inh_E'),
+        ('tau_syn_E',  'postsyn_exc_tau'),
+        ('tau_syn_I',  'postsyn_ihh_tau'),
         ('i_offset',   'I_OFFSET'),
+        ('v',          'neuron_V'),
+        ('m',          'neuron_m'),
+        ('h',          'neuron_h'),
+        ('n',          'neuron_n'),
     )
+
+    default_initial_values = cells.HH_cond_exp.default_initial_values
+    default_initial_values.update({
+        'm' : 0.5,
+        'h' : 0.5,
+        'n' : 0.5
+    })
+
+
+    genn_neuron = libgenn.NeuronModels.TraubMiles()
+    genn_postsyn = libgenn.PostsynapticModels.ExpCond()
 
 
 class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr):
@@ -118,13 +147,41 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson):
         ('duration', 'DURATION'),
     )
 
-
+        
 class SpikeSourceArray(cells.SpikeSourceArray):
     __doc__ = cells.SpikeSourceArray.__doc__
 
     translations = build_translations(
-        ('spike_times', 'SPIKE_TIMES'),
+        ('spike_times', 'neuron_spkTms'),
+        ('e_rev_E',    'postsyn_exc_E'),
+        ('e_rev_I',    'postsyn_inh_E'),
+        ('tau_syn_E',  'postsyn_exc_tau'),
+        ('tau_syn_I',  'postsyn_ihh_tau'),
     )
+    
+    default_parameters = cells.SpikeSourceArray.default_parameters
+
+    default_parameters.update({
+        'e_rev_E'   : 0.0,
+        'e_rev_I'   : 0.0,
+        'tau_syn_E' : 1.0,
+        'tau_syn_I' : 1.0
+    })
+
+    genn_neuron = GeNNModel.createCustomNeuronClass(
+            'SpikeSourceArray',
+            paramNames=['spkTms'],
+            #  varNameTypes=[('curSpk', 'scalar'), ('spkTms', 'scalar*')],
+            #  simCode=(
+            #      'if ( $(t) - $(spk_tm)[(int) curSpk] < $(DT) ) {\n'
+            #      '   $(glbSpkCnt) = 1;\n'
+            #      '   $(glbSpk)[0] = 0;\n'
+            #      '   ++curSpk;\n'
+            #      '}\n' ),
+            simCode='oldSpike = ( abs( $(t) - $(spkTms) - DT ) < DT );\n',
+            thresholdConditionCode='abs( $(t) - $(spkTms) ) < DT' )()
+
+    genn_postsyn = libgenn.PostsynapticModels.ExpCond()
 
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista):
@@ -240,8 +297,8 @@ class NoisyCurrentSource(MockCurrentSource, electrodes.NoisyCurrentSource):
 class StaticSynapse(synapses.StaticSynapse):
     __doc__ = synapses.StaticSynapse.__doc__
     translations = build_translations(
-        ('weight', 'WEIGHT'),
-        ('delay', 'DELAY'),
+        ('weight', 'g'),
+        ('delay', 'delaySteps'),
     )
 
     def _get_minimum_delay(self):
@@ -249,6 +306,10 @@ class StaticSynapse(synapses.StaticSynapse):
         if d == 'auto':
             d = state.dt
         return d
+
+    genn_weightUpdate = libgenn.WeightUpdateModels.StaticPulse()
+
+    
 
 
 class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse):
