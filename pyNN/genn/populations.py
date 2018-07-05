@@ -4,10 +4,28 @@ from pyNN.standardmodels import StandardCellType
 from pyNN.parameters import ParameterSpace, Sequence, simplify
 from . import simulator
 from .recording import Recorder
+from .standardmodels.cells import SpikeSourceArray
 
 
 class Assembly(common.Assembly):
     _simulator = simulator
+
+    def single_population(self):
+        ref_label = self.populations[0].label
+        if hasattr(self.populations[0], 'parent'):
+            ref_label = self.populations[0].grandparent.label
+        for pop in self.populations:
+            label = pop.label
+            if hasattr(pop, 'parent'):
+                label = pop.grandparent.label
+            if label != ref_label:
+                return False
+        return True
+
+    @property
+    def base_populations(self):
+        return [pop.grandparent if hasattr(pop, 'parent') else pop
+                 for pop in self.populations]
 
 
 class PopulationView(common.PopulationView):
@@ -18,7 +36,7 @@ class PopulationView(common.PopulationView):
         """return a ParameterSpace containing native parameters"""
         parameter_dict = {}
         for name in names:
-            value = self.parent._parameters[name]
+            value = self.parent._get_parameters(name)
             if isinstance(value, numpy.ndarray):
                 value = value[self.mask]
             parameter_dict[name] = simplify(value)
@@ -42,6 +60,16 @@ class Population(common.Population):
     _recorder_class = Recorder
     _assembly_class = Assembly
 
+    def __init__(self, size, cellclass, cellparams=None, structure=None,
+                 initial_values={}, label=None):
+        super(Population, self).__init__(size, cellclass, cellparams,
+                structure, initial_values, label)
+
+        # horrible workaround for SpikeSoureArray.
+        # GeNN expects a value for end_spike, but the standard model does not specify such
+        if isinstance(self.celltype, SpikeSourceArray):
+            self.initial_values['end_spike'].base_value = float(len(self._parameters['spikeTimes'][0].value))
+
     def _create_cells(self):
         id_range = numpy.arange(simulator.state.id_counter,
                                 simulator.state.id_counter + self.size)
@@ -51,7 +79,7 @@ class Population(common.Population):
         def is_local(id):
             return (id % simulator.state.num_processes) == simulator.state.mpi_rank
         self._mask_local = is_local(self.all_cells)
-        
+
         if isinstance(self.celltype, StandardCellType):
             parameter_space = self.celltype.native_parameters
         else:
@@ -59,78 +87,40 @@ class Population(common.Population):
         parameter_space.shape = (self.size,)
         parameter_space.evaluate(mask=self._mask_local, simplify=False)
         self._parameters = parameter_space.as_dict()
-        self._neuron_parameters = {}
-        self._postsyn_parameters = {}
-        for n, v in self._parameters.items():
-            if n.startswith( 'neuron_' ):
-                self._neuron_parameters[n[len('neuron_'):]] = v
-            elif n.startswith( 'postsyn_' ):
-                self._postsyn_parameters[n[len('postsyn_'):]] = v
-        
-        self._neuron_ini = {}
-        self._postsyn_ini = {}
-        for n, v in self.celltype.default_initial_values.items():
-            if n in self.celltype.translations:
-                n = self.celltype.translations[n]['translated_name']
-                if n.startswith( 'neuron_' ):
-                    self._neuron_ini[n[len('neuron_'):]] = v
-                elif n.startswith( 'postsyn_' ):
-                    self._postsyn_ini[n[len('postsyn_'):]] = v
-        
+
         for id in self.all_cells:
             id.parent = self
         simulator.state.id_counter += self.size
-        self._simulator.state.populations.append( self )
+        self._simulator.state.populations.append(self)
 
     def _create_native_population(self):
+        """Create a GeNN population
+            This function is supposed to be called by the simulator
+        """
+        neuron_params = self.celltype.get_neuron_params(
+                self._parameters,
+                self.initial_values
+        )
+        neuron_ini = self.celltype.get_neuron_vars(
+                self._parameters,
+                self.initial_values
+        )
 
-        n_param = {}
-        n_ini = {}
-
-        for n, v in self._neuron_parameters.items():
-            n_param[n] = self._get_first_value( v )
-            #  if isinstance( v, float ):
-            #      n_param[n] = v
-            #  else:
-            #
-            #      n_param[n] = v[0]
-        
-        for n, v in self._neuron_ini.items():
-            n_ini[n] = self._get_first_value( v )
-            #  if isinstance( v, numpy.ndarray ):
-            #      n_ini[n] = v[0]
-            #  else:
-            #      n_ini[n] = v
-
-        simulator.state.model.addNeuronPopulation(
+        pop = simulator.state.model.addNeuronPopulation(
                 self.label,
                 self.size,
                 self.celltype.genn_neuron,
-                n_param,
-                n_ini )
+                neuron_params,
+                neuron_ini
+        )
 
-    def _initialize_native_population( self ):
-        # TODO set values of the native population to correct ones
-        for k, v in self.initial_values.items():
-            if k in self.celltype.translations:
-                k = self.celltype.translations[k]['translated_name']
-                if k.startswith( 'neuron_' ):
-                    k = k[len('neuron_'):]
-                    self._simulator.state.model.initializeVarOnDevice(
-                        self.label,
-                        k,
-                        list( range( self.size ) ),
-                        list( v )
-                    )
+        extra_global = self.celltype.get_extra_global_params(
+                self._parameters,
+                self.initial_values
+        )
 
-    def _get_first_value( self, vals ):
-        v = vals
-        while not isinstance( v, float ):
-            if isinstance( v, Sequence ):
-                v = v.value
-            else:
-                v = v[0]
-        return v
+        for n, v in extra_global.items():
+            pop.addExtraGlobalParam(n, v)
 
     def _set_initial_value_array(self, variable, initial_values):
         pass
@@ -152,10 +142,3 @@ class Population(common.Population):
         parameter_space.evaluate(simplify=False, mask=self._mask_local)
         for name, value in parameter_space.items():
             self._parameters[name] = value
-            
-            if name.startswith( 'neuron_' ):
-                self._neuron_parameters[name[len('neuron_'):]] = value
-            elif name.startswith( 'postsyn_inh_' ) and self.receptor_types == 'inhibitory':
-                self._postsyn_parameters[name[len('postsyn_inh_'):]] = value
-            elif name.startswith( 'postsyn_exc_' ) and self.receptor_types == 'excitatory':
-                self._postsyn_parameters[name[len('postsyn_exc_'):]] = value

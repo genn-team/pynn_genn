@@ -21,10 +21,8 @@ class State(common.control.BaseState):
         self.model = GeNNModel.GeNNModel('float', 'GeNNModel')
         self.min_delay = 0
         self.clear()
+        self.use_sparse = False
         self.dt = 0.1
-        self._built = False
-        self.populations = []
-        self.projections = []
 
     @property
     def tt( self ):
@@ -46,58 +44,31 @@ class State(common.control.BaseState):
         self.model.build()
         self.model.load()
 
-
-        
-        #  self.model.initializeVarOnDevice( 'Stim_population1', 'g', [0], [-0.2] )
-        #
-        #  self.model.initializeSpikesOnDevice( 'Stim', [0], [0], [1] )
-
-
         self._built = True
-
-    def test_spikes(self):
-       self.model.addNeuronPopulation( 'Stim', 1, 'SpikeSource', [], [] )
-       self.model.addSynapsePopulation( 'Stim_population1', 'DENSE_INDIVIDUALG',
-                0, 'Stim', 'population1',
-                'StaticPulse', {}, {'g' : 0.0},
-                'ExpCond', {'tau' : 1.0, 'E' : -80.0}, {},
-                customWeightUpdate=True, customPostsynaptic=True)
-
         
     def run(self, simtime):
-        if not self._built:
-            self.finalize()
-        if not self.running:
-            for pop in self.populations:
-                pop._initialize_native_population()
-            for proj in self.projections:
-                proj._initialize_native_projection()
-        self.running = True
-        for i in range( int( simtime / self.dt ) ):
-            self.model.stepTimeGPU()
-            self.t += self.dt
-            for rec in self.recorders:
-                rec._read_vars()
+        self.run_until(self.t + simtime)
             
     def run_until(self, tstop):
         if not self._built:
-            self.first_run()
+            self.finalize()
         if not self.running:
-            for pop in self.populations:
-                pop._initialize_native_population()
-            for proj in self.projections:
-                proj._initialize_native_projection()
+            for rec in self.recorders:
+                rec.init_data_views()
         self.running = True
         while self.t < tstop:
             self.model.stepTimeGPU()
             self.t += self.dt
             for rec in self.recorders:
-                rec._read_vars()
+                rec._record_vars(self.t)
 
     def clear(self):
+        self.populations = []
+        self.projections = []
         self.recorders = set([])
-        self.id_counter = 42
+        self.id_counter = 0
         self.segment_counter = -1
+        self._built = False
         self.reset()
 
     def reset(self):
@@ -105,6 +76,8 @@ class State(common.control.BaseState):
         self.running = False
         self.t = 0
         self.t_start = 0
+        if self._built:
+            self.model.load()
         self.segment_counter += 1
 
 state = State()

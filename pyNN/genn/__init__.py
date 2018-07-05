@@ -13,8 +13,11 @@ from pyNN import common
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, DEFAULT_MIN_DELAY
 from pyNN.connectors import *
 from pyNN.recording import *
+from pyNN.standardmodels import StandardCellType
 from . import simulator
-from .standardmodels import *
+from .standardmodels.cells import *
+from .standardmodels.synapses import *
+from .standardmodels.electrodes import *
 from .populations import Population, PopulationView, Assembly
 from .projections import Projection
 from neo.io import get_io
@@ -39,6 +42,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get('rank', 0)
     simulator.state.num_processes = extra_params.get('num_processes', 1)
+    simulator.state.use_sparse = extra_params.get('use_sparse', False)
     return rank()
 
 
