@@ -17,12 +17,12 @@ def convert_to_single(value):
             return_value = value[0].value
         elif value.shape == (1,):
             return_value = value[0]
-        elif numpy.all(value == value[0]):
+        elif numpy.allclose(value, value[0]):
             return_value = value[0]
         else:
             raise ValueError('Expected a sigle value, but got {}'.format(value))
     elif isinstance(value, list):
-        assert numpy.all(value == value[0])
+        assert numpy.allclose(value, value[0])
         return_value = convert_to_single(value[0])
     else:
         return_value = value
@@ -48,6 +48,11 @@ def convert_to_array(container):
 
         for k, v in iteritems(container):
             compatible[k] = convert_to_single(v)
+    
+    elif isinstance(container, numpy.ndarray):
+        compatible = []
+        for value in container:
+            compatible.append(convert_to_single(value))
 
     else:
         compatible = convert_to_single(container)

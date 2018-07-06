@@ -6,6 +6,7 @@ Standard cells for the GeNN module.
 :license: CeCILL, see LICENSE for details.
 """
 
+import numpy as np
 from pyNN.standardmodels import cells, build_translations, StandardModelType
 from ..simulator import state
 import logging
@@ -21,8 +22,7 @@ class GeNNStandardCellType(StandardModelType):
     genn_postsyn = None
 
     def translate_dict(self, val_dict):
-
-        return {self.translations[n]['translated_name'] : list(v)
+        return {self.translations[n]['translated_name'] : v.evaluate()
                 for n, v in val_dict.items() if n in self.translations.keys()}
 
     def get_native_params(self, native_parameters, init_values, param_names, prefix=''):
@@ -76,11 +76,12 @@ class GeNNStandardCellType(StandardModelType):
 
     def get_extra_global_params(self, native_parameters, init_values):
         var_names = [vnt[0] for vnt in self.genn_neuron.getExtraGlobalParams()]
-
-        return convert_init_values(
-                    self.get_native_params(native_parameters,
-                                           init_values,
-                                           var_names))
+        
+        egps = self.get_native_params(native_parameters, init_values, var_names)
+        # in GeNN world, extra global parameters are defined for the whole population
+        # and not for individual neurons.
+        egps = {k : v[0] for k, v in egps.items()}
+        return convert_to_array(egps)
 
 ExpTC = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[1]))()
 Rmembrane = GeNNModel.createDPFClass(lambda pars, dt: pars[1] / pars[0])()
@@ -129,6 +130,7 @@ genn_lif = (
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
+        ('refrac_time','RefracTime')
     )
 )
 
@@ -219,7 +221,7 @@ genn_exp_curr = (
     },
     # translations
     (
-        ('RefracTime', 'RefracTime'),
+        #('RefracTime', 'RefracTime'),
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau')
     )
@@ -246,18 +248,19 @@ genn_alpha_curr = (
     (
         # TODO: x?
         ('tau_syn_E',  'exc_tau'),
-        ('tau_syn_I',  'inh_tau')
+        ('tau_syn_I',  'inh_tau'),
+        ('x',          'x')
     )
 )
 genn_alpha_cond = (
     # definitions
     {
         'decayCode' : (
-            "$(x) = (DT * $(expDecay) * $(inSyn) * ($(E) - $(V)) * $(init)) + ($(expDecay) * $(x));\n"
+            "$(x) = (DT * $(expDecay) * $(inSyn) * $(init)) + ($(expDecay) * $(x));\n"
             "$(inSyn)*=$(expDecay);\n"
         ),
 
-        'applyInputCode' : "$(Isyn) += $(x);",
+        'applyInputCode' : "$(Isyn) += ($(E) - $(V)) * $(x);",
 
         'paramNames' : [ "tau", "E" ],
 
@@ -271,12 +274,16 @@ genn_alpha_cond = (
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
-        ('tau_syn_I',  'inh_tau')
+        ('tau_syn_I',  'inh_tau'),
+        ('x',          'x')
     )
 )
 
 class IF_curr_alpha(cells.IF_curr_alpha, GeNNStandardCellType):
     __doc__ = cells.IF_curr_alpha.__doc__
+    
+    default_initial_values = cells.IF_curr_alpha.default_initial_values
+    default_initial_values['refrac_time'] = 0.0
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -291,7 +298,7 @@ class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
     __doc__ = cells.IF_curr_exp.__doc__
 
     default_initial_values = cells.IF_curr_exp.default_initial_values
-    default_initial_values['RefracTime'] = 0.0
+    default_initial_values['refrac_time'] = 0.0
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -304,10 +311,13 @@ class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
 
 class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
     __doc__ = cells.IF_cond_alpha.__doc__
+    
+    default_initial_values = cells.IF_cond_alpha.default_initial_values
+    default_initial_values['refrac_time'] = 0.0
 
     translations = build_translations(
         *(genn_lif[1]),
-        *(genn_alpha_curr[1])
+        *(genn_alpha_cond[1])
     )
     genn_neuron = GeNNModel.createCustomNeuronClass('LIF', **(genn_lif[0]))()
     genn_postsyn = GeNNModel.createCustomPostsynapticClass('AlphaCond', **(genn_alpha_cond[0]))()
@@ -316,10 +326,13 @@ class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
 
 class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp.__doc__
+    
+    default_initial_values = cells.IF_cond_exp.default_initial_values
+    default_initial_values['refrac_time'] = 0.0
 
     translations = build_translations(
         *(genn_lif[1]),
-        ('RefracTime', 'RefracTime'),
+        ('refrac_time','RefracTime'),
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
