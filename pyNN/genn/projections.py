@@ -6,6 +6,7 @@ except ImportError:
     izip = zip  # Python 3 zip returns an iterator already
 import numpy as np
 from pyNN import common
+from pyNN.connectors import AllToAllConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 from . import simulator
@@ -118,6 +119,9 @@ class Projection(common.Projection):
         self.connections = []
         connector.connect(self)
         self.connections = np.array(self.connections)
+        self.use_sparse = True
+        if isinstance(connector, AllToAllConnector):
+            self.use_sparse = False
         # process assemblies
         if hasattr(self.pre, 'populations') and not self.pre.single_population():
             setattr(self, 'subprojections', [])
@@ -201,15 +205,17 @@ class Projection(common.Projection):
     @property
     def wUpdateValues(self):
 
-        param_names = [k for k in self.synapse_type.native_parameters.keys()
-                        if k != 'g' and k != 'delaySteps']
-        wupdate_parameters = {k : getattr(self.connections[0], k) for k in param_names}
+        #  param_names = [k for k in self.synapse_type.native_parameters.keys()
+        #                  if k != 'g' and k != 'delaySteps']
+        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values) # {k : getattr(self.connections[0], k) for k in param_names}
 
-        wupdate_ini = {
-                k : list(v)
-                for k, v in self.initial_values.items()}
+        #  wupdate_ini = {
+        #          k : list(v)
+        #          for k, v in self.initial_values.items()}
+        #
+        #  wupdate_ini['g'] = 0.0
 
-        wupdate_ini['g'] = 0.0
+        wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
 
         return (wupdate_parameters, wupdate_ini)
 
@@ -232,7 +238,7 @@ class Projection(common.Projection):
         """Create a GeNN projection (aka synaptic population)
             This function is supposed to be called by the simulator
         """
-        if self._simulator.state.use_sparse:
+        if self.use_sparse:
             matrixType = 'SPARSE_INDIVIDUALG'
         else:
             matrixType = 'DENSE_INDIVIDUALG'

@@ -60,16 +60,6 @@ class Population(common.Population):
     _recorder_class = Recorder
     _assembly_class = Assembly
 
-    def __init__(self, size, cellclass, cellparams=None, structure=None,
-                 initial_values={}, label=None):
-        super(Population, self).__init__(size, cellclass, cellparams,
-                structure, initial_values, label)
-
-        # horrible workaround for SpikeSoureArray.
-        # GeNN expects a value for end_spike, but the standard model does not specify such
-        if isinstance(self.celltype, SpikeSourceArray):
-            self.initial_values['end_spike'].base_value = float(len(self._parameters['spikeTimes'][0].value))
-
     def _create_cells(self):
         id_range = numpy.arange(simulator.state.id_counter,
                                 simulator.state.id_counter + self.size)

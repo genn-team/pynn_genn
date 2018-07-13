@@ -6,7 +6,7 @@ Standard cells for the GeNN module.
 :license: CeCILL, see LICENSE for details.
 """
 
-from pyNN.standardmodels import synapses, build_translations
+from pyNN.standardmodels import synapses, StandardModelType, build_translations
 from ..simulator import state
 import logging
 import libgenn
@@ -15,45 +15,94 @@ from ..conversions import convert_to_single, convert_to_array, convert_init_valu
 
 logger = logging.getLogger("PyNN")
 
+class GeNNStandardSynapseType(StandardModelType):
+
+    genn_weightUpdate = None
+
+    def translate_dict(self, val_dict):
+        return {self.translations[n]['translated_name'] : convert_to_array(v)
+                for n, v in val_dict.items() if n in self.translations.keys()}
+
+    def get_native_params(self, connections, init_values, param_names):
+        init_values_ = self.default_initial_values.copy()
+        init_values_.update(init_values)
+        native_init_values = self.translate_dict(init_values_)
+        native_params = {}
+        for pn in param_names:
+            if any([hasattr(conn, pn) for conn in connections]):
+                native_params[pn] = []
+                for conn in connections:
+                    if hasattr(conn, pn):
+                        native_params[pn].append(getattr(conn, pn))
+            elif pn in native_init_values.keys():
+                native_params[pn] = native_init_values[pn]
+            else:
+                raise Exception('Variable "{}" not found'.format(pn))
+
+        return native_params
+
+    def get_params(self, connections, init_values):
+        param_names = list(self.genn_weightUpdate.getParamNames())
+
+        # parameters are single-valued in GeNN
+        return convert_to_array(
+                 self.get_native_params(connections,
+                                        init_values,
+                                        param_names))
+
+    def get_vars(self, connections, init_values):
+        var_names = [vnt[0] for vnt in self.genn_weightUpdate.getVars()]
+
+        return convert_init_values(
+                    self.get_native_params(connections,
+                                           init_values,
+                                           var_names))
+
 genn_tsodyksMakram = (
     # definitions
     {
-        'simCode' : (
-            'scalar deltaST = $(t) - $(sT_pre);\n'
-            '$(z) *= std::exp( -deltaST / $(tauRec) );\n'
-            '$(z) += $(y) * (std::exp( -deltaST / $(tauPsc) ) - '
-            '   std::exp( -deltaST / $(tauRec) ) ) / ( ( $(tauPsc) / $(tauRec) ) - 1 );\n'
-            '$(y) *= std::exp( -deltaST / $(tauPsc) );\n'
-            '$(x) = 1 - y - z;\n'
-            '$(u) *= std::exp( -deltaST ) / $(tauFacil);\n'
-            '$(u) += $(U) * ( 1 - $(u) );\n'
-            '$if ( $(u) > $(U) ) {\n'
-            '   $(u) = $(U);\n'
-            '}\n'
-            'y += x * u;\n'
-            #
-            #  '$(X) += $(Z) / $(tauRec) - $(u)*$(X)*deltaT;\n'
-            #  '$(Y) += $(Y) / $(tauI) - $(u)*$(X)*deltaT;\n'
-            #  '$(Z) += $(Y) / $(tauI) - $(Z) / $(tauRec);\n'
-            #  ''
-        ),
+        'simCode' : '''
+            scalar deltaST = $(t) - $(sT_pre);
+            $(z) *= exp( -deltaST / $(tauRec) );
+            $(z) += $(y) * ( exp( -deltaST / $(tauPsc) ) - 
+               exp( -deltaST / $(tauRec) ) ) / ( ( $(tauPsc) / $(tauRec) ) - 1 );
+            $(y) *= exp( -deltaST / $(tauPsc) );
+            $(x) = 1 - $(y) - $(z);
+            $(u) *= exp( -deltaST / $(tauFacil) );
+            $(u) += $(U) * ( 1 - $(u) );
+            if ( $(u) > $(U) ) {
+               $(u) = $(U);
+            }
+            $(y) += $(x) * $(u);
+            $(addtoinSyn) = $(g) * $(x) * $(u);
+            $(updatelinsyn);
+        ''',
         'paramNames' : [
             'U',        # asymptotic value of probability of release
             'tauRec',   # recovery time from synaptic depression [ms]
             'tauFacil', # time constant for facilitation [ms]
             'tauPsc'    # decay time constant of postsynaptic current [ms]
         ],
-        'varNameTypes' : [ ('u', 'scalar'), ('x', 'scalar'),
+        'varNameTypes' : [ ('g', 'scalar'), ('u', 'scalar'), ('x', 'scalar'),
             ('y', 'scalar'), ('z', 'scalar') ],
-        'needsPreSpikeTime' : True
+        'isPreSpikeTimeRequired' : True
     },
     # translations
     (
-        (),
+        ('weight',    'g'),
+        ('delay',     'delaySteps', 1/state.dt),
+        ('U',         'U'),
+        ('tau_rec',   'tauRec'),
+        ('tau_facil', 'tauFacil'),
+        ('tau_psc',   'tauPsc'),
+        ('u',         'u'),
+        ('x',         'x'),
+        ('y',         'y'),
+        ('z',         'z'),
     )
 )
 
-class StaticSynapse(synapses.StaticSynapse):
+class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
     translations = build_translations(
         ('weight', 'g'),
@@ -69,18 +118,22 @@ class StaticSynapse(synapses.StaticSynapse):
     genn_weightUpdate = libgenn.WeightUpdateModels.StaticPulse()
 
 
-class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse):
+class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.TsodyksMarkramSynapse.__doc__
 
+    default_parameters = synapses.TsodyksMarkramSynapse.default_parameters
+    default_parameters.update({
+        'tau_psc' : 1.0,
+    })
+    default_initial_values = synapses.TsodyksMarkramSynapse.default_initial_values
+    default_initial_values.update({
+        'x' : 1.0,
+        'y' : 0.0,
+        'z' : 0.0
+    })
+
     translations = build_translations(
-        ('weight', 'WEIGHT'),
-        ('delay', 'DELAY'),
-        ('U', 'UU'),
-        ('tau_rec', 'tauRec'),
-        ('tau_facil', 'tauFacil'),
-        ('u0', 'U0'),
-        ('x0', 'X'),
-        ('y0', 'Y')
+        *(genn_tsodyksMakram[1])
     )
 
     def _get_minimum_delay(self):
@@ -88,6 +141,8 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse):
         if d == 'auto':
             d = state.dt
         return d
+
+    genn_weightUpdate = GeNNModel.createCustomWeightUpdateClass('TsodyksMarkramSynapse', **(genn_tsodyksMakram[0]))()
 
 
 class STDPMechanism(synapses.STDPMechanism):

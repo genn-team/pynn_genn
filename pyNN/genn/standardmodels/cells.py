@@ -6,6 +6,7 @@ Standard cells for the GeNN module.
 :license: CeCILL, see LICENSE for details.
 """
 
+from copy import deepcopy
 import numpy as np
 from pyNN.standardmodels import cells, build_translations, StandardModelType
 from ..simulator import state
@@ -80,45 +81,46 @@ class GeNNStandardCellType(StandardModelType):
         egps = self.get_native_params(native_parameters, init_values, var_names)
         # in GeNN world, extra global parameters are defined for the whole population
         # and not for individual neurons.
-        egps = {k : v[0] for k, v in egps.items()}
-        return convert_to_array(egps)
+        # The standard model which use extra global params are supposed to override
+        # this function in order to convert values properly.
+        return egps
 
 ExpTC = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[1]))()
 Rmembrane = GeNNModel.createDPFClass(lambda pars, dt: pars[1] / pars[0])()
 genn_lif = (
     # definitions
     {
-        'simCode' : (
-            "if ($(RefracTime) <= 0.0)\n"
-            "{\n"
-            "  scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);\n"
-            "  $(V) = alpha - ($(ExpTC) * (alpha - $(V)));\n"
-            "}\n"
-            "else\n"
-            "{\n"
-            "  $(RefracTime) -= DT;\n"
-            "}\n"
-        ),
+        'simCode' : '''
+            if ($(RefracTime) <= 0.0)
+            {
+              scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
+              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+            }
+            else
+            {
+                $(RefracTime) -= DT;
+            }
+        ''',
 
-        'thresholdConditionCode' : "$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)",
+        'thresholdConditionCode' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
 
-        'resetCode' : (
-            "$(V) = $(Vreset);\n"
-            "$(RefracTime) = $(TauRefrac);\n"
-        ),
+        'resetCode' : '''
+            $(V) = $(Vreset);
+            $(RefracTime) = $(TauRefrac);
+        ''',
 
         'paramNames' : [
-            "C",          # Membrane capacitance
-            "TauM",       # Membrane time constant [ms]
-            "Vrest",      # Resting membrane potential [mV]
-            "Vreset",     # Reset voltage [mV]
-            "Vthresh",    # Spiking threshold [mV]
-            "Ioffset",    # Offset current
-            "TauRefrac"
+            'C',          # Membrane capacitance
+            'TauM',       # Membrane time constant [ms]
+            'Vrest',      # Resting membrane potential [mV]
+            'Vreset',     # Reset voltage [mV]
+            'Vthresh',    # Spiking threshold [mV]
+            'Ioffset',    # Offset current
+            'TauRefrac'
         ],
 
-        'derivedParams' : [("ExpTC", ExpTC), ("Rmembrane", Rmembrane)],
-        'varNameTypes' : [("V", "scalar"), ("RefracTime", "scalar")]
+        'derivedParams' : [('ExpTC', ExpTC), ('Rmembrane', Rmembrane)],
+        'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar')]
     },
     # translations
     (
@@ -134,67 +136,133 @@ genn_lif = (
     )
 )
 
+genn_lif_sfa_rr = (
+    # definitions
+    {
+        'simCode' : '''
+            if ($(RefracTime) <= 0.0)
+            {
+              scalar alpha = (($(Isyn) + $(Ioffset) - $(GR) * ($(V) - $(ERr)) - $(GS) * ($(V) - $(ESfa))) * $(Rmembrane)) + $(Vrest);
+              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+              $(GS) -= $(GS)/$(TauSfa);
+              $(GR) -= $(GR)/$(TauRr);
+            }
+            else
+            {
+              $(RefracTime) -= DT;
+            }
+        ''',
+
+                #  dv/dt = (v_rest-v)/tau_m + (>>-g_r*(v-E_r) - g_s*(v-E_s)<< + i_syn + i_offset + i_inj)/c_m  : mV
+                #  dg_s/dt = -g_s/tau_s    : nS
+                #  dg_r/dt = -g_r/tau_r    : nS
+        'thresholdConditionCode' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
+
+        'resetCode' : '''
+            $(V) = $(Vreset);
+            $(RefracTime) = $(TauRefrac);
+        ''',
+
+        'paramNames' : [
+            'C',          # Membrane capacitance
+            'TauM',       # Membrane time constant [ms]
+            'Vrest',      # Resting membrane potential [mV]
+            'Vreset',     # Reset voltage [mV]
+            'Vthresh',    # Spiking threshold [mV]
+            'Ioffset',    # Offset current
+            'TauRefrac',
+            'TauSfa',
+            'TauRr',
+            'ESfa',
+            'ERr'
+        ],
+
+        'derivedParams' : [('ExpTC', ExpTC), ('Rmembrane', Rmembrane)],
+        'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar'), ('GS', 'scalar'), ('GR', 'scalar')]
+    },
+    # translations
+    (
+        ('v_rest',     'Vrest'),
+        ('v_reset',    'Vreset'),
+        ('cm',         'C'),
+        ('tau_m',      'TauM'),
+        ('tau_refrac', 'TauRefrac'),
+        ('v_thresh',   'Vthresh'),
+        ('i_offset',   'Ioffset'),
+        ('v',          'V'),
+        ('refrac_time','RefracTime'),
+        ('tau_sfa',    'TauSfa'),
+        ('e_rev_sfa',  'ESfa'),
+        ('tau_rr',     'TauRr'),
+        ('e_rev_rr',   'ERr'),
+        ('g_s',        'GS'),
+        ('g_r',        'GR'),
+        ('q_sfa',      '_QSFA'),
+        ('q_rr',       '_QRR')
+    )
+)
+
 genn_adexp = (
     # definitions
     {
-        'simCode' : (
-            "#define DV(V, W) (1.0 / $(c)) * ((-$(gL) * ((V) - $(eL))) + ($(gL) * $(deltaT) * exp(((V) - $(vThresh)) / $(deltaT))) + i - (W))\n"
-            "#define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(eL))) - W)\n"
-            "const scalar i = $(Isyn) + $(iOffset);\n"
-            "// If voltage is above artificial spike height\n"
-            "if($(V) >= $(vSpike)) {\n"
-            "   $(V) = $(vReset);\n"
-            "}\n"
-            "// Calculate RK4 terms\n"
-            "const scalar v1 = DV($(V), $(W));\n"
-            "const scalar w1 = DW($(V), $(W));\n"
-            "const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));\n"
-            "const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));\n"
-            "const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));\n"
-            "const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));\n"
-            "const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));\n"
-            "const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));\n"
-            "// Update V\n"
-            "$(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);\n"
-            "// If we're not above peak, update w\n"
-            "// **NOTE** it's not safe to do this at peak as wn may well be huge\n"
-            "if($(V) <= -40.0) {\n"
-            "   $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);\n"
-            "}\n"
-        ),
+        'simCode' : '''
+            #define DV(V, W) (1.0 / $(c)) * ((-$(gL) * ((V) - $(eL))) + ($(gL) * $(deltaT) * exp(((V) - $(vThresh)) / $(deltaT))) + i - (W))
+            #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(eL))) - W)
+            const scalar i = $(Isyn) + $(iOffset);
+            // If voltage is above artificial spike height
+            if($(V) >= $(vSpike)) {
+               $(V) = $(vReset);
+            }
+            // Calculate RK4 terms
+            const scalar v1 = DV($(V), $(W));
+            const scalar w1 = DW($(V), $(W));
+            const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+            const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+            const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+            const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+            const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
+            const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+            // Update V
+            $(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
+            // If we're not above peak, update w
+            // **NOTE** it's not safe to do this at peak as wn may well be huge
+            if($(V) <= -40.0) {
+               $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
+            }
+        ''',
 
-        'thresholdConditionCode' : "$(V) > -40",
+        'thresholdConditionCode' : '$(V) > -40',
 
-        'resetCode' : (
-            "// **NOTE** we reset v to arbitrary plotting peak rather than to actual reset voltage\n"
-            "$(V) = $(vSpike);\n"
-            "$(W) += ($(b) * 1000.0);\n"
-        ),
+        'resetCode' : '''
+            // **NOTE** we reset v to arbitrary plotting peak rather than to actual reset voltage
+            $(V) = $(vSpike);
+            $(W) += ($(b) * 1000.0);
+        ''',
 
         'paramNames' : [
-            "c",        # Membrane capacitance [pF]
-            "gL",       # Leak conductance [nS]
-            "eL",       # Leak reversal potential [mV]
-            "deltaT",   # Slope factor [mV]
-            "vThresh",  # Threshold voltage [mV]
-            "vSpike",   # Artificial spike height [mV]
-            "vReset",   # Reset voltage [mV]
-            "tauW",     # Adaption time constant
-            "a",        # Subthreshold adaption [nS]
-            "b",        # Spike-triggered adaptation [nA]
-            "iOffset",  # Offset current
+            'c',        # Membrane capacitance [pF]
+            'gL',       # Leak conductance [nS]
+            'eL',       # Leak reversal potential [mV]
+            'deltaT',   # Slope factor [mV]
+            'vThresh',  # Threshold voltage [mV]
+            'vSpike',   # Artificial spike height [mV]
+            'vReset',   # Reset voltage [mV]
+            'tauW',     # Adaption time constant
+            'a',        # Subthreshold adaption [nS]
+            'b',        # Spike-triggered adaptation [nA]
+            'iOffset',  # Offset current
         ],
 
-        'varNameTypes' : [("V", "scalar"), ("W", "scalar")]
+        'varNameTypes' : [('V', 'scalar'), ('W', 'scalar')]
     },
     # translations
     (
         ('cm',         'c'),
-        ('tau_refrac', 'TAU_REFRAC'),
+        ('tau_refrac', '_TAU_REFRAC'),
         ('v_spike',    'vSpike'),
         ('v_reset',    'vReset'),
         ('v_rest',     'V_REST'),
-        ('tau_m',      'TAU_M'),
+        ('tau_m',      '_TAU_M'),
         ('i_offset',   'iOffset'),
         ('a',          'a'),
         ('b',          'b'),
@@ -211,13 +279,13 @@ initExp = GeNNModel.createDPFClass(lambda pars, dt: (pars[0] * (1.0 - np.exp(-dt
 genn_exp_curr = (
     # definitions
     {
-        'decayCode' : "$(inSyn)*=$(expDecay);",
+        'decayCode' : '$(inSyn)*=$(expDecay);',
 
-        'applyInputCode' : "$(Isyn) += $(init) * $(inSyn);",
+        'applyInputCode' : '$(Isyn) += $(init) * $(inSyn);',
 
-        'paramNames' : [ "tau" ],
+        'paramNames' : ['tau'],
 
-        'derivedParams' : [ ( "expDecay", expDecay ), ( "init", initExp ) ]
+        'derivedParams' : [('expDecay', expDecay), ('init', initExp)]
     },
     # translations
     (
@@ -231,22 +299,22 @@ initAlpha = GeNNModel.createDPFClass(lambda pars, dt: np.exp(1) / pars[0])
 genn_alpha_curr = (
     # definitions
     {
-        'decayCode' : (
-            "$(x) = (DT * $(expDecay) * $(inSyn) * $(init)) + ($(expDecay) * $(x));\n"
-            "$(inSyn)*=$(expDecay);\n"
-        ),
+        'decayCode' : '''
+            $(x) = (DT * $(expDecay) * $(inSyn) * $(init)) + ($(expDecay) * $(x));
+            $(inSyn)*=$(expDecay);
+        ''',
 
-        'applyInputCode' : "$(Isyn) += $(x);",
+        'applyInputCode' : '$(Isyn) += $(x);',
 
-        'paramNames' : [ "tau" ],
+        'paramNames' : ['tau'],
 
-        'varNameTypes' : [ ( "x", "scalar" ) ],
+        'varNameTypes' : [('x', 'scalar')],
 
-        'derivedParams' : [ ( "expDecay", expDecay ), ( "init", initAlpha ) ]
+        'derivedParams' : [('expDecay', expDecay), ('init', initAlpha)]
     },
     # translations
     (
-        # TODO: x?
+        # TODO: x -- additional var?
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
         ('x',          'x')
@@ -255,22 +323,22 @@ genn_alpha_curr = (
 genn_alpha_cond = (
     # definitions
     {
-        'decayCode' : (
-            "$(x) = (DT * $(expDecay) * $(inSyn) * $(init)) + ($(expDecay) * $(x));\n"
-            "$(inSyn)*=$(expDecay);\n"
-        ),
+        'decayCode' : '''
+            $(x) = (DT * $(expDecay) * $(inSyn) * $(init)) + ($(expDecay) * $(x));
+            $(inSyn)*=$(expDecay);
+        ''',
 
-        'applyInputCode' : "$(Isyn) += ($(E) - $(V)) * $(x);",
+        'applyInputCode' : '$(Isyn) += ($(E) - $(V)) * $(x);',
 
-        'paramNames' : [ "tau", "E" ],
+        'paramNames' : ['tau', 'E'],
 
-        'varNameTypes' : [ ( "x", "scalar" ) ],
+        'varNameTypes' : [('x', 'scalar')],
 
-        'derivedParams' : [ ( "expDecay", expDecay ), ( "init", initAlpha ) ]
+        'derivedParams' : [('expDecay', expDecay), ('init', initAlpha)]
     },
     # translations
     (
-        # TODO: x?
+        # TODO: x -- additional var?
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
@@ -332,7 +400,6 @@ class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
 
     translations = build_translations(
         *(genn_lif[1]),
-        ('refrac_time','RefracTime'),
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
@@ -382,6 +449,19 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
 class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp_gsfa_grr.__doc__
 
+    default_initial_values = cells.IF_cond_exp_gsfa_grr.default_initial_values
+    default_initial_values['refrac_time'] = 0.0
+
+    translations = build_translations(
+        *(genn_lif_sfa_rr[1]),
+        ('e_rev_E',    'exc_E'),
+        ('e_rev_I',    'inh_E'),
+        ('tau_syn_E',  'exc_tau'),
+        ('tau_syn_I',  'inh_tau')
+    )
+    genn_neuron = GeNNModel.createCustomNeuronClass('LIF_sfa_rr', **(genn_lif_sfa_rr[0]))()
+    genn_postsyn = libgenn.PostsynapticModels.ExpCond()
+
 
 class SpikeSourcePoisson(cells.SpikeSourcePoisson, GeNNStandardCellType):
     __doc__ = cells.SpikeSourcePoisson.__doc__
@@ -400,7 +480,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
         ('e_rev_E',     'exc_E'),
         ('e_rev_I',     'inh_E'),
         ('tau_syn_E',   'exc_tau'),
-        ('tau_syn_I',   'ihh_tau'),
+        ('tau_syn_I',   'inh_tau'),
         ('spike_times', 'spikeTimes'),
         ('start_spike', 'startSpike'),
         ('end_spike',   'endSpike')
@@ -423,20 +503,38 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     genn_neuron = libgenn.NeuronModels.SpikeSourceArray()
     genn_postsyn = libgenn.PostsynapticModels.ExpCond()
 
+    def get_extra_global_params(self, native_parameters, init_values):
+        egps = super(SpikeSourceArray, self).get_extra_global_params(
+                                                            native_parameters,
+                                                            init_values)
+        return {k : np.concatenate([convert_to_array(seq) for seq in v])
+                for k, v in egps.items()}
+
+    def get_neuron_vars(self, native_parameters, init_values):
+        converted_vars = super(SpikeSourceArray, self).get_neuron_vars(
+                                                            native_parameters,
+                                                            init_values)
+        spk_times = native_parameters['spikeTimes']
+
+        cumSize = 0
+        for i, seq in enumerate(spk_times):
+            converted_vars['startSpike'][i] = cumSize
+            cumSize += len(seq.value)
+            converted_vars['endSpike'][i] = cumSize
+
+        return converted_vars
+
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_alpha_isfa_ista.__doc__
 
     translations = build_translations(
         *(genn_adexp[1]),
-
-        ('e_rev_E',    'E_REV_E'),
-        ('tau_syn_E',  'TAU_SYN_E'),
-        ('e_rev_I',    'E_REV_I'),
-        ('tau_syn_I',  'TAU_SYN_I'),
+        *(genn_alpha_cond[1])
     )
 
-    genn_neuron = GeNNModel.createCustomNeuronClass('AdExp', **(genn_adexp[0]))
+    genn_neuron = GeNNModel.createCustomNeuronClass('AdExp', **(genn_adexp[0]))()
+    genn_postsyn = GeNNModel.createCustomPostsynapticClass('AlphaCond', **(genn_alpha_cond[0]))()
 
 
 class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType):
@@ -444,14 +542,13 @@ class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType)
 
     translations = build_translations(
         *(genn_adexp[1]),
-        ('RefracTime', 'RefracTime'),
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau')
     )
 
-    genn_neuron = GeNNModel.createCustomNeuronClass('AdExp', **(genn_adexp[0]))
+    genn_neuron = GeNNModel.createCustomNeuronClass('AdExp', **(genn_adexp[0]))()
     genn_postsyn = libgenn.PostsynapticModels.ExpCond()
 
 
