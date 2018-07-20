@@ -205,32 +205,23 @@ class Projection(common.Projection):
     @property
     def wUpdateValues(self):
 
-        #  param_names = [k for k in self.synapse_type.native_parameters.keys()
-        #                  if k != 'g' and k != 'delaySteps']
-        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values) # {k : getattr(self.connections[0], k) for k in param_names}
-
-        #  wupdate_ini = {
-        #          k : list(v)
-        #          for k, v in self.initial_values.items()}
-        #
-        #  wupdate_ini['g'] = 0.0
-
+        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values)
         wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
 
         return (wupdate_parameters, wupdate_ini)
 
-    @property
-    def postsynValues(self):
+    #  @property
+    def postsynValues(self, postPop):
 
         if self.receptor_type == 'inhibitory':
             prefix = 'inh_'
         else:
             prefix = 'exc_'
 
-        postsyn_parameters = self.pre.celltype.get_postsynaptic_params(
-                self.pre._parameters, self.pre.initial_values, prefix)
-        postsyn_ini = self.pre.celltype.get_postsynaptic_vars(
-                self.pre._parameters, self.pre.initial_values, prefix)
+        postsyn_parameters = postPop.celltype.get_postsynaptic_params(
+                postPop._parameters, postPop.initial_values, prefix)
+        postsyn_ini = postPop.celltype.get_postsynaptic_vars(
+                postPop._parameters, postPop.initial_values, prefix)
 
         return (postsyn_parameters, postsyn_ini)
 
@@ -298,8 +289,8 @@ class Projection(common.Projection):
                 postPop.label,
                 self.synapse_type.genn_weightUpdate,
                 *self.wUpdateValues,
-                self.pre.celltype.genn_postsyn,
-                *self.postsynValues
+                self.post.celltype.genn_postsyn,
+                *(self.postsynValues(postPop))
         )
 
         simulator.state.model.setConnections(self.label, conns, gs)

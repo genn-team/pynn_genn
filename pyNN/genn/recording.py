@@ -23,8 +23,8 @@ class Monitor(object):
 
         if self.data is None:
             self.id_set = new_ids
-            self.data = numpy.empty((1000, len(new_ids)), dtype=float)
-            self.time = numpy.empty((1000, 1), dtype=float )
+            self.data = numpy.zeros((1000, len(new_ids)), dtype=float)
+            self.time = numpy.zeros((1000, 1), dtype=float )
             self.data_size = len(self.data)
             self.cur = 0
         else:
@@ -77,8 +77,26 @@ class SpikeMonitor(Monitor):
         super(SpikeMonitor, self).__init__(parent)
 
     def init_data_view(self):
-        self.data_view = (self.recorder._simulator.state.model.neuronPopulations
+        self.spike_view = (self.recorder._simulator.state.model.neuronPopulations
+                [self.recorder.population.label].spikes)
+        self.spike_que = (self.recorder._simulator.state.model.neuronPopulations
+                [self.recorder.population.label].spikeQuePtr)
+        self.spike_count = (self.recorder._simulator.state.model.neuronPopulations
                 [self.recorder.population.label].spikeCount)
+
+    def __call__(self, t):
+        """Fetch new data"""
+
+        if (t % self.sampling_interval < 1):
+            self.time[self.cur] = t
+            if self.spike_count[self.spike_que[0]] > 0:
+                spikes = self.spike_view[self.spike_que[0] :
+                        self.spike_que[0] + self.spike_count[self.spike_que[0]]]
+                self.data[self.cur, spikes] = t
+
+                self.cur += 1
+                if self.cur == self.data_size:
+                    self.enlarge_storage()
 
 
 class Recorder(recording.Recorder):

@@ -21,6 +21,7 @@ class GeNNStandardCellType(StandardModelType):
 
     genn_neuron = None
     genn_postsyn = None
+    additional_defaults = {}
 
     def translate_dict(self, val_dict):
         return {self.translations[n]['translated_name'] : v.evaluate()
@@ -34,8 +35,14 @@ class GeNNStandardCellType(StandardModelType):
                 native_params[pn] = native_parameters[prefix + pn]
             elif prefix + pn in native_init_values.keys():
                 native_params[pn] = native_init_values[prefix + pn]
+            elif pn in native_parameters.keys():
+                native_params[pn] = native_parameters[pn]
+            elif pn in native_init_values.keys():
+                native_params[pn] = native_init_values[pn]
+            elif pn in self.additional_defaults:
+                native_params[pn] = self.additional_defaults[pn]
             else:
-                raise Exception('Variable "{}" not found'.format(prefix + pn))
+                raise Exception('Variable "{}" or "{}" not found'.format(pn,prefix + pn))
 
         return native_params
 
@@ -110,7 +117,7 @@ genn_lif = (
         ''',
 
         'paramNames' : [
-            'C',          # Membrane capacitance
+            'C',          # Membrane capacitance [nF?]
             'TauM',       # Membrane time constant [ms]
             'Vrest',      # Resting membrane potential [mV]
             'Vreset',     # Reset voltage [mV]
@@ -132,7 +139,6 @@ genn_lif = (
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
-        ('refrac_time','RefracTime')
     )
 )
 
@@ -190,7 +196,6 @@ genn_lif_sfa_rr = (
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
-        ('refrac_time','RefracTime'),
         ('tau_sfa',    'TauSfa'),
         ('e_rev_sfa',  'ESfa'),
         ('tau_rr',     'TauRr'),
@@ -201,6 +206,19 @@ genn_lif_sfa_rr = (
         ('q_rr',       '_QRR')
     )
 )
+
+#  genn_gif = (
+#      # definitions
+#      {
+#          'simCode' : '''
+#
+#          ''',
+#
+#          'thresholdConditionCode' : '',
+#
+#          'resetCode' : '',
+#
+#          'paramNames'
 
 genn_adexp = (
     # definitions
@@ -270,12 +288,14 @@ genn_adexp = (
         ('tau_w',      'tauW'),
         ('v_thresh',   'vThresh'),
         ('v',          'V'),
-        ('w',          'W')
+        ('w',          'W'),
+        ('g_leak',     'gL'),
+        ('e_leak',     'eL'),
     )
 )
 
-expDecay = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[0]))
-initExp = GeNNModel.createDPFClass(lambda pars, dt: (pars[0] * (1.0 - np.exp(-dt / pars[0]))) * (1.0 / dt))
+expDecay = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[0]))()
+initExp = GeNNModel.createDPFClass(lambda pars, dt: (pars[0] * (1.0 - np.exp(-dt / pars[0]))) * (1.0 / dt))()
 genn_exp_curr = (
     # definitions
     {
@@ -289,13 +309,12 @@ genn_exp_curr = (
     },
     # translations
     (
-        #('RefracTime', 'RefracTime'),
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau')
     )
 )
 
-initAlpha = GeNNModel.createDPFClass(lambda pars, dt: np.exp(1) / pars[0])
+initAlpha = GeNNModel.createDPFClass(lambda pars, dt: np.exp(1) / pars[0])()
 genn_alpha_curr = (
     # definitions
     {
@@ -314,10 +333,8 @@ genn_alpha_curr = (
     },
     # translations
     (
-        # TODO: x -- additional var?
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
-        ('x',          'x')
     )
 )
 genn_alpha_cond = (
@@ -338,20 +355,77 @@ genn_alpha_cond = (
     },
     # translations
     (
-        # TODO: x -- additional var?
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
-        ('x',          'x')
+    )
+)
+
+isi = GeNNModel.createDPFClass(lambda pars, dt: 1000 / (pars[0] * dt))()
+genn_sspoisson = (
+    # definitions
+    {
+        'simCode' : '''
+            oldSpike = false;
+            if($(timeStepToSpike) <= 0.0f) {
+                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+            }
+            $(timeStepToSpike) -= 1.0;
+        ''',
+
+        'thresholdConditionCode' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
+
+        'paramNames' : ['rate'],
+        'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
+                          ('duration', 'scalar')],
+        'derivedParams' : [('isi', isi)]
+    },
+    # translations
+    (
+        ('rate',     'rate'),
+        ('start',    'spikeStart'),
+        ('duration', 'duration')
+    )
+)
+
+genn_sspoisson_ref = (
+    # definitions
+    {
+        'simCode' : '''
+            oldSpike = false;
+            if($(timeStepToSpike) <= 0.0f) {
+                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+            }
+            $(timeStepToSpike) -= 1.0;
+            $(RefracTime) -= DT;
+        ''',
+
+        'thresholdConditionCode' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
+
+        'resetCode' : '$(RefracTime) = $(TauRefrac)',
+
+        'paramNames' : ['rate', 'TauRefrac'],
+        'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
+                          ('duration', 'scalar'), ('RefracTime', 'scalar')],
+        'derivedParams' : [('isi', isi)]
+    },
+    # translations
+    (
+        ('rate',       'rate'),
+        ('start',      'spikeStart'),
+        ('duration',   'duration'),
+        ('tau_refrac', 'TauRefrac')
     )
 )
 
 class IF_curr_alpha(cells.IF_curr_alpha, GeNNStandardCellType):
     __doc__ = cells.IF_curr_alpha.__doc__
     
-    default_initial_values = cells.IF_curr_alpha.default_initial_values
-    default_initial_values['refrac_time'] = 0.0
+    additional_defaults = {
+        'RefracTime' : 0.0,
+        'x'          : 0.0
+    }
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -365,8 +439,9 @@ class IF_curr_alpha(cells.IF_curr_alpha, GeNNStandardCellType):
 class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
     __doc__ = cells.IF_curr_exp.__doc__
 
-    default_initial_values = cells.IF_curr_exp.default_initial_values
-    default_initial_values['refrac_time'] = 0.0
+    additional_defaults = {
+        'RefracTime' : 0.0,
+    }
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -380,8 +455,10 @@ class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
 class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
     __doc__ = cells.IF_cond_alpha.__doc__
     
-    default_initial_values = cells.IF_cond_alpha.default_initial_values
-    default_initial_values['refrac_time'] = 0.0
+    additional_defaults = {
+        'RefracTime' : 0.0,
+        'x'          : 0.0
+    }
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -395,8 +472,9 @@ class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
 class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp.__doc__
     
-    default_initial_values = cells.IF_cond_exp.default_initial_values
-    default_initial_values['refrac_time'] = 0.0
+    additional_defaults = {
+        'RefracTime' : 0.0,
+    }
 
     translations = build_translations(
         *(genn_lif[1]),
@@ -415,6 +493,12 @@ class IF_facets_hardware1(cells.IF_facets_hardware1):
 class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
     __doc__ = cells.HH_cond_exp.__doc__
 
+    additional_defaults = {
+        'm' : 0.5,
+        'h' : 0.5,
+        'n' : 0.5
+    }
+
     translations = build_translations(
         ('gbar_Na',    'gNa'),
         ('gbar_K',     'gK'),
@@ -424,9 +508,9 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
         ('e_rev_K',    'EK'),
         ('e_rev_leak', 'El'),
         ('v',          'V'),
-        ('m',          'm'),
-        ('h',          'h'),
-        ('n',          'n'),
+        #  ('m',          'm'),
+        #  ('h',          'h'),
+        #  ('n',          'n'),
         ('e_rev_E',    'exc_E'),
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
@@ -435,13 +519,6 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
         ('i_offset',   'I_OFFSET'),
     )
 
-    default_initial_values = cells.HH_cond_exp.default_initial_values
-    default_initial_values.update({
-        'm' : 0.5,
-        'h' : 0.5,
-        'n' : 0.5
-    })
-
     genn_neuron = libgenn.NeuronModels.TraubMiles()
     genn_postsyn = libgenn.PostsynapticModels.ExpCond()
 
@@ -449,8 +526,9 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
 class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp_gsfa_grr.__doc__
 
-    default_initial_values = cells.IF_cond_exp_gsfa_grr.default_initial_values
-    default_initial_values['refrac_time'] = 0.0
+    additional_defaults = {
+        'RefracTime' : 0.0,
+    }
 
     translations = build_translations(
         *(genn_lif_sfa_rr[1]),
@@ -466,42 +544,48 @@ class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
 class SpikeSourcePoisson(cells.SpikeSourcePoisson, GeNNStandardCellType):
     __doc__ = cells.SpikeSourcePoisson.__doc__
 
+    additional_defaults = {
+        'timeStepToSpike' : 0.0,
+    }
+
     translations = build_translations(
-        ('start',    'START'),
-        ('rate',     'INTERVAL',  "1000.0/rate",  "1000.0/INTERVAL"),
-        ('duration', 'DURATION'),
+        *(genn_sspoisson[1])
     )
+
+    genn_neuron = GeNNModel.createCustomNeuronClass('SpikeSourcePoisson', **(genn_sspoisson[0]))()
+    genn_postsyn = libgenn.PostsynapticModels.DeltaCurr()
+
+class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStandardCellType):
+    __doc__ = cells.SpikeSourcePoissonRefractory.__doc__
+
+    additional_defaults = {
+        'timeStepToSpike' : 0.0,
+        'RefraTime' : 0.0
+    }
+
+    translations = build_translations(
+        *(genn_sspoisson_ref[1])
+    )
+
+    genn_neuron = GeNNModel.createCustomNeuronClass('SpikeSourcePoissonRefractory',
+                                                    **(genn_sspoisson_ref[0]))()
+    genn_postsyn = libgenn.PostsynapticModels.DeltaCurr()
 
 
 class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
 
+    additional_defaults = {
+        'startSpike' : [],
+        'endSpike'   : []
+    }
+
     translations = build_translations(
-        ('e_rev_E',     'exc_E'),
-        ('e_rev_I',     'inh_E'),
-        ('tau_syn_E',   'exc_tau'),
-        ('tau_syn_I',   'inh_tau'),
         ('spike_times', 'spikeTimes'),
-        ('start_spike', 'startSpike'),
-        ('end_spike',   'endSpike')
     )
 
-    default_parameters = cells.SpikeSourceArray.default_parameters
-    default_parameters.update({
-        'e_rev_E'   : 0.0,
-        'e_rev_I'   : 0.0,
-        'tau_syn_E' : 1.0,
-        'tau_syn_I' : 1.0
-    })
-
-    default_initial_values = cells.SpikeSourceArray.default_initial_values
-    default_initial_values.update( {
-        'start_spike' : 0,
-        'end_spike'   : 0
-    })
-
     genn_neuron = libgenn.NeuronModels.SpikeSourceArray()
-    genn_postsyn = libgenn.PostsynapticModels.ExpCond()
+    genn_postsyn = libgenn.PostsynapticModels.DeltaCurr()
 
     def get_extra_global_params(self, native_parameters, init_values):
         egps = super(SpikeSourceArray, self).get_extra_global_params(
@@ -518,15 +602,21 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
 
         cumSize = 0
         for i, seq in enumerate(spk_times):
-            converted_vars['startSpike'][i] = cumSize
+            converted_vars['startSpike'].append(cumSize)
             cumSize += len(seq.value)
-            converted_vars['endSpike'][i] = cumSize
+            converted_vars['endSpike'].append(cumSize)
 
         return converted_vars
 
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_alpha_isfa_ista.__doc__
+
+    additional_defaults = {
+        'gL' : 0.1,
+        'eL' : -60.0,
+        'x'  : 0.0
+    }
 
     translations = build_translations(
         *(genn_adexp[1]),
@@ -539,6 +629,12 @@ class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellT
 
 class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_exp_isfa_ista.__doc__
+
+    additional_defaults = {
+        'gL' : 0.1,
+        'eL' : -60.0,
+        'x'  : 0.0
+    }
 
     translations = build_translations(
         *(genn_adexp[1]),
@@ -560,12 +656,12 @@ class Izhikevich(cells.Izhikevich, GeNNStandardCellType):
         ('b',        'b'),
         ('c',        'c'),
         ('d',        'd'),
-        ('i_offset', 'I_OFFSET'),
+        ('i_offset', '_I_OFFSET'),
         ('v'         'V'),
         ('u'         'U')
     )
     standard_receptor_type = True
-    receptor_scale = 1e-3  # synaptic weight is in mV, so need to undo usual weight scaling
+    #receptor_scale = 1e-3  # synaptic weight is in mV, so need to undo usual weight scaling
 
-    genn_neuron = libgenn.NeuronModels.Izhikevich()
+    genn_neuron = libgenn.NeuronModels.IzhikevichVariable()
     genn_postsyn = libgenn.PostsynapticModels.DeltaCurr()
