@@ -43,6 +43,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.mpi_rank = extra_params.get('rank', 0)
     simulator.state.num_processes = extra_params.get('num_processes', 1)
     simulator.state.use_sparse = extra_params.get('use_sparse', False)
+    simulator.state.model.modelName = extra_params.get('model_name', 'GeNNModel')
     return rank()
 
 
@@ -53,6 +54,7 @@ def end(compatible_output=True):
         population.write_data(io, variables)
     simulator.state.write_on_end = []
     # should have common implementation of end()
+    simulator.state.clear()
 
 run, run_until = common.build_run(simulator)
 run_for = run
