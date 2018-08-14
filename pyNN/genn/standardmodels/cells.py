@@ -8,170 +8,25 @@ Standard cells for the GeNN module.
 
 from copy import deepcopy
 import numpy as np
-from pyNN.standardmodels import cells, build_translations, StandardModelType
+from pyNN.standardmodels import cells, build_translations
 from ..simulator import state
 import logging
-import libgenn
 import GeNNModel
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
+from . import GeNNStandardCellType, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
 
-class GeNNStandardCellType(StandardModelType):
-
-    def __init__(self, **parameters):
-        super(GeNNStandardCellType, self).__init__(**parameters);
-        self.translations = build_translations(
-            *(genn_neuron_defs[self.genn_neuron_name].translations),
-            *(genn_postsyn_defs[self.genn_postsyn_name].translations)
-        )
-        self._genn_neuron = None
-        self._genn_postsyn = None
-        self._params_to_vars = set([])
-
-        for param_name in self.native_parameters.keys():
-            if not self.native_parameters[param_name].is_homogeneous:
-                self.params_to_vars = [param_name]
-
-    def translate_dict(self, val_dict):
-        return {self.translations[n]['translated_name'] : v.evaluate()
-                for n, v in val_dict.items() if n in self.translations.keys()}
-
-    def get_native_params(self, native_parameters, init_values, param_names, prefix=''):
-        native_init_values = self.translate_dict(init_values)
-        native_params = {}
-        for pn in param_names:
-            if prefix + pn in native_parameters.keys():
-                native_params[pn] = native_parameters[prefix + pn]
-            elif prefix + pn in native_init_values.keys():
-                native_params[pn] = native_init_values[prefix + pn]
-            elif pn in native_parameters.keys():
-                native_params[pn] = native_parameters[pn]
-            elif pn in native_init_values.keys():
-                native_params[pn] = native_init_values[pn]
-            elif pn in self.extra_parameters:
-                native_params[pn] = self.extra_parameters[pn]
-            else:
-                raise Exception('Variable "{}" or "{}" not found'.format(pn,prefix + pn))
-
-        return native_params
-
-    def get_neuron_params(self, native_parameters, init_values):
-        param_names = list(self.genn_neuron.getParamNames())
-
-        # parameters are single-valued in GeNN
-        return convert_to_array(
-                 self.get_native_params(native_parameters,
-                                        init_values,
-                                        param_names))
-
-    def get_neuron_vars(self, native_parameters, init_values):
-        var_names = [vnt[0] for vnt in self.genn_neuron.getVars()]
-
-        return convert_init_values(
-                    self.get_native_params(native_parameters,
-                                           init_values,
-                                           var_names))
-
-    def get_postsynaptic_params(self, native_parameters, init_values, prefix):
-        param_names = list(self.genn_postsyn.getParamNames())
-
-        # parameters are single-valued in GeNN
-        return convert_to_array(
-                 self.get_native_params(native_parameters,
-                                        init_values,
-                                        param_names,
-                                        prefix))
-
-    def get_postsynaptic_vars(self, native_parameters, init_values, prefix):
-        var_names = [vnt[0] for vnt in self.genn_postsyn.getVars()]
-
-        return convert_init_values(
-                    self.get_native_params(native_parameters,
-                                           init_values,
-                                           var_names,
-                                           prefix))
-
-    def get_extra_global_params(self, native_parameters, init_values):
-        var_names = [vnt[0] for vnt in self.genn_neuron.getExtraGlobalParams()]
-        
-        egps = self.get_native_params(native_parameters, init_values, var_names)
-        # in GeNN world, extra global parameters are defined for the whole population
-        # and not for individual neurons.
-        # The standard model which use extra global params are supposed to override
-        # this function in order to convert values properly.
-        return egps
-
-    @property
-    def genn_neuron(self):
-        if genn_neuron_defs[self.genn_neuron_name].native:
-            return getattr(libgenn.NeuronModels, self.genn_neuron_name)()
-        genn_defs = genn_neuron_defs[self.genn_neuron_name].get_definitions(self._params_to_vars)
-        genn_defs['simCode'] = 'scalar Iinj = 0.0;\n' + genn_defs['simCode']
-        return GeNNModel.createCustomNeuronClass(self.genn_neuron_name, **genn_defs)()
-
-    @property
-    def genn_postsyn(self):
-        if genn_postsyn_defs[self.genn_postsyn_name].native:
-            return getattr(libgenn.PostsynapticModels, self.genn_postsyn_name)()
-        genn_defs = genn_postsyn_defs[self.genn_postsyn_name].get_definitions()
-        return GeNNModel.createCustomPostsynapticClass(self.genn_postsyn_name, **genn_defs)()
-
-    @property
-    def params_to_vars(self):
-        return self._params_to_vars
-
-    @params_to_vars.setter
-    def params_to_vars(self, params_to_vars):
-        self._params_to_vars = self._params_to_vars.union(set(params_to_vars))
-
-class GeNNDefinitions(object):
-
-    def __init__(self, definitions, translations, native=False):
-        self.native = native
-        self._definitions = definitions.keys()
-        self.translations = translations
-        for key, value in definitions.items():
-            setattr(self, key, value)
-
-    @property
-    def translations(self):
-        return self._translations
-
-    @translations.setter
-    def translations(self, translations):
-        self._translations = translations
-
-    @property
-    def definitions(self):
-        return {defname : getattr(self, defname) for defname in self._definitions}
-
-    def get_definitions(self, params_to_vars=None):
-        """get definition for GeNN model
-        Args:
-        params_to_vars -- list with parameters which should be treated as variables in GeNN
-        """
-        defs = self.definitions
-        if params_to_vars is not None:
-            par_names = self.paramNames.copy()
-            var_names = self.varNameTypes.copy()
-            for par in params_to_vars:
-                par_names.remove(par)
-                var_names.append((par, 'scalar'))
-            defs.update({'paramNames' : par_names, 'varNameTypes' : var_names})
-        return defs
-
-ExpTC = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[1]))()
-Rmembrane = GeNNModel.createDPFClass(lambda pars, dt: pars[1] / pars[0])()
 genn_neuron_defs = {}
+
 genn_neuron_defs['IF'] = GeNNDefinitions(
     # definitions
     {
         'simCode' : '''
             if ($(RefracTime) <= 0.0)
             {
-              scalar alpha = (($(Isyn) + $(Ioffset) + Iinj) * $(Rmembrane)) + $(Vrest);
-              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+              scalar alpha = (($(Isyn) + $(Ioffset)) * $(TauM) / $(C)) + $(Vrest);
+              $(V) = alpha - (exp(-DT / $(TauM)) * (alpha - $(V)));
             }
             else
             {
@@ -196,7 +51,6 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
             'TauRefrac'
         ],
 
-        'derivedParams' : [('ExpTC', ExpTC), ('Rmembrane', Rmembrane)],
         'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar')]
     },
     # translations
@@ -212,19 +66,17 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
     )
 )
 
-ExpDecayGSfa = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[7]))()
-ExpDecayGRr = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[8]))()
 genn_neuron_defs['Adapt'] = GeNNDefinitions(
     # definitions
     {
         'simCode' : '''
             if ($(RefracTime) <= 0.0)
             {
-              scalar alpha = (($(Isyn) + $(Ioffset) + Iinj - $(GRr) * ($(V) -
-                $(ERr)) - $(GSfa) * ($(V) - $(ESfa))) * $(Rmembrane)) + $(Vrest);
-              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
-              $(GSfa) *= $(ExpDecayGSfa);
-              $(GRr) *= $(ExpDecayGRr);
+              scalar alpha = (($(Isyn) + $(Ioffset) - $(GRr) * ($(V) -
+                $(ERr)) - $(GSfa) * ($(V) - $(ESfa))) * $(TauM) / $(C)) + $(Vrest);
+              $(V) = alpha - (exp(-DT / $(TauM)) * (alpha - $(V)));
+              $(GSfa) *= exp(-DT / $(TauSfa));
+              $(GRr) *= exp(-DT / $(TauRr));
             }
             else
             {
@@ -258,8 +110,6 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
  
         ],
 
-        'derivedParams' : [('ExpTC', ExpTC), ('Rmembrane', Rmembrane),
-                           ('ExpDecayGRr', ExpDecayGRr), ('ExpDecayGSfa', ExpDecayGSfa)],
         'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar'),
                           ('GSfa', 'scalar'), ('GRr', 'scalar')]
     },
@@ -303,7 +153,7 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
         'simCode' : '''
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
-            const scalar i = $(Isyn) + $(iOffset) + Iinj;
+            const scalar i = $(Isyn) + $(iOffset);
             // If voltage is above artificial spike height
             if($(V) >= $(vSpike)) {
                $(V) = $(vReset);
@@ -379,14 +229,13 @@ genn_neuron_defs['SpikeSourceArray'] = GeNNDefinitions({},
     True # use native
 )
 
-isi = GeNNModel.createDPFClass(lambda pars, dt: 1000 / (pars[0] * dt))()
 genn_neuron_defs['Poisson'] = GeNNDefinitions(
     # definitions
     {
         'simCode' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+                $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
             }
             $(timeStepToSpike) -= 1.0;
         ''',
@@ -396,7 +245,6 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
         'paramNames' : ['rate'],
         'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
                           ('duration', 'scalar')],
-        'derivedParams' : [('isi', isi)]
     },
     # translations
     (
@@ -412,7 +260,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
         'simCode' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+                $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
             }
             $(timeStepToSpike) -= 1.0;
             $(RefracTime) -= DT;
@@ -425,7 +273,6 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
         'paramNames' : ['rate', 'TauRefrac'],
         'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
                           ('duration', 'scalar'), ('RefracTime', 'scalar')],
-        'derivedParams' : [('isi', isi)]
     },
     # translations
     (
@@ -444,8 +291,8 @@ genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
                $(V)=$(c);
                $(U)+=$(d);
             }
-            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset)+Iinj)*DT; //at two times for numerical stability
-            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset)+Iinj)*DT;
+            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT; //at two times for numerical stability
+            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT;
             $(U)+=$(a)*($(b)*$(V)-$(U))*DT;
             //if ($(V) > 30.0){   //keep this only for visualisation -- not really necessaary otherwise
             //  $(V)=30.0;
@@ -479,7 +326,7 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
             for (mt=0; mt < 25; mt++) {
                Imem= -($(m)*$(m)*$(m)*$(h)*$(gNa)*($(V)-($(ENa)))+
                    $(n)*$(n)*$(n)*$(n)*$(gK)*($(V)-($(EK)))+
-                   $(gl)*($(V)-($(El)))-$(Isyn)-$(Ioffset)-Iinj);
+                   $(gl)*($(V)-($(El)))-$(Isyn)-$(Ioffset));
                scalar _a;
                if (lV == -52.0) {
                    _a= 1.28;
@@ -530,34 +377,29 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
     )
 )
 
-expDecay = GeNNModel.createDPFClass(lambda pars, dt: np.exp(-dt / pars[0]))()
-initExp = GeNNModel.createDPFClass(lambda pars, dt: (pars[0] * (1.0 - np.exp(-dt / pars[0]))) * (1.0 / dt))()
 genn_postsyn_defs = {}
 genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
     # definitions
     {
-        'decayCode' : '$(inSyn)*=$(expDecay);',
+        'decayCode' : '$(inSyn)*= exp(-DT / $(tau));',
 
-        'applyInputCode' : '$(Isyn) += $(init) * $(inSyn);',
+        'applyInputCode' : '$(Isyn) += ($(tau) * (1.0 - exp(-DT / $(tau)))) * (1.0 / DT) * $(inSyn);',
 
         'paramNames' : ['tau'],
-
-        'derivedParams' : [('expDecay', expDecay), ('init', initExp)]
     },
     # translations
     (
         ('tau_syn_E',  'exc_tau'),
-        ('tau_syn_I',  'inh_tau')
+        ('tau_syn_I',  'inh_tau'),
     )
 )
 
-initAlpha = GeNNModel.createDPFClass(lambda pars, dt: np.exp(1) / pars[0])()
 genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
     # definitions
     {
         'decayCode' : '''
-            $(x) = $(expDecay) * ((DT * $(inSyn) * $(init)) + $(x));
-            $(inSyn)*=$(expDecay);
+            $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
+            $(inSyn)*=exp(-DT/$(tau));
         ''',
 
         'applyInputCode' : '$(Isyn) += $(x);',
@@ -565,8 +407,6 @@ genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
         'paramNames' : ['tau'],
 
         'varNameTypes' : [('x', 'scalar')],
-
-        'derivedParams' : [('expDecay', expDecay), ('init', initAlpha)]
     },
     # translations
     (
@@ -578,8 +418,8 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
     # definitions
     {
         'decayCode' : '''
-            $(x) = $(expDecay) * ((DT * $(inSyn) * $(init)) + $(x));
-            $(inSyn)*=$(expDecay);
+            $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
+            $(inSyn)*=exp(-DT/$(tau));
         ''',
 
         'applyInputCode' : '$(Isyn) += ($(E) - $(V)) * $(x);',
@@ -587,8 +427,6 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
         'paramNames' : ['tau', 'E'],
 
         'varNameTypes' : [('x', 'scalar')],
-
-        'derivedParams' : [('expDecay', expDecay), ('init', initAlpha)]
     },
     # translations
     (
@@ -617,8 +455,10 @@ class IF_curr_alpha(cells.IF_curr_alpha, GeNNStandardCellType):
 
     genn_neuron_name = 'IF'
     genn_postsyn_name = 'AlphaCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
     
-    extra_parameters = {
+    genn_extra_parameters = {
         'RefracTime' : 0.0,
         'x'          : 0.0
     }
@@ -628,8 +468,10 @@ class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
 
     genn_neuron_name = 'IF'
     genn_postsyn_name = 'ExpCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'RefracTime' : 0.0,
     }
 
@@ -638,8 +480,10 @@ class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
 
     genn_neuron_name = 'IF'
     genn_postsyn_name = 'AlphaCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
     
-    extra_parameters = {
+    genn_extra_parameters = {
         'RefracTime' : 0.0,
         'x'          : 0.0
     }
@@ -649,8 +493,10 @@ class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
 
     genn_neuron_name = 'IF'
     genn_postsyn_name = 'ExpCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
     
-    extra_parameters = {
+    genn_extra_parameters = {
         'RefracTime' : 0.0,
     }
 
@@ -663,8 +509,10 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
 
     genn_neuron_name = 'HH'
     genn_postsyn_name = 'ExpCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'm' : 0.0529324,
         'h' : 0.3176767,
         'n' : 0.5961207
@@ -675,8 +523,10 @@ class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
 
     genn_neuron_name = 'Adapt'
     genn_postsyn_name = 'ExpCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'RefracTime' : 0.0,
     }
 
@@ -685,8 +535,10 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, GeNNStandardCellType):
 
     genn_neuron_name = 'Poisson'
     genn_postsyn_name = 'DeltaCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'timeStepToSpike' : 0.0,
     }
 
@@ -695,8 +547,10 @@ class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStand
 
     genn_neuron_name = 'PoissonRef'
     genn_postsyn_name = 'DeltaCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'timeStepToSpike' : 0.0,
         'RefraTime' : 0.0
     }
@@ -705,8 +559,10 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
     genn_neuron_name = 'SpikeSourceArray'
     genn_postsyn_name = 'DeltaCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'startSpike' : [],
         'endSpike'   : []
     }
@@ -737,8 +593,10 @@ class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellT
     __doc__ = cells.EIF_cond_alpha_isfa_ista.__doc__
     genn_neuron_name = 'AdExp'
     genn_postsyn_name = 'AlphaCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'x'  : 0.0
     }
 
@@ -746,8 +604,10 @@ class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType)
     __doc__ = cells.EIF_cond_exp_isfa_ista.__doc__
     genn_neuron_name = 'AdExp'
     genn_postsyn_name = 'ExpCond'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    extra_parameters = {
+    genn_extra_parameters = {
         'x'  : 0.0
     }
 
@@ -755,6 +615,8 @@ class Izhikevich(cells.Izhikevich, GeNNStandardCellType):
     __doc__ = cells.Izhikevich.__doc__
     genn_neuron_name = 'Izhikevich'
     genn_postsyn_name = 'DeltaCurr'
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
     standard_receptor_type = True
     receptor_scale = 1e-3  # synaptic weight is in mV, so need to undo usual weight scaling
