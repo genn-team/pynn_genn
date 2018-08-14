@@ -23,6 +23,7 @@ class State(common.control.BaseState):
         self.clear()
         self.use_sparse = False
         self.dt = 0.1
+        self.num_current_sources = 0
 
     @property
     def tt( self ):
@@ -57,7 +58,7 @@ class State(common.control.BaseState):
                 rec.init_data_views()
         self.running = True
         while self.t < tstop:
-            self.model.stepTimeGPU()
+            self.model.stepTime()
             self.t += self.dt
             for rec in self.recorders:
                 rec._record_vars(self.t)
