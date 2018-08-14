@@ -9,6 +9,7 @@ class Monitor(object):
         self.start_id = parent.population.first_id
         self.data = None
         self.time = None
+        self.id_data_idx_map = {}
 
     @property
     def id_set(self):
@@ -23,40 +24,45 @@ class Monitor(object):
 
         if self.data is None:
             self.id_set = new_ids
-            self.data = numpy.zeros((1000, len(new_ids)), dtype=float)
-            self.time = numpy.zeros((1000, 1), dtype=float )
-            self.data_size = len(self.data)
-            self.cur = 0
+            self.data = [[] for _ in new_ids]
+            self.time = []
         else:
+            old_id_len = len(self.id_set)
             self.id_set = self.id_set.union(new_ids)
-            self.data.resize((self.data.shape[0], len(self.id_set)))
+            [self.data.append([]) for i in range(len(self.id_set) - old_id_len)]
+
+        iimap_len = len(self.id_data_idx_map)
+        self.id_data_idx_map.update({idd - self.start_id : i + iimap_len for i, idd in enumerate(new_ids)})
 
         self.sampling_interval = sampling_interval or 1
 
     def get_data(self, ids):
-        ids = [idd - self.start_id for idd in self._id_set]
-        return self.data[:self.cur, ids]
+        if isinstance(ids, list):
+            ids = [idd - self.start_id for idd in ids]
+        else:
+            ids = ids - self.start_id
+
+        data_ids = [self.id_data_idx_map[idd] for idd in ids]
+
+        return numpy.array(self.data)[data_ids,:].T if len(self.data) > 1 else numpy.array(self.data).T
 
     def get_time(self):
-        return self.time[:self.cur]
+        return self.time
 
-    def enlarge_storage(self):
-        data_shape = list(self.data.shape)
-        data_shape[0] *= 2
-        self.data.resize(data_shape)
-        self.time.resize((data_shape[0], 1))
-        self.data_size = data_shape[0]
+    def enlarge_storage(self, idx):
+        self.data_size[idx] *= 2
+        self.data[idx].resize((self.data_size[idx],))
+        if self.data_size[idx]/2 <= len(self.time):
+            self.time.resize((self.data_size[idx],))
 
     def __call__(self, t):
         """Fetch new data"""
 
         if (t % self.sampling_interval < 1):
-            self.time[self.cur] = t
-            self.data[self.cur, :] = self.data_view[self.ids]
+            self.time.append(t)
+            for idd, i in self.id_data_idx_map.items():
+                self.data[i].append(self.data_view[idd])
 
-            self.cur += 1
-            if self.cur == self.data_size:
-                self.enlarge_storage()
 
 class StateMonitor(Monitor):
 
@@ -77,26 +83,19 @@ class SpikeMonitor(Monitor):
         super(SpikeMonitor, self).__init__(parent)
 
     def init_data_view(self):
-        self.spike_view = (self.recorder._simulator.state.model.neuronPopulations
-                [self.recorder.population.label].spikes)
-        self.spike_que = (self.recorder._simulator.state.model.neuronPopulations
-                [self.recorder.population.label].spikeQuePtr)
-        self.spike_count = (self.recorder._simulator.state.model.neuronPopulations
-                [self.recorder.population.label].spikeCount)
+        self.pop = (self.recorder._simulator.state.model.neuronPopulations
+                    [self.recorder.population.label])
+
+    def get_data(self, ids):
+        return self.data[ids-self.start_id]
 
     def __call__(self, t):
         """Fetch new data"""
 
         if (t % self.sampling_interval < 1):
-            self.time[self.cur] = t
-            if self.spike_count[self.spike_que[0]] > 0:
-                spikes = self.spike_view[self.spike_que[0] :
-                        self.spike_que[0] + self.spike_count[self.spike_que[0]]]
-                self.data[self.cur, spikes] = t
-
-                self.cur += 1
-                if self.cur == self.data_size:
-                    self.enlarge_storage()
+            for i in self.pop.currentSpikes:
+                if i in self.id_data_idx_map:
+                    self.data[self.id_data_idx_map[i]].append(t)
 
 
 class Recorder(recording.Recorder):
@@ -120,12 +119,11 @@ class Recorder(recording.Recorder):
 
     def _record_vars(self, t):
 
-        self._simulator.state.model.pullPopulationSpikesFromDevice(self.population.label)
         if len(self.recorded) > 0:
             if 'spikes' in self.recorded:
-                self._simulator.state.model.pullPopulationSpikesFromDevice(self.population.label)
+                self._simulator.state.model.pullCurrentSpikesFromDevice(self.population.label)
             if len(self.recorded) - ('spikes' in self.recorded) > 0:
-                self._simulator.state.model.pullPopulationStateFromDevice(self.population.label)
+                self._simulator.state.model.pullStateFromDevice(self.population.label)
 
         for monitor in self.monitors.values():
             monitor(t)
