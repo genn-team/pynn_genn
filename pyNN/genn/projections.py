@@ -1,4 +1,5 @@
 from itertools import repeat
+import logging
 from copy import deepcopy
 try:
     from itertools import izip
@@ -10,7 +11,6 @@ from pyNN.connectors import AllToAllConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 from . import simulator
-
 
 class Connection(common.Connection):
     """
@@ -102,15 +102,14 @@ class Projection(common.Projection):
             # override label autogeneration because GeNN does not support unicode
             pre_label = presynaptic_population.label
             post_label = postsynaptic_population.label
-            if hasattr(presynaptic_population, 'parent'):
-                pre_label = presynaptic_population.grandparent.label
-            if hasattr(postsynaptic_population, 'parent'):
-                post_label = postsynaptic_population.grandparent.label
             if pre_label and post_label:
                 # adding a number to each projection to avoid collisions
                 # there can be several projections between two populations
                 label = '{}_{}_{}'.format(pre_label, post_label,
                         len(self._simulator.state.projections))
+        # make sure that the label is alphanumeric
+        else:
+            label = ''.join(c for c in label if c.isalnum())
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
                                    space, label)
@@ -207,10 +206,10 @@ class Projection(common.Projection):
 
         wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values)
         wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
+        wupdate_ini['g'] = None
 
         return (wupdate_parameters, wupdate_ini)
 
-    #  @property
     def postsynValues(self, postPop):
 
         if self.receptor_type == 'inhibitory':
@@ -234,7 +233,18 @@ class Projection(common.Projection):
         else:
             matrixType = 'DENSE_INDIVIDUALG'
 
-        prIdc, poIdc, gs = zip(*(self.get('weight', format='list')))
+        if len(self.connections) == 0:
+            logging.warning('Projection {} has no connections. Ignoring.'.format(self.label))
+            return
+        else:
+            prIdc, poIdc, gs = zip(*(self.get('weight', format='list')))
+            delaySteps = getattr(self.connections[0], 'delaySteps')
+            if not np.allclose([getattr(conn, 'delaySteps') for conn in self.connections], delaySteps):
+                delaySteps = int(np.mean([getattr(conn, 'delaySteps') for conn in self.connections]))
+                logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
+                                'Using mean value {} ms for all connections.'.format(
+                                    self.label,
+                                    delaySteps * simulator.state.dt))
         prIdc = np.array(prIdc)
         poIdc = np.array(poIdc)
 
@@ -284,7 +294,7 @@ class Projection(common.Projection):
         simulator.state.model.addSynapsePopulation(
                 self.label,
                 matrixType,
-                int(getattr(self.connections[0], 'delaySteps')),
+                int(delaySteps),
                 prePop.label,
                 postPop.label,
                 self.synapse_type.genn_weightUpdate,
