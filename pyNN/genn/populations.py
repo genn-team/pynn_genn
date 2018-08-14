@@ -59,6 +59,18 @@ class Population(common.Population):
     _simulator = simulator
     _recorder_class = Recorder
     _assembly_class = Assembly
+    _injected_currents = []
+
+    def __init__(self, size, cellclass, cellparams=None, structure=None,
+                 initial_values={}, label=None):
+        """
+        Create a population of neurons all of the same type.
+        """
+        # make sure that the label is alphanumeric
+        if label is not None:
+            label = ''.join( c for c in label if c.isalnum())
+        super(Population, self).__init__(size, cellclass, cellparams, structure,
+                initial_values, label)
 
     def _create_cells(self):
         id_range = numpy.arange(simulator.state.id_counter,
@@ -111,6 +123,23 @@ class Population(common.Population):
 
         for n, v in extra_global.items():
             pop.addExtraGlobalParam(n, v)
+
+        for label, inj_curr, inj_cells in self._injected_currents:
+            inj_ini = inj_curr.get_currentsource_vars()
+            applyIinj = numpy.array([0.0 for i in range( self.size )])
+            applyIinj[[ic - self.first_id for ic in inj_cells]] = 1.0
+            inj_ini.update({'applyIinj' : list(applyIinj)})
+            cs = simulator.state.model.addCurrentSource(
+                    label,
+                    inj_curr.genn_currentsource,
+                    self.label,
+                    inj_curr.get_currentsource_params(),
+                    inj_ini
+            )
+            extra_global = inj_curr.get_extra_global_params()
+
+            for n, v in extra_global.items():
+                cs.addExtraGlobalParam(n, v)
 
     def _set_initial_value_array(self, variable, initial_values):
         pass
