@@ -10,10 +10,10 @@ from string import Template
 from pyNN.standardmodels import synapses, StandardModelType, build_translations
 from ..simulator import state
 import logging
-import pygenn
-import GeNNModel
+from pygenn.genn_model import createCustomWeightUpdateClass
+from pygenn.genn_wrapper.WeightUpdateModels import StaticPulse
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
-from . import GeNNStandardSynapseType, GeNNDefinitions
+from ..model import GeNNStandardSynapseType, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
 
@@ -69,8 +69,7 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
     translations = build_translations(
         ('weight', 'g'),
-        ('delay', 'delaySteps', 1/state.dt),
-    )
+        ('delay', 'delaySteps', 1/state.dt))
 
     def _get_minimum_delay(self):
         d = state.min_delay
@@ -78,7 +77,7 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
             d = state.dt
         return d
 
-    genn_weightUpdate = pygenn.WeightUpdateModels.StaticPulse()
+    genn_weightUpdate = StaticPulse()
 
 
 class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseType):
@@ -105,9 +104,10 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
             d = state.dt
         return d
 
-    genn_weightUpdate = GeNNModel.createCustomWeightUpdateClass('TsodyksMarkramSynapse', **(genn_tsodyksMakram[0]))()
+    genn_weightUpdate = createCustomWeightUpdateClass('TsodyksMarkramSynapse',
+                                                      **(genn_tsodyksMakram[0]))()
 
-genn_stdp = [
+genn_stdp = (
     {
         'paramNames' : [],
         'varNameTypes' : [('g', 'scalar')],
@@ -130,16 +130,15 @@ genn_stdp = [
         ('weight', 'g'),
         ('delay', 'delaySteps', 1/state.dt),
     )
-]
+)
 
 
 class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
     __doc__ = synapses.STDPMechanism.__doc__
 
     base_translations = build_translations(
-        *(genn_stdp[1]),
-        ('dendritic_delay_fraction', '_dendritic_delay_fraction')
-    )
+        ('dendritic_delay_fraction', '_dendritic_delay_fraction'),
+        *genn_stdp[1])
 
     def _get_minimum_delay(self):
         d = state.min_delay
@@ -173,8 +172,8 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
                     self.weight_dependence.boundaryCode
                 )
         )
-        self.genn_weightUpdate = GeNNModel.createCustomWeightUpdateClass('STDP',
-                **settings)()
+        self.genn_weightUpdate = createCustomWeightUpdateClass('STDP',
+                                                               **settings)()
 
 
 
@@ -218,9 +217,7 @@ class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependen
 
     potentiationUpdateCode = 'scalar newWeight = $(g) + update;\n'
 
-    translations = build_translations(
-        *(WeightDependence.wd_translations)
-    )
+    translations = build_translations(*WeightDependence.wd_translations)
 
 
 class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, WeightDependence):
@@ -230,9 +227,7 @@ class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, We
 
     potentiationUpdateCode = 'scalar newWeight = $(g) + $(g) * update;\n'
 
-    translations = build_translations(
-        *(WeightDependence.wd_translations)
-    )
+    translations = build_translations(*WeightDependence.wd_translations)
 
 
 class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiationMultiplicativeDepression, WeightDependence):
@@ -242,9 +237,7 @@ class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiation
 
     potentiationUpdateCode = 'scalar newWeight = $(g) + update;\n'
 
-    translations = build_translations(
-        *(WeightDependence.wd_translations)
-    )
+    translations = build_translations(*WeightDependence.wd_translations)
 
 
 class GutigWeightDependence(synapses.GutigWeightDependence, WeightDependence):
@@ -260,10 +253,9 @@ class GutigWeightDependence(synapses.GutigWeightDependence, WeightDependence):
     potentiationUpdateCode = 'scalar newWeight = $(g) + pow(($(Wmax) - $(g)), $(muPlus)) * update;\n'
 
     translations = build_translations(
-        *(WeightDependence.wd_translations),
         ('mu_plus',  'muPlus'),
-        ('mu_minus', 'muMinus')
-    )
+        ('mu_minus', 'muMinus'),
+        *WeightDependence.wd_translations)
 
 class SpikePairRule(synapses.SpikePairRule):
     __doc__ = synapses.SpikePairRule.__doc__
@@ -298,8 +290,7 @@ class SpikePairRule(synapses.SpikePairRule):
         ('tau_plus',   'tauPlus'),
         ('tau_minus',  'tauMinus'),
         ('A_plus',     'Aplus'),
-        ('A_minus',    'Aminus'),
-    )
+        ('A_minus',    'Aminus'))
 
 
 class Vogels2011Rule(synapses.Vogels2011Rule):
@@ -326,6 +317,5 @@ class Vogels2011Rule(synapses.Vogels2011Rule):
     translations = build_translations(
         ('tau', 'Tau'),
         ('eta', 'Eta'),
-        ('rho', 'Rho')
-    )
+        ('rho', 'Rho'))
 

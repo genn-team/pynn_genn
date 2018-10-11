@@ -1,5 +1,5 @@
 from pyNN import common
-import GeNNModel
+from pygenn import GeNNModel
 
 name = "genn"
 
@@ -18,7 +18,7 @@ class State(common.control.BaseState):
         common.control.BaseState.__init__(self)
         self.mpi_rank = 0
         self.num_processes = 1
-        self.model = GeNNModel.GeNNModel('float', 'GeNNModel')
+        self.model = GeNNModel('float', 'GeNNModel')
         self.min_delay = 0
         self.clear()
         self.use_sparse = False

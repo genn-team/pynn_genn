@@ -201,29 +201,6 @@ class Projection(common.Projection):
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
-    @property
-    def wUpdateValues(self):
-
-        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values)
-        wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
-        wupdate_ini['g'] = None
-
-        return (wupdate_parameters, wupdate_ini)
-
-    def postsynValues(self, postPop):
-
-        if self.receptor_type == 'inhibitory':
-            prefix = 'inh_'
-        else:
-            prefix = 'exc_'
-
-        postsyn_parameters = postPop.celltype.get_postsynaptic_params(
-                postPop._parameters, postPop.initial_values, prefix)
-        postsyn_ini = postPop.celltype.get_postsynaptic_vars(
-                postPop._parameters, postPop.initial_values, prefix)
-
-        return (postsyn_parameters, postsyn_ini)
-
     def _create_native_projection(self):
         """Create a GeNN projection (aka synaptic population)
             This function is supposed to be called by the simulator
@@ -291,16 +268,24 @@ class Projection(common.Projection):
 
         conns = list(zip(prIdc, poIdc))
 
+        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values)
+        wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
+        wupdate_ini['g'] = None
+
+        if self.receptor_type == 'inhibitory':
+            prefix = 'inh_'
+        else:
+            prefix = 'exc_'
+
+        postsyn_parameters = postPop.celltype.get_postsynaptic_params(
+                postPop._parameters, postPop.initial_values, prefix)
+        postsyn_ini = postPop.celltype.get_postsynaptic_vars(
+                postPop._parameters, postPop.initial_values, prefix)
+
         simulator.state.model.addSynapsePopulation(
-                self.label,
-                matrixType,
-                int(delaySteps),
-                prePop.label,
-                postPop.label,
-                self.synapse_type.genn_weightUpdate,
-                *self.wUpdateValues,
-                self.post.celltype.genn_postsyn,
-                *(self.postsynValues(postPop))
-        )
+            self.label, matrixType, int(delaySteps),
+            prePop.label, postPop.label,
+            self.synapse_type.genn_weightUpdate, wupdate_parameters, wupdate_ini,
+            self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
         simulator.state.model.setConnections(self.label, conns, gs)

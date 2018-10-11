@@ -9,9 +9,9 @@ import numpy
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
-import GeNNModel
+from pygenn.genn_model import createDPFClass
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
-from . import GeNNStandardCurrentSource, GeNNDefinitions
+from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
 
@@ -97,9 +97,8 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
         'paramNames' : ['tStart', 'tStop', 'Ampl', 'Freq', 'Phase', 'Offset'],
         'varNameTypes' : [('applyIinj', 'unsigned char')],
         'derivedParams' : [
-            ('Omega', GeNNModel.createDPFClass(lambda pars, dt: pars[3] * 2 * numpy.pi / 1000.0)()),
-            ('PhaseRad', GeNNModel.createDPFClass(lambda pars, dt: pars[4] / 180 * numpy.pi)())
-            ]
+            ('Omega', createDPFClass(lambda pars, dt: pars[3] * 2 * numpy.pi / 1000.0)()),
+            ('PhaseRad', createDPFClass(lambda pars, dt: pars[4] / 180 * numpy.pi)())]
     },
     # translations
     (
@@ -128,9 +127,8 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
         'paramNames' : ['tStart', 'tStop', 'mean', 'sd', '_DT'],
         'varNameTypes' : [('applyIinj', 'unsigned char')],
         'derivedParams' : [
-            ('meanDT', GeNNModel.createDPFClass(lambda pars, dt: pars[2] * pars[4])()),
-            ('sdDT', GeNNModel.createDPFClass(lambda pars, dt: pars[3] * pars[4])())
-            ]
+            ('meanDT', createDPFClass(lambda pars, dt: pars[2] * pars[4])()),
+            ('sdDT', createDPFClass(lambda pars, dt: pars[3] * pars[4])())]
     },
     # translations
     (

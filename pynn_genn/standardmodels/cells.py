@@ -11,9 +11,8 @@ import numpy as np
 from pyNN.standardmodels import cells, build_translations
 from ..simulator import state
 import logging
-import GeNNModel
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
-from . import GeNNStandardCellType, GeNNDefinitions
+from ..model import GeNNStandardCellType, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
 
