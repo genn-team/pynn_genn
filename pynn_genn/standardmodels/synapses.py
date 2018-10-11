@@ -124,7 +124,6 @@ genn_stdp = (
 
         'simCode' : DDTemplate('''
             $(addToInSyn, $(g));
-            $(updatelinsyn);
             scalar dt = $(t) - $(sT_post);
             $${TD_CODE}
         '''),
