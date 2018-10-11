@@ -18,7 +18,6 @@ class State(common.control.BaseState):
         common.control.BaseState.__init__(self)
         self.mpi_rank = 0
         self.num_processes = 1
-        self.model = GeNNModel('float', 'GeNNModel')
         self.min_delay = 0
         self.clear()
         self.use_sparse = False
@@ -64,6 +63,7 @@ class State(common.control.BaseState):
                 rec._record_vars(self.t)
 
     def clear(self):
+        self.model = GeNNModel('float', 'GeNNModel')
         self.populations = []
         self.projections = []
         self.recorders = set([])
