@@ -299,7 +299,7 @@ class Vogels2011Rule(synapses.Vogels2011Rule):
 
     simCode = DDTemplate('''
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
-        const scalar update = scale * exp(-dt / $(Tau)) - $(Rho);
+        const scalar update = scale * (exp(-dt / $(Tau)) - $(Rho));
         $${WD_CODE}
     ''')
 
