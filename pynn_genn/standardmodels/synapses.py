@@ -305,7 +305,7 @@ class Vogels2011Rule(synapses.Vogels2011Rule):
 
     learnPostCode = DDTemplate('''
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
-        const scalar update = scale * exp(-dt / $(Tau));
+        const scalar update = -scale * exp(-dt / $(Tau));
         $${WD_CODE}
     ''')
 
