@@ -201,6 +201,9 @@ class Projection(common.Projection):
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
+    def _get_attributes_as_arrays(self, *names):
+        assert False
+
     def _get_attributes_as_list(self, *names):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
