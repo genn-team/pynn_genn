@@ -17,6 +17,16 @@ from ..model import GeNNStandardSynapseType, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
 
+# Convert delays from milliseconds into timesteps
+# **NOTE** in GeNN delay 0 is one timestep
+def delayMsToSteps(delay, **kwargs):
+    return max(0, (delay / state.dt) - 1)
+
+# Convert delay from timesteps back to milliseconds
+# **NOTE** in GeNN delay 0 is one timestep
+def delayStepsToMs(delaySteps, **kwargs):
+    return (delaySteps + 1.0) * state.dt
+
 class DDTemplate(Template):
     '''Template string class with the delimiter overridden with double $'''
     delimiter = '$$'
@@ -53,7 +63,7 @@ genn_tsodyksMakram = (
     # translations
     (
         ('weight',    'g'),
-        ('delay',     'delaySteps', 1/state.dt),
+        ('delay',     'delaySteps', delayMsToSteps, delayStepsToMs),
         ('U',         'U'),
         ('tau_rec',   'tauRec'),
         ('tau_facil', 'tauFacil'),
@@ -69,7 +79,7 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
     translations = build_translations(
         ('weight', 'g'),
-        ('delay', 'delaySteps', 1/state.dt))
+        ('delay', 'delaySteps', delayMsToSteps, delayStepsToMs))
 
     def _get_minimum_delay(self):
         d = state.min_delay
@@ -128,7 +138,7 @@ genn_stdp = (
     },
     (
         ('weight', 'g'),
-        ('delay', 'delaySteps', 1/state.dt),
+        ('delay', 'delaySteps', delayMsToSteps, delayStepsToMs),
     )
 )
 
