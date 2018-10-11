@@ -201,6 +201,29 @@ class Projection(common.Projection):
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
+    def _get_attributes_as_list(self, *names):
+        # Dig out reference to GeNN model
+        genn_model = self._simulator.state.model
+
+        # Pull projection state from device
+        genn_model.pullStateFromDevice(self.label)
+
+        # Loop through names of variables that are required
+        # **NOTE** no idea why they come as a list inside a tuple
+        variables = []
+        for n in names[0]:
+            if n == "presynaptic_index":
+                assert False
+            elif n == "postsynaptic_index":
+                assert False
+            # Otherwise add view of GeNN variable to list
+            else:
+                var = genn_model.synapsePopulations[self.label].vars[n].view
+                variables.append(var)
+
+        # Unzip into list of tuples and return
+        return zip(*variables)
+
     def _create_native_projection(self):
         """Create a GeNN projection (aka synaptic population)
             This function is supposed to be called by the simulator
@@ -214,7 +237,8 @@ class Projection(common.Projection):
             logging.warning('Projection {} has no connections. Ignoring.'.format(self.label))
             return
         else:
-            prIdc, poIdc, gs = zip(*(self.get('weight', format='list')))
+            prIdc, poIdc, gs = zip(*((c.presynaptic_index, c.postsynaptic_index, c.g)
+                                     for c in self.connections))
             delaySteps = getattr(self.connections[0], 'delaySteps')
             if not np.allclose([getattr(conn, 'delaySteps') for conn in self.connections], delaySteps):
                 delaySteps = int(np.mean([getattr(conn, 'delaySteps') for conn in self.connections]))
