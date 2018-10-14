@@ -312,7 +312,7 @@ class Projection(common.Projection):
         simulator.state.model.addSynapsePopulation(
             self.label, matrixType, int(delaySteps),
             prePop.label, postPop.label,
-            self.synapse_type.genn_weightUpdate, wupdate_parameters, wupdate_ini,
+            self.synapse_type.genn_weightUpdate, wupdate_parameters, wupdate_ini, {}, {},
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
         simulator.state.model.setConnections(self.label, conns, gs)
