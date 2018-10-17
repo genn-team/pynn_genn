@@ -9,7 +9,7 @@ import numpy
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
-from pygenn.genn_model import createDPFClass
+from pygenn.genn_model import create_dpf_class
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
 from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
@@ -21,13 +21,13 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injectionCode' : '''
+        'injection_code' : '''
             if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(amplitude));
             }
         ''',
-        'paramNames' : ['tStart', 'tStop', 'amplitude'],
-        'varNameTypes' : [('applyIinj', 'unsigned char')]
+        'param_names' : ['tStart', 'tStop', 'amplitude'],
+        'var_name_types' : [('applyIinj', 'unsigned char')]
     },
     # translations
     (
@@ -45,16 +45,16 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injectionCode' : '''
+        'injection_code' : '''
             if ($(applyIinj) && $(t) >= $(tStart) && $(t) <= $(tStop)) {
                 if ($(t) >= $(stepTimes)[$(currStep)])
                     ++$(currStep); // having step variable for each neuron is not optimal, but avoids concurrency issues
                 $(injectCurrent, $(stepAmpls)[$(currStep)-1]);
             }
         ''',
-        'paramNames' : ['tStart', 'tStop'],
-        'varNameTypes' : [('applyIinj', 'unsigned char'), ('currStep', 'int')],
-        'extraGlobalParams' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
+        'param_names' : ['tStart', 'tStop'],
+        'var_vame_types' : [('applyIinj', 'unsigned char'), ('currStep', 'int')],
+        'extra_global_params' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
     },
     # translations
     (
@@ -89,16 +89,16 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injectionCode' : '''
+        'injection_code' : '''
             if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(Ampl) * sin($(Omega) * $(t) + $(PhaseRad)) + $(Offset));
             }
         ''',
-        'paramNames' : ['tStart', 'tStop', 'Ampl', 'Freq', 'Phase', 'Offset'],
-        'varNameTypes' : [('applyIinj', 'unsigned char')],
-        'derivedParams' : [
-            ('Omega', createDPFClass(lambda pars, dt: pars[3] * 2 * numpy.pi / 1000.0)()),
-            ('PhaseRad', createDPFClass(lambda pars, dt: pars[4] / 180 * numpy.pi)())]
+        'param_names' : ['tStart', 'tStop', 'Ampl', 'Freq', 'Phase', 'Offset'],
+        'var_name_types' : [('applyIinj', 'unsigned char')],
+        'derived_params' : [
+            ('Omega', create_dpf_class(lambda pars, dt: pars[3] * 2 * numpy.pi / 1000.0)()),
+            ('PhaseRad', create_dpf_class(lambda pars, dt: pars[4] / 180 * numpy.pi)())]
     },
     # translations
     (
@@ -119,16 +119,16 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injectionCode' : '''
+        'injection_code' : '''
             if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(meanDT) + $(gennrand_normal) * $(sdDT));
             }
         ''',
-        'paramNames' : ['tStart', 'tStop', 'mean', 'sd', '_DT'],
-        'varNameTypes' : [('applyIinj', 'unsigned char')],
-        'derivedParams' : [
-            ('meanDT', createDPFClass(lambda pars, dt: pars[2] * pars[4])()),
-            ('sdDT', createDPFClass(lambda pars, dt: pars[3] * pars[4])())]
+        'param_names' : ['tStart', 'tStop', 'mean', 'sd', '_DT'],
+        'var_name_types' : [('applyIinj', 'unsigned char')],
+        'derived_params' : [
+            ('meanDT', create_dpf_class(lambda pars, dt: pars[2] * pars[4])()),
+            ('sdDT', create_dpf_class(lambda pars, dt: pars[3] * pars[4])())]
     },
     # translations
     (

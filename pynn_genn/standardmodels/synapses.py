@@ -10,7 +10,7 @@ from string import Template
 from pyNN.standardmodels import synapses, StandardModelType, build_translations
 from ..simulator import state
 import logging
-from pygenn.genn_model import createCustomWeightUpdateClass
+from pygenn.genn_model import create_custom_weight_update_class
 from pygenn.genn_wrapper.WeightUpdateModels import StaticPulse
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
 from ..model import GeNNStandardSynapseType, GeNNDefinitions
@@ -34,7 +34,7 @@ class DDTemplate(Template):
 genn_tsodyksMakram = (
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             scalar deltaST = $(t) - $(sT_pre);
             $(z) *= exp( -deltaST / $(tauRec) );
             $(z) += $(y) * ( exp( -deltaST / $(tauPsc) ) - 
@@ -50,15 +50,15 @@ genn_tsodyksMakram = (
             $(addToInSyn, $(g) * $(x) * $(u));
             $(updatelinsyn);
         ''',
-        'paramNames' : [
+        'param_names' : [
             'U',        # asymptotic value of probability of release
             'tauRec',   # recovery time from synaptic depression [ms]
             'tauFacil', # time constant for facilitation [ms]
             'tauPsc'    # decay time constant of postsynaptic current [ms]
         ],
-        'varNameTypes' : [ ('g', 'scalar'), ('u', 'scalar'), ('x', 'scalar'),
+        'var_name_types' : [ ('g', 'scalar'), ('u', 'scalar'), ('x', 'scalar'),
             ('y', 'scalar'), ('z', 'scalar') ],
-        'isPreSpikeTimeRequired' : True
+        'is_pre_spike_time_required' : True
     },
     # translations
     (
@@ -87,7 +87,7 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
             d = state.dt
         return d
 
-    genn_weightUpdate = StaticPulse()
+    genn_weight_update = StaticPulse()
 
 
 class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseType):
@@ -114,26 +114,26 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
             d = state.dt
         return d
 
-    genn_weightUpdate = createCustomWeightUpdateClass('TsodyksMarkramSynapse',
+    genn_weight_update = create_custom_weight_update_class('TsodyksMarkramSynapse',
                                                       **(genn_tsodyksMakram[0]))()
 
 genn_stdp = (
     {
-        'paramNames' : [],
-        'varNameTypes' : [('g', 'scalar')],
+        'param_names' : [],
+        'var_name_types' : [('g', 'scalar')],
 
-        'simCode' : DDTemplate('''
+        'sim_code' : DDTemplate('''
             $(addToInSyn, $(g));
             scalar dt = $(t) - $(sT_post);
             $${TD_CODE}
         '''),
-        'learnPostCode' : DDTemplate('''
+        'learn_post_code' : DDTemplate('''
             scalar dt = $(t) - $(sT_pre);
             $${TD_CODE}
         '''),
 
-        'isPreSpikeTimeRequired' : True,
-        'isPostSpikeTimeRequired' : True,
+        'is_pre_spike_time_required' : True,
+        'is_post_spike_time_required' : True,
     },
     (
         ('weight', 'g'),
@@ -163,37 +163,37 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
                 weight, delay)
 
         settings = deepcopy(genn_stdp[0])
-        settings['paramNames'].extend(self.timing_dependence.paramNames)
-        settings['paramNames'].extend(self.weight_dependence.paramNames)
+        settings['param_names'].extend(self.timing_dependence.param_names)
+        settings['paramNames'].extend(self.weight_dependence.param_names)
 
-        settings['varNameTypes'].extend(self.timing_dependence.varNameTypes)
-        settings['varNameTypes'].extend(self.weight_dependence.varNameTypes)
+        settings['var_name_types'].extend(self.timing_dependence.var_name_types)
+        settings['var_name_types'].extend(self.weight_dependence.var_name_types)
 
-        settings['simCode'] = settings['simCode'].substitute(
-                TD_CODE=self.timing_dependence.simCode.substitute(
-                    WD_CODE=self.weight_dependence.depressionUpdateCode)
+        settings['sim_code'] = settings['sim_code'].substitute(
+                TD_CODE=self.timing_dependence.sim_code.substitute(
+                    WD_CODE=self.weight_dependence.depression_update_code)
         )
-        settings['learnPostCode'] = settings['learnPostCode'].substitute(
-                TD_CODE=self.timing_dependence.learnPostCode.substitute(
-                    WD_CODE=self.weight_dependence.potentiationUpdateCode)
+        settings['learn_post_code'] = settings['learn_post_code'].substitute(
+                TD_CODE=self.timing_dependence.learn_post_code.substitute(
+                    WD_CODE=self.weight_dependence.potentiation_update_code)
         )
-        self.genn_weightUpdate = createCustomWeightUpdateClass('STDP',
-                                                               **settings)()
+        self.genn_weight_update = create_custom_weight_updateClass('STDP',
+                                                                  **settings)()
 
 
 
 class WeightDependence(object):
 
-    paramNames = [
+    param_names = [
         'Wmin',     # td + 1 - Minimum weight
         'Wmax',     # td + 2 - Maximum weight
     ]
 
-    varNameTypes = []
+    var_name_types = []
 
-    depressionUpdateCode = None
+    depression_update_code = None
 
-    potentiationUpdateCode = None
+    potentiation_update_code = None
 
     wd_translations = (
         ('w_max',     'Wmax'),
@@ -204,9 +204,9 @@ class WeightDependence(object):
 class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependence):
     __doc__ = synapses.AdditiveWeightDependence.__doc__
 
-    depressionUpdateCode = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
+    depression_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
 
-    potentiationUpdateCode = '$(g) = min($(Wmax), max($(Wmin), $(g) + update));\n'
+    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + update));\n'
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -216,7 +216,7 @@ class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, We
 
     depressionUpdateCode = '$(g) -= ($(g) - $(Wmin)) * update;\n'
 
-    potentiationUpdateCode = '$(g) += ($(Wmax) - $(g)) * update;\n'
+    potentiation_update_code = '$(g) += ($(Wmax) - $(g)) * update;\n'
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -226,7 +226,7 @@ class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiation
 
     depressionUpdateCode = '$(g) -= ($(g) - $(Wmin)) * update;\n'
 
-    potentiationUpdateCode = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
+    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -234,14 +234,14 @@ class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiation
 class GutigWeightDependence(synapses.GutigWeightDependence, WeightDependence):
     __doc__ = synapses.GutigWeightDependence.__doc__
 
-    paramNames = copy(WeightDependence.paramNames)
+    param_names = copy(WeightDependence.param_names)
 
-    paramNames.append('muPlus')
-    paramNames.append('muMinus')
+    param_names.append('muPlus')
+    param_names.append('muMinus')
 
-    depressionUpdateCode = '$(g) -=  pow(($(g) - $(Wmin)), $(muMinus)) * update;\n'
+    depression_update_code = '$(g) -=  pow(($(g) - $(Wmin)), $(muMinus)) * update;\n'
 
-    potentiationUpdateCode = '$(g) += pow(($(Wmax) - $(g)), $(muPlus)) * update;\n'
+    potentiation_update_code = '$(g) += pow(($(Wmax) - $(g)), $(muPlus)) * update;\n'
 
     translations = build_translations(
         ('mu_plus',  'muPlus'),
@@ -251,17 +251,17 @@ class GutigWeightDependence(synapses.GutigWeightDependence, WeightDependence):
 class SpikePairRule(synapses.SpikePairRule):
     __doc__ = synapses.SpikePairRule.__doc__
 
-    paramNames = [
+    param_names = [
         'tauPlus',  # 0 - Potentiation time constant (ms)
         'tauMinus', # 1 - Depression time constant (ms)
         'Aplus',    # 2 - Rate of potentiation
         'Aminus',   # 3 - Rate of depression
     ]
 
-    varNameTypes = []
+    var_name_types = []
 
     # using {.brc} for left{ or right} so that .format() does not freak out
-    simCode = DDTemplate('''
+    sim_code = DDTemplate('''
         if (dt > 0)
         {
             const scalar scale = ($(Wmax) - $(Wmin)) * $(Aminus);
@@ -270,7 +270,7 @@ class SpikePairRule(synapses.SpikePairRule):
         }
     ''')
 
-    learnPostCode = DDTemplate('''
+    learn_post_code = DDTemplate('''
         if (dt > 0)
         {
             const scalar scale = ($(Wmax) - $(Wmin)) * $(Aplus);
@@ -289,21 +289,21 @@ class SpikePairRule(synapses.SpikePairRule):
 class Vogels2011Rule(synapses.Vogels2011Rule):
     __doc__ = synapses.Vogels2011Rule.__doc__
 
-    paramNames = [
+    param_names = [
         'Tau',      # 0 - Plasticity time constant (ms)
         'Rho',      # 1 - Target rate
         'Eta',      # 2 - Learning rate
     ]
 
-    varNameTypes = []
+    var_name_types = []
 
-    simCode = DDTemplate('''
+    sim_code = DDTemplate('''
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
         const scalar update = scale * (exp(-dt / $(Tau)) - $(Rho));
         $${WD_CODE}
     ''')
 
-    learnPostCode = DDTemplate('''
+    learn_post_code = DDTemplate('''
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
         const scalar update = -scale * exp(-dt / $(Tau));
         $${WD_CODE}

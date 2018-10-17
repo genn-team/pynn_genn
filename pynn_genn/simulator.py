@@ -57,7 +57,7 @@ class State(common.control.BaseState):
                 rec.init_data_views()
         self.running = True
         while self.t < tstop:
-            self.model.stepTime()
+            self.model.step_time()
             self.t += self.dt
             for rec in self.recorders:
                 rec._record_vars(self.t)

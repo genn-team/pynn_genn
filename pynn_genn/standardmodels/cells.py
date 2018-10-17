@@ -21,7 +21,7 @@ genn_neuron_defs = {}
 genn_neuron_defs['IF'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             if ($(RefracTime) <= 0.0)
             {
               scalar alpha = (($(Isyn) + $(Ioffset)) * $(TauM) / $(C)) + $(Vrest);
@@ -33,14 +33,14 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
             }
         ''',
 
-        'thresholdConditionCode' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
+        'threshold_condition_code' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
 
-        'resetCode' : '''
+        'reset_code' : '''
             $(V) = $(Vreset);
             $(RefracTime) = $(TauRefrac);
         ''',
 
-        'paramNames' : [
+        'param_names' : [
             'C',          # Membrane capacitance [nF?]
             'TauM',       # Membrane time constant [ms]
             'Vrest',      # Resting membrane potential [mV]
@@ -50,7 +50,7 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
             'TauRefrac'
         ],
 
-        'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar')]
+        'var_name_types' : [('V', 'scalar'), ('RefracTime', 'scalar')]
     },
     # translations
     (
@@ -68,7 +68,7 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
 genn_neuron_defs['Adapt'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             if ($(RefracTime) <= 0.0)
             {
               scalar alpha = (($(Isyn) + $(Ioffset) - $(GRr) * ($(V) -
@@ -83,16 +83,16 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
             }
         ''',
 
-        'thresholdConditionCode' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
+        'threshold_condition_code' : '$(RefracTime) <= 0.0 && $(V) >= $(Vthresh)',
 
-        'resetCode' : '''
+        'reset_code' : '''
             $(V) = $(Vreset);
             $(RefracTime) = $(TauRefrac);
             $(GSfa) += $(QSfa);
             $(GRr) += $(QRr);
         ''',
 
-        'paramNames' : [
+        'param_names' : [
             'C',          # Membrane capacitance [nF]
             'TauM',       # Membrane time constant [ms]
             'Vrest',      # Resting membrane potential [mV]
@@ -109,7 +109,7 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
  
         ],
 
-        'varNameTypes' : [('V', 'scalar'), ('RefracTime', 'scalar'),
+        'var_name_types' : [('V', 'scalar'), ('RefracTime', 'scalar'),
                           ('GSfa', 'scalar'), ('GRr', 'scalar')]
     },
     # translations
@@ -149,7 +149,7 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
 genn_neuron_defs['AdExp'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
             const scalar i = $(Isyn) + $(iOffset);
@@ -175,15 +175,15 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             }
         ''',
 
-        'thresholdConditionCode' : '$(V) > -40',
+        'threshold_condition_code' : '$(V) > -40',
 
-        'resetCode' : '''
+        'reset_code' : '''
             // **NOTE** we reset v to arbitrary plotting peak rather than to actual reset voltage
             $(V) = $(vSpike);
             $(W) += ($(b));
         ''',
 
-        'paramNames' : [
+        'param_names' : [
             'C',        # Membrane capacitance [nF]
             'TauM',     # Membrane time constant [ms]
             'Vrest',    # Resting membrane voltage (Leak reversal potential) [mV]
@@ -197,7 +197,7 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             'iOffset',  # Offset current [nA]
         ],
 
-        'varNameTypes' : [('V', 'scalar'),
+        'var_name_types' : [('V', 'scalar'),
                 ('W', 'scalar')] # adaptation current, [nA]
     },
     # translations
@@ -231,7 +231,7 @@ genn_neuron_defs['SpikeSourceArray'] = GeNNDefinitions({},
 genn_neuron_defs['Poisson'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
                 $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
@@ -239,10 +239,10 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
             $(timeStepToSpike) -= 1.0;
         ''',
 
-        'thresholdConditionCode' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
+        'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
 
-        'paramNames' : ['rate'],
-        'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
+        'param_names' : ['rate'],
+        'var_name_types' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
                           ('duration', 'scalar')],
     },
     # translations
@@ -256,7 +256,7 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
 genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
                 $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
@@ -265,12 +265,12 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
             $(RefracTime) -= DT;
         ''',
 
-        'thresholdConditionCode' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
+        'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
 
-        'resetCode' : '$(RefracTime) = $(TauRefrac)',
+        'reset_code' : '$(RefracTime) = $(TauRefrac)',
 
-        'paramNames' : ['rate', 'TauRefrac'],
-        'varNameTypes' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
+        'param_names' : ['rate', 'TauRefrac'],
+        'var_name_types' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
                           ('duration', 'scalar'), ('RefracTime', 'scalar')],
     },
     # translations
@@ -285,7 +285,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
 genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             if ($(V) >= 30.0){
                $(V)=$(c);
                $(U)+=$(d);
@@ -298,10 +298,10 @@ genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
             //}
         ''',
 
-        'thresholdConditionCode' : '$(V) >= 29.99',
+        'threshold_condition_code' : '$(V) >= 29.99',
 
-        'paramNames' : ['a', 'b', 'c', 'd', 'Ioffset'],
-        'varNameTypes' : [('V', 'scalar'), ('U', 'scalar')],
+        'param_names' : ['a', 'b', 'c', 'd', 'Ioffset'],
+        'var_name_types' : [('V', 'scalar'), ('U', 'scalar')],
     },
     # translations
     (
@@ -318,7 +318,7 @@ genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
 genn_neuron_defs['HH'] = GeNNDefinitions(
     # definitions
     {
-        'simCode' : '''
+        'sim_code' : '''
             scalar Imem;
             unsigned int mt;
             scalar mdt= DT/25.0;
@@ -356,10 +356,10 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
             }
         ''',
 
-        'thresholdConditionCode' : '$(V) >= 0.0',
+        'threshold_condition_code' : '$(V) >= 0.0',
 
-        'paramNames' : ['gNa', 'ENa', 'gK', 'EK', 'gl', 'El', 'C', 'Ioffset'],
-        'varNameTypes' : [('V', 'scalar'), ('m', 'scalar'), ('h', 'scalar'), ('n', 'scalar')]
+        'param_names' : ['gNa', 'ENa', 'gK', 'EK', 'gl', 'El', 'C', 'Ioffset'],
+        'var_name_types' : [('V', 'scalar'), ('m', 'scalar'), ('h', 'scalar'), ('n', 'scalar')]
     },
     # translations
     (
@@ -380,11 +380,11 @@ genn_postsyn_defs = {}
 genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
     # definitions
     {
-        'decayCode' : '$(inSyn)*= exp(-DT / $(tau));',
+        'decay_code' : '$(inSyn)*= exp(-DT / $(tau));',
 
-        'applyInputCode' : '$(Isyn) += ($(tau) * (1.0 - exp(-DT / $(tau)))) * (1.0 / DT) * $(inSyn);',
+        'apply_input_code' : '$(Isyn) += ($(tau) * (1.0 - exp(-DT / $(tau)))) * (1.0 / DT) * $(inSyn);',
 
-        'paramNames' : ['tau'],
+        'param_names' : ['tau'],
     },
     # translations
     (
@@ -396,16 +396,16 @@ genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
 genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
     # definitions
     {
-        'decayCode' : '''
+        'decay_code' : '''
             $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
             $(inSyn)*=exp(-DT/$(tau));
         ''',
 
-        'applyInputCode' : '$(Isyn) += $(x);',
+        'apply_input_code' : '$(Isyn) += $(x);',
 
-        'paramNames' : ['tau'],
+        'param_names' : ['tau'],
 
-        'varNameTypes' : [('x', 'scalar')],
+        'var_name_types' : [('x', 'scalar')],
     },
     # translations
     (
@@ -416,16 +416,16 @@ genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
 genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
     # definitions
     {
-        'decayCode' : '''
+        'decay_code' : '''
             $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
             $(inSyn)*=exp(-DT/$(tau));
         ''',
 
-        'applyInputCode' : '$(Isyn) += ($(E) - $(V)) * $(x);',
+        'apply_input_code' : '$(Isyn) += ($(E) - $(V)) * $(x);',
 
-        'paramNames' : ['tau', 'E'],
+        'param_names' : ['tau', 'E'],
 
-        'varNameTypes' : [('x', 'scalar')],
+        'var_name_types' : [('x', 'scalar')],
     },
     # translations
     (

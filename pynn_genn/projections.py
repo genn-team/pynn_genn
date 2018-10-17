@@ -209,7 +209,7 @@ class Projection(common.Projection):
         genn_model = self._simulator.state.model
 
         # Pull projection state from device
-        genn_model.pullStateFromDevice(self.label)
+        genn_model.pull_state_from_device(self.label)
 
         # Loop through names of variables that are required
         # **NOTE** no idea why they come as a list inside a tuple
@@ -221,7 +221,7 @@ class Projection(common.Projection):
                 assert False
             # Otherwise add view of GeNN variable to list
             else:
-                var = genn_model.synapsePopulations[self.label].vars[n].view
+                var = genn_model.synapse_populations[self.label].vars[n].view
                 variables.append(var)
 
         # Unzip into list of tuples and return
@@ -309,10 +309,10 @@ class Projection(common.Projection):
         postsyn_ini = postPop.celltype.get_postsynaptic_vars(
                 postPop._parameters, postPop.initial_values, prefix)
 
-        simulator.state.model.addSynapsePopulation(
+        pop = simulator.state.model.add_synapse_population(
             self.label, matrixType, int(delaySteps),
             prePop.label, postPop.label,
-            self.synapse_type.genn_weightUpdate, wupdate_parameters, wupdate_ini, {}, {},
+            self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, {}, {},
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
-        simulator.state.model.setConnections(self.label, conns, gs)
+        pop.set_connections(conns, gs)
