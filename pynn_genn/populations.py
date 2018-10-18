@@ -108,13 +108,9 @@ class Population(common.Population):
                 self.initial_values
         )
 
-        pop = simulator.state.model.add_neuron_population(
-                self.label,
-                self.size,
-                self.celltype.genn_neuron,
-                neuron_params,
-                neuron_ini
-        )
+        self._pop = simulator.state.model.add_neuron_population(
+            self.label, self.size, self.celltype.genn_neuron,
+            neuron_params, neuron_ini)
 
         extra_global = self.celltype.get_extra_global_params(
                 self._parameters,
@@ -122,7 +118,7 @@ class Population(common.Population):
         )
 
         for n, v in extra_global.items():
-            pop.add_extra_global_param(n, v)
+            self._pop.add_extra_global_param(n, v)
 
         for label, inj_curr, inj_cells in self._injected_currents:
             inj_ini = inj_curr.get_currentsource_vars()
@@ -130,12 +126,9 @@ class Population(common.Population):
             applyIinj[[ic - self.first_id for ic in inj_cells]] = 1.0
             inj_ini.update({'applyIinj' : list(applyIinj)})
             cs = simulator.state.model.add_current_source(
-                    label,
-                    inj_curr.genn_currentsource,
-                    self.label,
-                    inj_curr.get_currentsource_params(),
-                    inj_ini
-            )
+                label, inj_curr.genn_currentsource, self.label,
+                inj_curr.get_currentsource_params(), inj_ini)
+
             extra_global = inj_curr.get_extra_global_params()
 
             for n, v in extra_global.items():

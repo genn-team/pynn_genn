@@ -73,8 +73,7 @@ class StateMonitor(Monitor):
                 [variable]['translated_name'])
 
     def init_data_view(self):
-        self.data_view = (self.recorder._simulator.state.model.neuron_populations
-                [self.recorder.population.label].vars[self.translated].view)
+        self.data_view = (self.recorder.population._pop.vars[self.translated].view)
 
 
 class SpikeMonitor(Monitor):
@@ -83,8 +82,7 @@ class SpikeMonitor(Monitor):
         super(SpikeMonitor, self).__init__(parent)
 
     def init_data_view(self):
-        self.pop = (self.recorder._simulator.state.model.neuron_populations
-                    [self.recorder.population.label])
+        pass
 
     def get_data(self, ids):
         return self.data[ids-self.start_id]
@@ -93,7 +91,7 @@ class SpikeMonitor(Monitor):
         """Fetch new data"""
 
         if (t % self.sampling_interval < 1):
-            for i in self.pop.current_spikes:
+            for i in self.recorder.population._pop.current_spikes:
                 if i in self.id_data_idx_map:
                     self.data[self.id_data_idx_map[i]].append(t)
 
@@ -118,7 +116,6 @@ class Recorder(recording.Recorder):
             monitor.init_data_view()
 
     def _record_vars(self, t):
-
         if len(self.recorded) > 0:
             if 'spikes' in self.recorded:
                 self._simulator.state.model.pull_current_spikes_from_device(self.population.label)

@@ -221,8 +221,7 @@ class Projection(common.Projection):
                 assert False
             # Otherwise add view of GeNN variable to list
             else:
-                var = genn_model.synapse_populations[self.label].vars[n].view
-                variables.append(var)
+                variables.append(self._pop.vars[n].view)
 
         # Unzip into list of tuples and return
         return zip(*variables)
@@ -309,10 +308,10 @@ class Projection(common.Projection):
         postsyn_ini = postPop.celltype.get_postsynaptic_vars(
                 postPop._parameters, postPop.initial_values, prefix)
 
-        pop = simulator.state.model.add_synapse_population(
+        self._pop = simulator.state.model.add_synapse_population(
             self.label, matrixType, int(delaySteps),
-            prePop.label, postPop.label,
+            prePop._pop, postPop._pop,
             self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, {}, {},
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
-        pop.set_connections(conns, gs)
+        self._pop.set_connections(conns, gs)
