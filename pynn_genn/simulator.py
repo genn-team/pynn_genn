@@ -20,7 +20,6 @@ class State(common.control.BaseState):
         self.num_processes = 1
         self.min_delay = 0
         self.clear()
-        self.use_sparse = False
         self.dt = 0.1
         self.num_current_sources = 0
 
