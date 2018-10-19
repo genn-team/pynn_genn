@@ -42,8 +42,8 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get('rank', 0)
     simulator.state.num_processes = extra_params.get('num_processes', 1)
-    simulator.state.use_sparse = extra_params.get('use_sparse', False)
     simulator.state.model.model_name = extra_params.get('model_name', 'GeNNModel')
+    simulator.state.model.cpu_only = extra_params.get('cpu_only', False)
     return rank()
 
 
