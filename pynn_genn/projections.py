@@ -1,6 +1,8 @@
+from collections import defaultdict, Iterable
 from itertools import repeat
 import logging
 from copy import deepcopy
+from six import iteritems, itervalues
 try:
     from itertools import izip
 except ImportError:
@@ -12,6 +14,8 @@ from pyNN.core import ezip
 from pyNN.space import Space
 from . import simulator
 
+from contexts import ContextMixin
+'''
 class Connection(common.Connection):
     """
     Store an individual plastic connection and information about it. Provide an
@@ -89,9 +93,9 @@ class Connection(common.Connection):
     def as_dict(self, *attribute_names):
         # should return indices, not IDs for source and target
         return dict([(name, getattr(self, name)) for name in attribute_names])
+'''
 
-
-class Projection(common.Projection):
+class Projection(common.Projection, ContextMixin):
     __doc__ = common.Projection.__doc__
     _simulator = simulator
 
@@ -113,16 +117,17 @@ class Projection(common.Projection):
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
                                    space, label)
+        
+        # Initialise the context stack
+        ContextMixin.__init__(self, {})
 
-        #  Create connections
-        self.connections = []
-        connector.connect(self)
-        self.connections = np.array(self.connections)
-        self.use_sparse = True
-        if isinstance(connector, AllToAllConnector):
-            self.use_sparse = False
+        # **TODO** leave type up to Connector types
+        self.use_sparse = (False if isinstance(connector, AllToAllConnector)
+                           else True)
+    
         # process assemblies
         if hasattr(self.pre, 'populations') and not self.pre.single_population():
+            assert False
             setattr(self, 'subprojections', [])
             self.subprojections = []
             pre_pops = self.pre.populations
@@ -162,6 +167,7 @@ class Projection(common.Projection):
                     pre_cum_size += pre_pop.size
 
         elif hasattr(self.post, 'populations') and not self.post.single_population():
+            assert False
             setattr(self, 'subprojections', [])
             self.subprojections = []
             post_pops = self.post.populations
@@ -188,16 +194,21 @@ class Projection(common.Projection):
     def set(self, **attributes):
         raise NotImplementedError
 
+    @ContextMixin.use_contextual_arguments()
     def _convergent_connect(self, presynaptic_indices, postsynaptic_index,
+                            conn_pre_indices, conn_post_indices, conn_params,
                             **connection_parameters):
-        for name, value in connection_parameters.items():
-            if isinstance(value, float):
-                connection_parameters[name] = repeat(value)
-        for pre_idx, other in ezip(presynaptic_indices, *connection_parameters.values()):
-            other_attributes = dict(zip(connection_parameters.keys(), other))
-            self.connections.append(
-                Connection(pre_idx, postsynaptic_index, **other_attributes)
-            )
+        num_synapses = len(presynaptic_indices)
+        conn_pre_indices.extend(presynaptic_indices)
+        conn_post_indices.extend(repeat(postsynaptic_index, times=num_synapses))
+        
+        # Loop through connection _parameters
+        for p_name, p_val in iteritems(connection_parameters):
+            if isinstance(p_val, Iterable):
+                conn_params[p_name].extend(p_val)
+            else:
+                conn_params[p_name].extend(repeat(p_val, times=num_synapses))
+
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
@@ -235,68 +246,90 @@ class Projection(common.Projection):
         else:
             matrixType = 'DENSE_INDIVIDUALG'
 
-        if len(self.connections) == 0:
-            logging.warning('Projection {} has no connections. Ignoring.'.format(self.label))
+        #  Create connections rows to hold synapses
+        pre_indices = []
+        post_indices = []
+        conn_params = defaultdict(list)
+        
+        # Build connectivity
+        with self.get_new_context(conn_pre_indices=pre_indices, 
+                                  conn_post_indices=post_indices,
+                                  conn_params=conn_params):
+            self._connector.connect(self)
+        
+        pre_indices = np.asarray(pre_indices, dtype=np.uint32)
+        post_indices = np.asarray(post_indices, dtype=np.uint32)
+        
+        num_synapses = len(pre_indices)
+        if num_synapses == 0:
+            logging.warning("Projection {} has no connections. "
+                            "Ignoring.".format(self.label))
             return
+        
+        # Extract delays
+        delay_steps = conn_params["delaySteps"]
+        
+        # If delays aren't all the same
+        # **TODO** add support for heterogeneous sdendritic delay
+        if not np.allclose(delay_steps, delay_steps[0]):
+            # Get average delay
+            delay_steps = int(round(np.mean(delay_steps)))
+            logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
+                            'Using mean value {} ms for all connections.'.format(
+                                self.label,
+                                average_delay * simulator.state.dt))
         else:
-            prIdc, poIdc, gs = zip(*((c.presynaptic_index, c.postsynaptic_index, c.g)
-                                     for c in self.connections))
-            delaySteps = getattr(self.connections[0], 'delaySteps')
-            if not np.allclose([getattr(conn, 'delaySteps') for conn in self.connections], delaySteps):
-                delaySteps = int(np.mean([getattr(conn, 'delaySteps') for conn in self.connections]))
-                logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
-                                'Using mean value {} ms for all connections.'.format(
-                                    self.label,
-                                    delaySteps * simulator.state.dt))
-        prIdc = np.array(prIdc)
-        poIdc = np.array(poIdc)
-
+            delay_steps = int(delay_steps[0])
+        
         prePop = self.pre
         # if assembly with one base population
         if hasattr(self.pre, 'populations'):
+            assert False
             prePop = self.pre.populations[0]
             if hasattr(prePop, 'parent'):
                 prePop = prePop.grandparent;
             popsIdc = []
             cumSize = 0
             for pop in self.pre.populations:
-                mask = np.logical_and(cumSize <=  prIdc, prIdc < (cumSize + pop.size))
-                popsIdc.append(prIdc[mask] - cumSize)
+                mask = np.logical_and(cumSize <=  pre_indices, 
+                                      pre_indices < (cumSize + pop.size))
+                popsIdc.append(pre_indices[mask] - cumSize)
                 cumSize += pop.size
                 if hasattr(pop, 'parent'):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
-            prIdc = [idx for idx in idc for idc in popsIdc]
+            pre_indices = [idx for idx in idc for idc in popsIdc]
 
         # if population view
         elif hasattr(prePop, 'parent'):
-            prIdc = prePop.index_in_grandparent(list(prIdc))
+            assert False
+            pre_indices = prePop.index_in_grandparent(list(pre_indices))
             prePop = prePop.grandparent;
 
         postPop = self.post
         # if assembly with one base population
         if hasattr(self.post, 'populations'):
+            assert False
             postPop = self.post.populations[0]
             if hasattr(postPop, 'parent'):
                 postPop = postPop.grandparent;
             popsIdc = []
             cumSize = 0
             for pop in self.post.populations:
-                mask = np.logical_and(cumSize <=  poIdc, poIdc < (cumSize + pop.size))
-                popsIdc.append(poIdc[mask] - cumSize)
+                mask = np.logical_and(cumSize <=  post_indices, 
+                                      post_indices < (cumSize + pop.size))
+                popsIdc.append(post_indices[mask] - cumSize)
                 cumSize += pop.size
                 if hasattr(pop, 'parent'):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
-            prIdc = [idx for idc in popsIdc for idx in idc]
+            pre_indices = [idx for idc in popsIdc for idx in idc]
         # if population view
         elif hasattr(postPop, 'parent'):
-            poIdc = postPop.index_in_grandparent(list(poIdc))
+            assert Falses
+            post_indices = postPop.index_in_grandparent(post_indices)
             postPop = postPop.grandparent;
 
-        conns = list(zip(prIdc, poIdc))
-
-        wupdate_parameters = self.synapse_type.get_params(self.connections, self.initial_values)
-        wupdate_ini = self.synapse_type.get_vars(self.connections, self.initial_values)
-        wupdate_ini['g'] = None
+        wupdate_parameters = self.synapse_type.get_params(conn_params, self.initial_values)
+        wupdate_ini = self.synapse_type.get_vars(conn_params, self.initial_values)
 
         if self.receptor_type == 'inhibitory':
             prefix = 'inh_'
@@ -309,9 +342,9 @@ class Projection(common.Projection):
                 postPop._parameters, postPop.initial_values, prefix)
 
         self._pop = simulator.state.model.add_synapse_population(
-            self.label, matrixType, int(delaySteps),
+            self.label, matrixType, delay_steps,
             prePop._pop, postPop._pop,
             self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, {}, {},
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
-        self._pop.set_connections(conns, gs)
+        self._pop.set_connections(pre_indices, post_indices)

@@ -128,39 +128,41 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         return {self.translations[n]['translated_name'] : convert_to_array(v)
                 for n, v in val_dict.items() if n in self.translations.keys()}
 
-    def get_native_params(self, connections, init_values, param_names):
-        init_values_ = self.default_initial_values.copy()
-        init_values_.update(init_values)
-        native_init_values = self.translate_dict(init_values_)
+    def get_native_params(self, conn_params, init_values, param_names):
+        default_init_values = self.default_initial_values.copy()
+        default_init_values.update(init_values)
+        native_init_values = self.translate_dict(default_init_values)
         native_params = {}
+        
+        # Loop through parameters
         for pn in param_names:
-            if any([hasattr(conn, pn) for conn in connections]):
-                native_params[pn] = []
-                for conn in connections:
-                    if hasattr(conn, pn):
-                        native_params[pn].append(getattr(conn, pn))
-            elif pn in native_init_values.keys():
+            # If they are already specified, 
+            # copy parameter directly from connections
+            if pn in conn_params:
+                native_params[pn] = conn_params[pn]
+            # Otherwise, use default
+            # **NOTE** at this point it is fine for these to be scalar
+            elif pn in native_init_values:
                 native_params[pn] = native_init_values[pn]
             else:
                 raise Exception('Variable "{}" not found'.format(pn))
 
-        native_init_values['g'] = None
         return native_params
 
-    def get_params(self, connections, init_values):
+    def get_params(self, conn_params, init_values):
         param_names = list(self.genn_weight_update.get_param_names())
 
         # parameters are single-valued in GeNN
         return convert_to_array(
-                 self.get_native_params(connections,
+                 self.get_native_params(conn_params,
                                         init_values,
                                         param_names))
 
-    def get_vars(self, connections, init_values):
+    def get_vars(self, conn_params, init_values):
         var_names = [vnt[0] for vnt in self.genn_weight_update.get_vars()]
 
         return convert_init_values(
-                    self.get_native_params(connections,
+                    self.get_native_params(conn_params,
                                            init_values,
                                            var_names))
 
