@@ -347,4 +347,4 @@ class Projection(common.Projection, ContextMixin):
             self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, {}, {},
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
-        self._pop.set_connections(pre_indices, post_indices)
+        self._pop.set_sparse_connections(pre_indices, post_indices)
