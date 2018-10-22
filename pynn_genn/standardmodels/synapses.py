@@ -164,7 +164,7 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
 
         settings = deepcopy(genn_stdp[0])
         settings['param_names'].extend(self.timing_dependence.param_names)
-        settings['paramNames'].extend(self.weight_dependence.param_names)
+        settings['param_names'].extend(self.weight_dependence.param_names)
 
         settings['var_name_types'].extend(self.timing_dependence.var_name_types)
         settings['var_name_types'].extend(self.weight_dependence.var_name_types)
@@ -177,8 +177,8 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
                 TD_CODE=self.timing_dependence.learn_post_code.substitute(
                     WD_CODE=self.weight_dependence.potentiation_update_code)
         )
-        self.genn_weight_update = create_custom_weight_updateClass('STDP',
-                                                                  **settings)()
+        self.genn_weight_update = create_custom_weight_update_class('STDP',
+                                                                    **settings)()
 
 
 
