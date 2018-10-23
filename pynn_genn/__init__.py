@@ -8,7 +8,9 @@ really running simulations.
 :license: CeCILL, see LICENSE for details.
 """
 
+import inspect
 import logging
+import os
 from pyNN import common
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, DEFAULT_MIN_DELAY
 from pyNN.connectors import *
@@ -42,8 +44,18 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get('rank', 0)
     simulator.state.num_processes = extra_params.get('num_processes', 1)
-    simulator.state.model.model_name = extra_params.get('model_name', 'GeNNModel')
     simulator.state.model.cpu_only = extra_params.get('cpu_only', False)
+
+    # If a model name is specified, use that
+    if 'model_name' in extra_params:
+        simulator.state.model.model_name = extra_params['model_name']
+    # Otherwise
+    else:
+        # Get the parent frame from our current frame (whatever called setup)
+        calframe = inspect.getouterframes(inspect.currentframe(), 1)
+
+        # Remove extension from its filename and use as model name
+        simulator.state.model.model_name = os.path.splitext(calframe[1][1])[0]
     return rank()
 
 
