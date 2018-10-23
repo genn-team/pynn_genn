@@ -214,7 +214,7 @@ class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependen
 class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, WeightDependence):
     __doc__ = synapses.MultiplicativeWeightDependence.__doc__
 
-    depressionUpdateCode = '$(g) -= ($(g) - $(Wmin)) * update;\n'
+    depression_update_code = '$(g) -= ($(g) - $(Wmin)) * update;\n'
 
     potentiation_update_code = '$(g) += ($(Wmax) - $(g)) * update;\n'
 
@@ -224,7 +224,7 @@ class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, We
 class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiationMultiplicativeDepression, WeightDependence):
     __doc__ = synapses.AdditivePotentiationMultiplicativeDepression.__doc__
 
-    depressionUpdateCode = '$(g) -= ($(g) - $(Wmin)) * update;\n'
+    depression_update_code = '$(g) -= ($(g) - $(Wmin)) * update;\n'
 
     potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
 
