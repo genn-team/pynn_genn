@@ -169,14 +169,19 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
         settings['var_name_types'].extend(self.timing_dependence.var_name_types)
         settings['var_name_types'].extend(self.weight_dependence.var_name_types)
 
+        settings['pre_var_name_types'] = self.timing_dependence.pre_var_name_types
+        settings['post_var_name_types'] = self.timing_dependence.post_var_name_types
+
         settings['sim_code'] = settings['sim_code'].substitute(
                 TD_CODE=self.timing_dependence.sim_code.substitute(
-                    WD_CODE=self.weight_dependence.depression_update_code)
-        )
+                    WD_CODE=self.weight_dependence.depression_update_code))
         settings['learn_post_code'] = settings['learn_post_code'].substitute(
                 TD_CODE=self.timing_dependence.learn_post_code.substitute(
-                    WD_CODE=self.weight_dependence.potentiation_update_code)
-        )
+                    WD_CODE=self.weight_dependence.potentiation_update_code))
+
+        settings['post_spike_code'] = self.timing_dependence.post_spike_code
+        settings['pre_spike_code'] = self.timing_dependence.pre_spike_code
+
         self.genn_weight_update = create_custom_weight_update_class('STDP',
                                                                     **settings)()
 
@@ -204,9 +209,9 @@ class WeightDependence(object):
 class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependence):
     __doc__ = synapses.AdditiveWeightDependence.__doc__
 
-    depression_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
+    depression_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - (($(Wmax) - $(Wmin)) * update)));\n'
 
-    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + update));\n'
+    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n'
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -226,7 +231,7 @@ class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiation
 
     depression_update_code = '$(g) -= ($(g) - $(Wmin)) * update;\n'
 
-    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - update));\n'
+    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n'
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -259,25 +264,35 @@ class SpikePairRule(synapses.SpikePairRule):
     ]
 
     var_name_types = []
+    pre_var_name_types = [("preTrace", "scalar")]
+    post_var_name_types = [("postTrace", "scalar")]
 
     # using {.brc} for left{ or right} so that .format() does not freak out
     sim_code = DDTemplate('''
         if (dt > 0)
         {
-            const scalar scale = ($(Wmax) - $(Wmin)) * $(Aminus);
-            const scalar update = scale * exp(-dt / $(tauMinus));
+            const scalar update = $(Aminus) * $(postTrace) * exp(-dt / $(tauMinus));
             $${WD_CODE}
         }
-    ''')
+        ''')
 
     learn_post_code = DDTemplate('''
         if (dt > 0)
         {
-            const scalar scale = ($(Wmax) - $(Wmin)) * $(Aplus);
-            const scalar update = scale * exp(-dt / $(tauPlus));
+            const scalar update = $(Aplus) * $(preTrace) * exp(-dt / $(tauPlus));
             $${WD_CODE}
         }
-    ''')
+        ''')
+
+    pre_spike_code = '''\
+        const scalar dt = $(t) - $(sT_pre);
+        $(preTrace) = $(preTrace) * exp(-dt / $(tauPlus)) + 1.0;
+        '''
+
+    post_spike_code = '''\
+        const scalar dt = $(t) - $(sT_post);
+        $(postTrace) = $(postTrace) * exp(-dt / $(tauMinus)) + 1.0;
+        '''
 
     translations = build_translations(
         ('tau_plus',   'tauPlus'),

@@ -232,7 +232,7 @@ class Projection(common.Projection, ContextMixin):
                 assert False
             # Otherwise add view of GeNN variable to list
             else:
-                variables.append(self._pop.vars[n].view)
+                variables.append(self._pop.get_var_values(n))
 
         # Unzip into list of tuples and return
         return zip(*variables)
@@ -242,7 +242,7 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrixType = 'SPARSE_INDIVIDUALG'
+            matrixType = 'RAGGED_INDIVIDUALG'
         else:
             matrixType = 'DENSE_INDIVIDUALG'
 
@@ -330,6 +330,8 @@ class Projection(common.Projection, ContextMixin):
 
         wupdate_parameters = self.synapse_type.get_params(conn_params, self.initial_values)
         wupdate_ini = self.synapse_type.get_vars(conn_params, self.initial_values)
+        wupdate_pre_ini = self.synapse_type.get_pre_vars()
+        wupdate_post_ini = self.synapse_type.get_post_vars()
 
         if self.receptor_type == 'inhibitory':
             prefix = 'inh_'
@@ -344,7 +346,9 @@ class Projection(common.Projection, ContextMixin):
         self._pop = simulator.state.model.add_synapse_population(
             self.label, matrixType, delay_steps,
             prePop._pop, postPop._pop,
-            self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, {}, {},
+            self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, wupdate_pre_ini, wupdate_post_ini,
             self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
 
-        self._pop.set_sparse_connections(pre_indices, post_indices)
+        # If connectivity is sparse, configure sparse connectivity
+        if self.use_sparse:
+            self._pop.set_sparse_connections(pre_indices, post_indices)

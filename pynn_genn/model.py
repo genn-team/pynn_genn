@@ -165,6 +165,17 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                     self.get_native_params(conn_params,
                                            init_values,
                                            var_names))
+    def get_pre_vars(self):
+        # Zero all presynaptic variables
+        # **TODO** other means of initialisation
+        return {vnt[0]: 0.0
+                for vnt in self.genn_weight_update.get_pre_vars()}
+
+    def get_post_vars(self):
+        # Zero all postsynaptic variables
+        # **TODO** other means of initialisation
+        return {vnt[0]: 0.0
+                for vnt in self.genn_weight_update.get_post_vars()}
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
 
