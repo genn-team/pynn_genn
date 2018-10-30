@@ -12,6 +12,15 @@ from pyNN.standardmodels import (StandardModelType,
 from conversions import convert_to_single, convert_to_array, convert_init_values
 from six import iteritems, iterkeys
 
+# Mapping from GeNN to numpy types
+genn_to_numpy_types = {
+    'scalar': np.float32,
+    'float': np.float32,
+    'double': np.float64,
+    'unsigned char': np.uint8,
+    'int': np.int32,
+    'unsigned int': np.uint32}
+
 class GeNNStandardModelType(StandardModelType):
 
     genn_extra_parameters = {}
@@ -94,7 +103,7 @@ class GeNNStandardModelType(StandardModelType):
 
         # Loop through native parameters which have b
         neuron_ini = {}
-        for n in iterkeys(vars):
+        for n, t in iteritems(vars):
             pref_n = prefix + n
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
@@ -107,7 +116,11 @@ class GeNNStandardModelType(StandardModelType):
                 neuron_ini[n] = init_vals[pynn_n].evaluate(simplify=False)
             # Otherwise if this variable is manually initialised
             elif n in self.genn_extra_parameters:
-                neuron_ini[n] = np.ones(shape=native_params.shape, dtype=np.float32) * self.genn_extra_parameters[n]
+                # Convert dtype from GeNNto numpy
+                dtype = genn_to_numpy_types[t] if t in genn_to_numpy_types else np.float32
+
+                # Fill with extra parameter value
+                neuron_ini[n] = np.ones(shape=native_params.shape, dtype=dtype) * self.genn_extra_parameters[n]
             else:
                 raise Exception('Variable "{}" not correctly initialised'.format(n))
 
@@ -223,14 +236,17 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
                      list(cs)) )
             pop._simulator.state.num_current_sources += 1
 
-    def build_genn_current_source(self, native_params, init_vals):
+    def get_extra_global_params(self, native_params):
+        return {}
+
+    def build_genn_current_source(self, native_params):
         # Build lambda function to create a custom current source from defs
         creator = lambda **defs : create_custom_current_source_class(
             self.genn_currentsource_name, **defs)
 
         # Build model
         return self.build_genn_model(self.currentsource_defs, native_params,
-                                     init_vals, creator)
+                                     {}, creator)
 
 class GeNNDefinitions(object):
 

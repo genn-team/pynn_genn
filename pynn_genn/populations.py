@@ -1,6 +1,6 @@
 from copy import deepcopy
 from six import iteritems
-import numpy
+import numpy as np
 from pyNN import common
 from pyNN.standardmodels import StandardCellType
 from pyNN.parameters import ParameterSpace, Sequence, simplify
@@ -39,7 +39,7 @@ class PopulationView(common.PopulationView):
         parameter_dict = {}
         for name in names:
             value = self.parent._get_parameters(name)
-            if isinstance(value, numpy.ndarray):
+            if isinstance(value, np.ndarray):
                 value = value[self.mask]
             parameter_dict[name] = simplify(value)
         return ParameterSpace(parameter_dict, shape=(self.size,))  # or local size?
@@ -75,10 +75,10 @@ class Population(common.Population):
                 initial_values, label)
 
     def _create_cells(self):
-        id_range = numpy.arange(simulator.state.id_counter,
-                                simulator.state.id_counter + self.size)
-        self.all_cells = numpy.array([simulator.ID(id) for id in id_range],
-                                     dtype=simulator.ID)
+        id_range = np.arange(simulator.state.id_counter,
+                             simulator.state.id_counter + self.size)
+        self.all_cells = np.array([simulator.ID(id) for id in id_range],
+                                  dtype=simulator.ID)
 
         def is_local(id):
             return (id % simulator.state.num_processes) == simulator.state.mpi_rank
@@ -119,15 +119,29 @@ class Population(common.Population):
             self._pop.add_extra_global_param(n, v)
 
         for label, inj_curr, inj_cells in self._injected_currents:
-            inj_ini = inj_curr.get_currentsource_vars()
-            applyIinj = numpy.array([0.0 for i in range( self.size )])
-            applyIinj[[ic - self.first_id for ic in inj_cells]] = 1.0
-            inj_ini.update({'applyIinj' : list(applyIinj)})
-            cs = simulator.state.model.add_current_source(
-                label, inj_curr.genn_currentsource, self.label,
-                inj_curr.get_currentsource_params(), inj_ini)
+            # Take a copy of current source parameters and
+            # set its shape to match population
+            cs_params = deepcopy(inj_curr.native_parameters)
+            cs_params.shape = (self.size,)
 
-            extra_global = inj_curr.get_extra_global_params()
+            # Build current source model
+            genn_cs, cs_params, cs_ini =\
+                inj_curr.build_genn_current_source(cs_params)
+
+            # Extract the applyInj variable
+            apply_inj = cs_ini["applyIinj"]
+
+            # Convert indices to a numpy array and make relative to 1st ID
+            inj_indices = np.asarray(inj_cells, dtype=int)
+            inj_indices -= self.first_id
+
+            # Set all indices to one
+            apply_inj[inj_indices] = 1
+
+            cs = simulator.state.model.add_current_source(
+                label, genn_cs, self.label, cs_params, cs_ini)
+
+            extra_global = inj_curr.get_extra_global_params(cs_params)
 
             for n, v in iteritems(extra_global):
                 cs.add_extra_global_param(n, v)

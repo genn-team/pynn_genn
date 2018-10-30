@@ -26,8 +26,10 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
                 $(injectCurrent, $(amplitude));
             }
         ''',
-        'param_names' : ['tStart', 'tStop', 'amplitude'],
-        'var_name_types' : [('applyIinj', 'unsigned char')]
+        'vars' : {'tStart': 'scalar',
+                  'tStop': 'scalar',
+                  'amplitude': 'scalar',
+                  'applyIinj': 'unsigned char'}
     },
     # translations
     (
@@ -37,7 +39,7 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     ),
     )
 
-    genn_extra_parameters = {'applyIinj' : False}
+    genn_extra_parameters = {'applyIinj' : 0}
 
 class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource):
     __doc__ = electrodes.StepCurrentSource.__doc__
@@ -52,8 +54,11 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
                 $(injectCurrent, $(stepAmpls)[$(currStep)-1]);
             }
         ''',
-        'param_names' : ['tStart', 'tStop'],
-        'var_vame_types' : [('applyIinj', 'unsigned char'), ('currStep', 'int')],
+        'vars' : {'tStart': 'scalar',
+                  'tStop': 'scalar',
+                  'applyIinj': 'unsigned char',
+                  'currStep': 'int'},
+
         'extra_global_params' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
     },
     # translations
@@ -67,7 +72,7 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
         'tStart' : None,
         'tStop'  : None,
         'currStep' : 0,
-        'applyIinj' : False
+        'applyIinj' : 0
     }
 
     def get_currentsource_params(self):
@@ -111,7 +116,7 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
     ),
     )
 
-    genn_extra_parameters = {'applyIinj' : False}
+    genn_extra_parameters = {'applyIinj' : 0}
 
 class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSource):
     __doc__ = electrodes.NoisyCurrentSource.__doc__
@@ -140,4 +145,4 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
     ),
     )
 
-    genn_extra_parameters = {'applyIinj' : False}
+    genn_extra_parameters = {'applyIinj' : 0}
