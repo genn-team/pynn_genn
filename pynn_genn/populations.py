@@ -110,12 +110,11 @@ class Population(common.Population):
             self.label, self.size, self._genn_nmodel,
             neuron_params, neuron_ini)
 
-        #extra_global = self.celltype.get_extra_global_params(
-        #        self._parameters,
-        #        self.initial_values
-        #)
-        extra_global = {}
+        # Get any extra global parameters defined by the model
+        extra_global = self.celltype.get_extra_global_neuron_params(
+            self._parameters, self.initial_values)
 
+        # Add to underlying neuron group
         for n, v in iteritems(extra_global):
             self._pop.add_extra_global_param(n, v)
 

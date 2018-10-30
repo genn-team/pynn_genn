@@ -114,7 +114,6 @@ class GeNNStandardModelType(StandardModelType):
         return genn_model, neuron_params, neuron_ini
 
 
-
 class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def __init__(self, **parameters):
@@ -129,15 +128,8 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
         else:
             self.translations = build_translations(*self.neuron_defs.translations)
 
-    def get_extra_global_params(self, native_parameters, init_values):
-        var_names = [vnt[0] for vnt in self.genn_neuron.get_extra_global_params()]
-
-        egps = self.get_native_params(native_parameters, init_values, var_names)
-        # in GeNN, extra global parameters are defined for the whole population
-        # and not for individual neurons.
-        # The standard model which use extra global params are supposed to override
-        # this function in order to convert values properly.
-        return egps
+    def get_extra_global_neuron_params(self, native_params, init_vals):
+        return {}
 
     def build_genn_psm(self, native_params, init_vals, prefix):
         # Build lambda function to create a custom PSM from defs
@@ -221,9 +213,6 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
         super(GeNNStandardCurrentSource, self).__init__(**parameters);
         self.translations = build_translations(
             *self.currentsource_defs.translations)
-        self.parameter_space._set_shape((1,))
-        self.parameter_space.evaluate()
-        self._genn_currentsource = None
 
     def inject_into(self, cells):
         __doc__ = StandardCurrentSource.inject_into.__doc__
@@ -234,48 +223,14 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
                      list(cs)) )
             pop._simulator.state.num_current_sources += 1
 
-    def get_currentsource_params(self):#, native_parameters, init_values):
-        param_names = list(self.genn_currentsource.get_param_names())
+    def build_genn_current_source(self, native_params, init_vals):
+        # Build lambda function to create a custom current source from defs
+        creator = lambda **defs : create_custom_current_source_class(
+            self.genn_currentsource_name, **defs)
 
-        # parameters are single-valued in GeNN
-        native_params = self.native_parameters
-        native_params.evaluate()
-        return convert_to_array(
-                 self.get_native_params(native_params.as_dict(),
-                                        {},
-                                        param_names))
-
-    def get_currentsource_vars(self):
-        var_names = [vnt[0] for vnt in self.genn_currentsource.get_vars()]
-
-        native_params = self.native_parameters
-        native_params.evaluate()
-        return convert_init_values(
-                    self.get_native_params(native_params.as_dict(),
-                                           {},
-                                           var_names))
-
-    def get_extra_global_params(self):
-        var_names = [vnt[0] for vnt in self.genn_currentsource.get_extra_global_params()]
-
-        native_params = self.native_parameters
-        native_params.evaluate()
-
-        egps = self.get_native_params(native_params, {}, var_names)
-        # in GeNN, extra global parameters are defined for the whole population
-        # and not for individual neurons.
-        # The standard model which use extra global params are supposed to override
-        # this function in order to convert values properly.
-        return egps
-
-    @property
-    def genn_currentsource(self):
-        if self.currentsource_defs.native:
-            return getattr(genn_wrapper.CurrentSourceModels, self.genn_currentsource_name)()
-        genn_defs = self.currentsource_defs.get_definitions()
-        return create_custom_current_source_class(self.genn_currentsource_name,
-                                              **genn_defs)()
-
+        # Build model
+        return self.build_genn_model(self.currentsource_defs, native_params,
+                                     init_vals, creator)
 
 class GeNNDefinitions(object):
 

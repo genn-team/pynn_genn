@@ -13,6 +13,7 @@ from ..simulator import state
 import logging
 from ..conversions import convert_to_single, convert_to_array, convert_init_values
 from ..model import GeNNStandardCellType, GeNNDefinitions
+from pygenn.genn_model import create_custom_neuron_class
 
 logger = logging.getLogger("PyNN")
 
@@ -208,15 +209,6 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
         ('v',          'V'),
         ('w',          'W'),
     )
-)
-
-
-genn_neuron_defs['SpikeSourceArray'] = GeNNDefinitions({},
-    # translations
-    (
-        ('spike_times', 'spikeTimes'),
-    ),
-    True # use native
 )
 
 genn_neuron_defs['Poisson'] = GeNNDefinitions(
@@ -562,33 +554,53 @@ class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStand
 class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
     genn_neuron_name = 'SpikeSourceArray'
-    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    neuron_defs = GeNNDefinitions(
+        {
+            "sim_code": "oldSpike = false;\n",
+            "threshold_condition_code": "$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
+            "reset_code": "$(startSpike)++;\n",
 
-    genn_extra_parameters = {
-        'startSpike' : [],
-        'endSpike'   : []
-    }
-    
-    def get_extra_global_params(self, native_parameters, init_values):
-        egps = super(SpikeSourceArray, self).get_extra_global_params(
-                                                            native_parameters,
-                                                            init_values)
-        return {k : np.concatenate([convert_to_array(seq) for seq in v])
-                for k, v in egps.items()}
+            "var_name_types": [("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
+            "extra_global_params": [("spikeTimes", "scalar*")]
+        },
+        # translations
+        (
+            ('spike_times', 'spikeTimes'),
+        ))
 
-    def get_neuron_vars(self, native_parameters, init_values):
-        converted_vars = super(SpikeSourceArray, self).get_neuron_vars(
-                                                            native_parameters,
-                                                            init_values)
-        spk_times = native_parameters['spikeTimes']
+    def get_extra_global_neuron_params(self, native_params, init_vals):
+        # Get spike times
+        spk_times = native_params["spikeTimes"]
 
-        cumSize = 0
+        # Concatenate together spike times to form extra global parameter
+        return {"spikeTimes" : np.concatenate([seq.value
+                                               for seq in spk_times])}
+
+    def build_genn_neuron(self, native_params, init_vals):
+        # Create model using unmodified defs
+        genn_model = create_custom_neuron_class(self.genn_neuron_name,
+                                                **self.neuron_defs.definitions)()
+
+        # Get spike times
+        spk_times = native_params["spikeTimes"]
+
+        # Create empty numpy arrays to hold start and end spikes indices
+        start_spike = np.empty(shape=native_params.shape, dtype=np.float32)
+        end_spike = np.empty(shape=native_params.shape, dtype=np.float32)
+
+        # Calculate indices for each sequence
+        cum_size = 0
         for i, seq in enumerate(spk_times):
-            converted_vars['startSpike'].append(cumSize)
-            cumSize += len(seq.value)
-            converted_vars['endSpike'].append(cumSize)
+            start_spike[i] = cum_size
+            cum_size += len(seq.value)
+            end_spike[i] = cum_size
 
-        return converted_vars
+        # Build initialisation dictionary
+        neuron_ini = {"startSpike": start_spike,
+                      "endSpike": end_spike}
+
+        # Return with model
+        return genn_model, [], neuron_ini
 
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):
