@@ -21,6 +21,12 @@ logger = logging.getLogger("PyNN")
 def tauMToDecay(tau_m, **kwargs):
     return la.exp(-state.dt / tau_m)
 
+def rateToISI(rate, **kwargs):
+    return (1000.0 / rate) * state.dt 
+
+def isiToRate(isi, **kwargs):
+    return (1000.0 / rate) * state.dt 
+
 genn_neuron_defs = {}
 
 genn_neuron_defs['IF'] = GeNNDefinitions(
@@ -221,21 +227,21 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
         'sim_code' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
+                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
             }
             $(timeStepToSpike) -= 1.0;
         ''',
 
         'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
 
-        'vars' : {'rate': 'scalar',
+        'vars' : {'isi': 'scalar',
                   'timeStepToSpike': 'scalar',
                   'spikeStart': 'scalar',
                   'duration': 'scalar'},
     },
     # translations
     (
-        ('rate',     'rate'),
+        ('rate',     'isi',         rateToISI,  isiToRate),
         ('start',    'spikeStart'),
         ('duration', 'duration')
     )
@@ -247,7 +253,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
         'sim_code' : '''
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += 1000.0f / $(rate) * DT * $(gennrand_exponential);
+                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
             }
             $(timeStepToSpike) -= 1.0;
             $(RefracTime) -= DT;
@@ -257,7 +263,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
 
         'reset_code' : '$(RefracTime) = $(TauRefrac)',
 
-        'vars' : {'rate': 'scalar',
+        'vars' : {'isi': 'scalar',
                   'TauRefrac': 'scalar',
                   'timeStepToSpike': 'scalar',
                   'spikeStart': 'scalar',
@@ -266,7 +272,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
     },
     # translations
     (
-        ('rate',       'rate'),
+        ('rate',       'isi',           rateToISI,      isiToRate),
         ('start',      'spikeStart'),
         ('duration',   'duration'),
         ('tau_refrac', 'TauRefrac')
