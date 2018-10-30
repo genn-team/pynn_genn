@@ -21,6 +21,12 @@ logger = logging.getLogger("PyNN")
 def tauMToDecay(tau_m, **kwargs):
     return la.exp(-state.dt / tau_m)
 
+def tauSfaToDecay(tau_sfa, **kwargs):
+    return la.exp(-state.dt / tau_sfa)
+
+def tauRrToDecay(tau_rr, **kwargs):
+    return la.exp(-state.dt / tau_rr)
+    
 def rateToISI(rate, **kwargs):
     return (1000.0 / rate) * state.dt 
 
@@ -33,13 +39,11 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
     # definitions
     {
         'sim_code' : '''
-            if ($(RefracTime) <= 0.0)
-            {
-              scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
-              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+            if ($(RefracTime) <= 0.0) {
+                scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
+                $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
             }
-            else
-            {
+            else {
                 $(RefracTime) -= DT;
             }
         ''',
@@ -78,17 +82,14 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
     # definitions
     {
         'sim_code' : '''
-            if ($(RefracTime) <= 0.0)
-            {
-              scalar alpha = (($(Isyn) + $(Ioffset) - $(GRr) * ($(V) -
-                $(ERr)) - $(GSfa) * ($(V) - $(ESfa))) * $(TauM) / $(C)) + $(Vrest);
-              $(V) = alpha - (exp(-DT / $(TauM)) * (alpha - $(V)));
-              $(GSfa) *= exp(-DT / $(TauSfa));
-              $(GRr) *= exp(-DT / $(TauRr));
+            if ($(RefracTime) <= 0.0) {
+                scalar alpha = (($(Isyn) + $(Ioffset) - $(GRr) * ($(V) - $(ERr)) - $(GSfa) * ($(V) - $(ESfa))) * $(Rmembrane)) + $(Vrest);
+                $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+                $(GSfa) *= $(ExpSFA);
+                $(GRr) *= $(ExpRr);
             }
-            else
-            {
-              $(RefracTime) -= DT;
+            else {
+                $(RefracTime) -= DT;
             }
         ''',
 
@@ -105,31 +106,33 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
                   'RefracTime': 'scalar',
                   'GSfa': 'scalar',
                   'GRr': 'scalar',
-                  'C': 'scalar',          # Membrane capacitance [nF]
-                  'TauM': 'scalar',       # Membrane time constant [ms]
+                  'Rmembrane': 'scalar',  # Membrane resistance
+                  'ExpTC': 'scalar',      # Membrane decay
                   'Vrest': 'scalar',      # Resting membrane potential [mV]
                   'Vreset': 'scalar',     # Reset voltage [mV]
                   'Vthresh': 'scalar',    # Spiking threshold [mV]
                   'Ioffset': 'scalar',    # Offset current [nA]
                   'TauRefrac': 'scalar',  # Refractoriness [ms]
-                  'TauSfa': 'scalar',     # Spike frequency adaptation time constant [ms]
-                  'TauRr': 'scalar',      # Relative refractoriness time constant [ms]
+                  'ExpSFA': 'scalar',     # Spike frequency adaptation decay
+                  'ExpRr': 'scalar',      # Relative refractoriness decay
                   'ESfa': 'scalar',       # Spike frequency adaptation reversal potention [mV]
-                  'ERr': 'scalar'},       # Relative refractoriness reversal potention [mV]
+                  'ERr': 'scalar',        # Relative refractoriness reversal potention [mV]
+                  'QSfa': 'scalar',       # Quantal spike frequency adaptation conductance increase [pS]
+                  'QRr': 'scalar'}        # Quantal relative refractoriness conductance increase [pS]
     },
     # translations
     (
         ('v_rest',     'Vrest'),
         ('v_reset',    'Vreset'),
-        ('cm',         'C'),
-        ('tau_m',      'TauM'),
+        ('cm',         'Rmembrane',     "tau_m / cm",   ""),
+        ('tau_m',      'ExpTC',         tauMToDecay,    None),
         ('tau_refrac', 'TauRefrac'),
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
-        ('tau_sfa',    'TauSfa'),
+        ('tau_sfa',    'ExpSFA',        tauSfaToDecay,  None),
         ('e_rev_sfa',  'ESfa'),
-        ('tau_rr',     'TauRr'),
+        ('tau_rr',     'ExpRr',         tauRrToDecay,   None),
         ('e_rev_rr',   'ERr'),
         ('g_s',        'GSfa', 0.001),
         ('g_r',        'GRr', 0.001),
