@@ -8,6 +8,7 @@ Standard cells for the GeNN module.
 
 from copy import deepcopy
 import numpy as np
+import lazyarray as la
 from pyNN.standardmodels import cells, build_translations
 from ..simulator import state
 import logging
@@ -15,6 +16,10 @@ from ..model import GeNNStandardCellType, GeNNDefinitions
 from pygenn.genn_model import create_custom_neuron_class
 
 logger = logging.getLogger("PyNN")
+
+# Convert membrane time constant to exponential decay
+def tauMToDecay(tau_m, **kwargs):
+    return la.exp(-state.dt / tau_m)
 
 genn_neuron_defs = {}
 
@@ -24,8 +29,8 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
         'sim_code' : '''
             if ($(RefracTime) <= 0.0)
             {
-              scalar alpha = (($(Isyn) + $(Ioffset)) * $(TauM) / $(C)) + $(Vrest);
-              $(V) = alpha - (exp(-DT / $(TauM)) * (alpha - $(V)));
+              scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
+              $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
             }
             else
             {
@@ -42,8 +47,8 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
 
         'vars' : {'V': 'scalar',
                   'RefracTime': 'scalar',
-                  'C': 'scalar',            # Membrane capacitance [nF?]
-                  'TauM': 'scalar',       # Membrane time constant [ms]
+                  'Rmembrane': 'scalar',  # Membrane resistance
+                  'ExpTC': 'scalar',       # Membrane time constant [ms]
                   'Vrest': 'scalar',      # Resting membrane potential [mV]
                   'Vreset': 'scalar',     # Reset voltage [mV]
                   'Vthresh': 'scalar',    # Spiking threshold [mV]
@@ -54,8 +59,8 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
     (
         ('v_rest',     'Vrest'),
         ('v_reset',    'Vreset'),
-        ('cm',         'C'),
-        ('tau_m',      'TauM'),
+        ('cm',         'Rmembrane',     "tau_m / cm", ""),
+        ('tau_m',      'ExpTC',         tauMToDecay, None),
         ('tau_refrac', 'TauRefrac'),
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
