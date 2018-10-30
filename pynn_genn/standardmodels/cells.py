@@ -542,9 +542,7 @@ class SpikeSourcePoisson(cells.SpikeSourcePoisson, GeNNStandardCellType):
     __doc__ = cells.SpikeSourcePoisson.__doc__
 
     genn_neuron_name = 'Poisson'
-    genn_postsyn_name = 'DeltaCurr'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
-    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
     genn_extra_parameters = {
         'timeStepToSpike' : 0.0,
@@ -554,9 +552,7 @@ class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStand
     __doc__ = cells.SpikeSourcePoissonRefractory.__doc__
 
     genn_neuron_name = 'PoissonRef'
-    genn_postsyn_name = 'DeltaCurr'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
-    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
     genn_extra_parameters = {
         'timeStepToSpike' : 0.0,
@@ -566,9 +562,7 @@ class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStand
 class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
     genn_neuron_name = 'SpikeSourceArray'
-    genn_postsyn_name = 'DeltaCurr'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
-    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
     genn_extra_parameters = {
         'startSpike' : [],

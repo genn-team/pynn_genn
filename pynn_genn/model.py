@@ -119,9 +119,15 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def __init__(self, **parameters):
         super(GeNNStandardCellType, self).__init__(**parameters);
-        self.translations = build_translations(
-            *(self.neuron_defs.translations + self.postsyn_defs.translations))
-        self._genn_postsyn = None
+
+        # If cell has a postsynaptic model i.e. it's not a spike source
+        if hasattr(self, "postsyn_defs"):
+            # Build translations from both translation tuples
+            self.translations = build_translations(
+                *(self.neuron_defs.translations + self.postsyn_defs.translations))
+        # Otherwise, build translations from neuron translations
+        else:
+            self.translations = build_translations(*self.neuron_defs.translations)
 
     def get_extra_global_params(self, native_parameters, init_values):
         var_names = [vnt[0] for vnt in self.genn_neuron.get_extra_global_params()]
