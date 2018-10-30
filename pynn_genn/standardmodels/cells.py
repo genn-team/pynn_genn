@@ -11,7 +11,6 @@ import numpy as np
 from pyNN.standardmodels import cells, build_translations
 from ..simulator import state
 import logging
-from ..conversions import convert_to_single, convert_to_array, convert_init_values
 from ..model import GeNNStandardCellType, GeNNDefinitions
 from pygenn.genn_model import create_custom_neuron_class
 
@@ -555,6 +554,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
     genn_neuron_name = 'SpikeSourceArray'
     neuron_defs = GeNNDefinitions(
+        # definitions
         {
             "sim_code": "oldSpike = false;\n",
             "threshold_condition_code": "$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",

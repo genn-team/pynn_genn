@@ -10,7 +10,6 @@ from pyNN.standardmodels import electrodes, build_translations#, StandardCurrent
 from ..simulator import state
 import logging
 from pygenn.genn_model import create_dpf_class
-from ..conversions import convert_to_single, convert_to_array, convert_init_values
 from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")

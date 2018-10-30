@@ -250,7 +250,7 @@ class Projection(common.Projection, ContextMixin):
         pre_indices = []
         post_indices = []
         conn_params = defaultdict(list)
-        
+
         # Build connectivity
         with self.get_new_context(conn_pre_indices=pre_indices, 
                                   conn_post_indices=post_indices,
@@ -259,7 +259,7 @@ class Projection(common.Projection, ContextMixin):
         
         pre_indices = np.asarray(pre_indices, dtype=np.uint32)
         post_indices = np.asarray(post_indices, dtype=np.uint32)
-        
+
         num_synapses = len(pre_indices)
         if num_synapses == 0:
             logging.warning("Projection {} has no connections. "
@@ -270,7 +270,7 @@ class Projection(common.Projection, ContextMixin):
         delay_steps = conn_params["delaySteps"]
         
         # If delays aren't all the same
-        # **TODO** add support for heterogeneous sdendritic delay
+        # **TODO** add support for heterogeneous dendritic delay
         if not np.allclose(delay_steps, delay_steps[0]):
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))
@@ -328,26 +328,25 @@ class Projection(common.Projection, ContextMixin):
             post_indices = postPop.index_in_grandparent(post_indices)
             postPop = postPop.grandparent;
 
-        wupdate_parameters = self.synapse_type.get_params(conn_params, self.initial_values)
-        wupdate_ini = self.synapse_type.get_vars(conn_params, self.initial_values)
-        wupdate_pre_ini = self.synapse_type.get_pre_vars()
-        wupdate_post_ini = self.synapse_type.get_post_vars()
-
         if self.receptor_type == 'inhibitory':
             prefix = 'inh_'
         else:
             prefix = 'exc_'
 
         # Build GeNN postsynaptic model
-        self._psm_nmodel, psm_params, psm_ini =\
+        self._psm_model, psm_params, psm_ini =\
             postPop.celltype.build_genn_psm(postPop._parameters,
                                             postPop.initial_values, prefix)
+
+        # Build GeNN weight update model
+        self._wum_model, wum_params, wum_init, wum_pre_init, wum_post_init =\
+            self.synapse_type.build_genn_wum(conn_params, self.initial_values)
 
         self._pop = simulator.state.model.add_synapse_population(
             self.label, matrixType, delay_steps,
             prePop._pop, postPop._pop,
-            self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, wupdate_pre_ini, wupdate_post_ini,
-            self._psm_nmodel, psm_params, psm_ini)
+            self._wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
+            self._psm_model, psm_params, psm_ini)
 
         # If connectivity is sparse, configure sparse connectivity
         if self.use_sparse:

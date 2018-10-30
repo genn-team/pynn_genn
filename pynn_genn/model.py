@@ -2,14 +2,13 @@ from itertools import groupby
 from copy import deepcopy
 import numpy as np
 from pygenn.genn_model import (create_custom_neuron_class, create_custom_postsynaptic_class,
-                               create_custom_current_source_class)
+                               create_custom_current_source_class, create_custom_weight_update_class)
 
 from pygenn import genn_wrapper
 from pyNN.standardmodels import (StandardModelType,
                                  StandardCellType,
                                  StandardCurrentSource,
                                  build_translations)
-from conversions import convert_to_single, convert_to_array, convert_init_values
 from six import iteritems, iterkeys
 
 # Mapping from GeNN to numpy types
@@ -24,29 +23,6 @@ genn_to_numpy_types = {
 class GeNNStandardModelType(StandardModelType):
 
     genn_extra_parameters = {}
-
-    def translate_dict(self, val_dict):
-        return {self.translations[n]['translated_name'] : v.evaluate()
-                for n, v in val_dict.items() if n in self.translations.keys()}
-
-    def get_native_params(self, native_parameters, init_values, param_names, prefix=''):
-        native_init_values = self.translate_dict(init_values)
-        native_params = {}
-        for pn in param_names:
-            if prefix + pn in native_parameters.keys():
-                native_params[pn] = native_parameters[prefix + pn]
-            elif prefix + pn in native_init_values.keys():
-                native_params[pn] = native_init_values[prefix + pn]
-            elif pn in native_parameters.keys():
-                native_params[pn] = native_parameters[pn]
-            elif pn in native_init_values.keys():
-                native_params[pn] = native_init_values[pn]
-            elif pn in self.genn_extra_parameters:
-                native_params[pn] = self.genn_extra_parameters[pn]
-            else:
-                raise Exception('Variable "{}" not found'.format(pn))
-
-        return native_params
 
     def build_genn_model(self, defs, native_params, init_vals,
                          create_custom_model, prefix=""):
@@ -164,61 +140,72 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
 
 class GeNNStandardSynapseType(GeNNStandardModelType):
+    def build_genn_wum(self, conn_params, init_vals):
+        # Take a deep copy of the definitions
+        genn_defs = deepcopy(self.wum_defs)
 
-    genn_weight_update = None
+        # Check that it doesn't already have its
+        # variables and parameters seperated out
+        assert "param_names" not in genn_defs
+        assert "var_name_types" not in genn_defs
 
-    def translate_dict(self, val_dict):
-        return {self.translations[n]['translated_name'] : convert_to_array(v)
-                for n, v in val_dict.items() if n in self.translations.keys()}
+        # Extract variables from copy of defs and remove
+        # **NOTE** all vars are by default GeNN variables
+        vars = genn_defs["vars"]
+        del genn_defs["vars"]
 
-    def get_native_params(self, conn_params, init_values, param_names):
-        default_init_values = self.default_initial_values.copy()
-        default_init_values.update(init_values)
-        native_init_values = self.translate_dict(default_init_values)
-        native_params = {}
-        
-        # Loop through parameters
-        for pn in param_names:
-            # If they are already specified, 
-            # copy parameter directly from connections
-            if pn in conn_params:
-                native_params[pn] = conn_params[pn]
-            # Otherwise, use default
-            # **NOTE** at this point it is fine for these to be scalar
-            elif pn in native_init_values:
-                native_params[pn] = native_init_values[pn]
-            else:
-                raise Exception('Variable "{}" not found'.format(pn))
+        # Start with an empty list of parameterss
+        param_names = []
 
-        return native_params
+        # Get set of forcibly mutable vars if synapse type has one
+        mutable_vars = (self.mutable_vars
+                        if hasattr(self, "mutable_vars")
+                        else set())
 
-    def get_params(self, conn_params, init_values):
-        param_names = list(self.genn_weight_update.get_param_names())
+        # Loop through connection parameters
+        for n, p in iteritems(conn_params):
+            # If this parameter is in the variable dictionary,
+            # but it is homogenous
+            if n in vars and np.allclose(p, p[0]) and n not in mutable_vars:
+                # Remove from vars
+                del vars[n]
 
-        # parameters are single-valued in GeNN
-        return convert_to_array(
-                 self.get_native_params(conn_params,
-                                        init_values,
-                                        param_names))
+                # Add it to params
+                param_names.append(n)
 
-    def get_vars(self, conn_params, init_values):
-        var_names = [vnt[0] for vnt in self.genn_weight_update.get_vars()]
+        # Copy updated vars and parameters back into defs
+        genn_defs["var_name_types"] = vars.items()
+        genn_defs["param_names"] = param_names
 
-        return convert_init_values(
-                    self.get_native_params(conn_params,
-                                           init_values,
-                                           var_names))
-    def get_pre_vars(self):
+        # Create custom model
+        genn_model = create_custom_weight_update_class(self.__class__.__name__, **genn_defs)()
+
+        # Use first entry in conn param for parameters
+        wum_params = {n: conn_params[n][0]
+                      for n in genn_defs["param_names"]}
+
+        # Convert variables to arrays with correct data type
+        wum_init = {n: np.asarray(conn_params[n],
+                                  dtype=(genn_to_numpy_types[t]
+                                         if t in genn_to_numpy_types
+                                         else np.float32))
+                    for n, t in iteritems(vars)}
+
         # Zero all presynaptic variables
         # **TODO** other means of initialisation
-        return {vnt[0]: 0.0
-                for vnt in self.genn_weight_update.get_pre_vars()}
+        wum_pre_init = (None
+                        if "pre_var_name_types" not in genn_defs
+                        else {n[0]: 0.0
+                              for n in genn_defs["pre_var_name_types"]})
 
-    def get_post_vars(self):
         # Zero all postsynaptic variables
         # **TODO** other means of initialisation
-        return {vnt[0]: 0.0
-                for vnt in self.genn_weight_update.get_post_vars()}
+        wum_post_init = (None
+                         if "post_var_name_types" not in genn_defs
+                         else {n[0]: 0.0
+                               for n in genn_defs["post_var_name_types"]})
+
+        return genn_model, wum_params, wum_init, wum_pre_init, wum_post_init
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
 
@@ -254,18 +241,3 @@ class GeNNDefinitions(object):
         self.native = native
         self.definitions = definitions
         self.translations = translations
-
-    def get_definitions(self, params_to_vars=None):
-        """get definition for GeNN model
-        Args:
-        params_to_vars -- list with parameters which should be treated as variables in GeNN
-        """
-        defs = deepcopy(self.definitions)
-        if params_to_vars is not None:
-            par_names = defs["param_names"]
-            var_names = defs["var_name_types"]
-            for par in params_to_vars:
-                par_names.remove(par)
-                var_names.append((par, 'scalar'))
-            defs.update({'param_names' : par_names, 'var_name_types' : var_names})
-        return defs
