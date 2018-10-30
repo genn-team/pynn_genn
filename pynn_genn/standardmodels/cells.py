@@ -40,17 +40,15 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
             $(RefracTime) = $(TauRefrac);
         ''',
 
-        'param_names' : [
-            'C',          # Membrane capacitance [nF?]
-            'TauM',       # Membrane time constant [ms]
-            'Vrest',      # Resting membrane potential [mV]
-            'Vreset',     # Reset voltage [mV]
-            'Vthresh',    # Spiking threshold [mV]
-            'Ioffset',    # Offset current
-            'TauRefrac'
-        ],
-
-        'var_name_types' : [('V', 'scalar'), ('RefracTime', 'scalar')]
+        'vars' : {'V': 'scalar',
+                  'RefracTime': 'scalar',
+                  'C': 'scalar',            # Membrane capacitance [nF?]
+                  'TauM': 'scalar',       # Membrane time constant [ms]
+                  'Vrest': 'scalar',      # Resting membrane potential [mV]
+                  'Vreset': 'scalar',     # Reset voltage [mV]
+                  'Vthresh': 'scalar',    # Spiking threshold [mV]
+                  'Ioffset': 'scalar',    # Offset current
+                  'TauRefrac': 'scalar'}
     },
     # translations
     (
@@ -92,25 +90,21 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
             $(GRr) += $(QRr);
         ''',
 
-        'param_names' : [
-            'C',          # Membrane capacitance [nF]
-            'TauM',       # Membrane time constant [ms]
-            'Vrest',      # Resting membrane potential [mV]
-            'Vreset',     # Reset voltage [mV]
-            'Vthresh',    # Spiking threshold [mV]
-            'Ioffset',    # Offset current [nA]
-            'TauRefrac',  # Refractoriness [ms]
-            'TauSfa',     # Spike frequency adaptation time constant [ms]
-            'TauRr',      # Relative refractoriness time constant [ms] 
-            'ESfa',       # Spike frequency adaptation reversal potention [mV]
-            'ERr',        # Relative refractoriness reversal potention [mV]
-            'QSfa',       # Quantal spike frequency adaptation conductance increase [pS]
-            'QRr'         # Quantal relative refractoriness conductance increase [pS]
- 
-        ],
-
-        'var_name_types' : [('V', 'scalar'), ('RefracTime', 'scalar'),
-                          ('GSfa', 'scalar'), ('GRr', 'scalar')]
+        'vars' : {'V': 'scalar',
+                  'RefracTime': 'scalar',
+                  'GSfa': 'scalar',
+                  'GRr': 'scalar',
+                  'C': 'scalar',          # Membrane capacitance [nF]
+                  'TauM': 'scalar',       # Membrane time constant [ms]
+                  'Vrest': 'scalar',      # Resting membrane potential [mV]
+                  'Vreset': 'scalar',     # Reset voltage [mV]
+                  'Vthresh': 'scalar',    # Spiking threshold [mV]
+                  'Ioffset': 'scalar',    # Offset current [nA]
+                  'TauRefrac': 'scalar',  # Refractoriness [ms]
+                  'TauSfa': 'scalar',     # Spike frequency adaptation time constant [ms]
+                  'TauRr': 'scalar',      # Relative refractoriness time constant [ms]
+                  'ESfa': 'scalar',       # Spike frequency adaptation reversal potention [mV]
+                  'ERr': 'scalar'},       # Relative refractoriness reversal potention [mV]
     },
     # translations
     (
@@ -183,22 +177,19 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             $(W) += ($(b));
         ''',
 
-        'param_names' : [
-            'C',        # Membrane capacitance [nF]
-            'TauM',     # Membrane time constant [ms]
-            'Vrest',    # Resting membrane voltage (Leak reversal potential) [mV]
-            'deltaT',   # Slope factor [mV]
-            'vThresh',  # Threshold voltage [mV]
-            'vSpike',   # Artificial spike height [mV]
-            'vReset',   # Reset voltage [mV]
-            'tauW',     # Adaption time constant [ms]
-            'a',        # Subthreshold adaption [pS]
-            'b',        # Spike-triggered adaptation [nA]
-            'iOffset',  # Offset current [nA]
-        ],
-
-        'var_name_types' : [('V', 'scalar'),
-                ('W', 'scalar')] # adaptation current, [nA]
+        'vars' : {'V': 'scalar',
+                  'W': 'scalar', # adaptation current, [nA]
+                  'C': 'scalar',        # Membrane capacitance [nF]
+                  'TauM': 'scalar',     # Membrane time constant [ms]
+                  'Vrest': 'scalar',    # Resting membrane voltage (Leak reversal potential) [mV]
+                  'deltaT': 'scalar',   # Slope factor [mV]
+                  'vThresh': 'scalar',  # Threshold voltage [mV]
+                  'vSpike': 'scalar',   # Artificial spike height [mV]
+                  'vReset': 'scalar',   # Reset voltage [mV]
+                  'tauW': 'scalar',     # Adaption time constant [ms]
+                  'a': 'scalar',        # Subthreshold adaption [pS]
+                  'b': 'scalar',        # Spike-triggered adaptation [nA]
+                  'iOffset': 'scalar'}, # Offset current [nA]
     },
     # translations
     (
@@ -241,9 +232,10 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
 
-        'param_names' : ['rate'],
-        'var_name_types' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
-                          ('duration', 'scalar')],
+        'vars' : {'rate': 'scalar',
+                  'timeStepToSpike': 'scalar',
+                  'spikeStart': 'scalar',
+                  'duration': 'scalar'},
     },
     # translations
     (
@@ -269,9 +261,12 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
 
         'reset_code' : '$(RefracTime) = $(TauRefrac)',
 
-        'param_names' : ['rate', 'TauRefrac'],
-        'var_name_types' : [('timeStepToSpike', 'scalar'), ('spikeStart', 'scalar'),
-                          ('duration', 'scalar'), ('RefracTime', 'scalar')],
+        'vars' : {'rate': 'scalar',
+                  'TauRefrac': 'scalar',
+                  'timeStepToSpike': 'scalar',
+                  'spikeStart': 'scalar',
+                  'duration': 'scalar',
+                  'RefracTime': 'scalar'},
     },
     # translations
     (
@@ -293,15 +288,20 @@ genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
             $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT; //at two times for numerical stability
             $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT;
             $(U)+=$(a)*($(b)*$(V)-$(U))*DT;
-            //if ($(V) > 30.0){   //keep this only for visualisation -- not really necessaary otherwise
-            //  $(V)=30.0;
-            //}
+            if ($(V) > 30.0) {
+              $(V)=30.0;
+            }
         ''',
 
         'threshold_condition_code' : '$(V) >= 29.99',
 
-        'param_names' : ['a', 'b', 'c', 'd', 'Ioffset'],
-        'var_name_types' : [('V', 'scalar'), ('U', 'scalar')],
+        'vars' : {'V': 'scalar',
+                  'U': 'scalar',
+                  'a': 'scalar',
+                  'b': 'scalar',
+                  'c': 'scalar',
+                  'd': 'scalar',
+                  'Ioffset': 'scalar'},
     },
     # translations
     (
@@ -358,8 +358,18 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(V) >= 0.0',
 
-        'param_names' : ['gNa', 'ENa', 'gK', 'EK', 'gl', 'El', 'C', 'Ioffset'],
-        'var_name_types' : [('V', 'scalar'), ('m', 'scalar'), ('h', 'scalar'), ('n', 'scalar')]
+        'vars' : {'gNa': 'scalar',
+                  'ENa': 'scalar',
+                  'gK': 'scalar',
+                  'EK': 'scalar',
+                  'gl': 'scalar',
+                  'El': 'scalar',
+                  'C': 'scalar',
+                  'Ioffset': 'scalar',
+                  'V': 'scalar',
+                  'm': 'scalar',
+                  'h': 'scalar',
+                  'n': 'scalar'}
     },
     # translations
     (
@@ -384,7 +394,7 @@ genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
 
         'apply_input_code' : '$(Isyn) += ($(tau) * (1.0 - exp(-DT / $(tau)))) * (1.0 / DT) * $(inSyn);',
 
-        'param_names' : ['tau'],
+        'vars' : {'tau': 'scalar'}
     },
     # translations
     (
@@ -403,9 +413,8 @@ genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
 
         'apply_input_code' : '$(Isyn) += $(x);',
 
-        'param_names' : ['tau'],
-
-        'var_name_types' : [('x', 'scalar')],
+        'vars' : {'tau': 'scalar',
+                  'x': 'scalar'},
     },
     # translations
     (
@@ -423,9 +432,9 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
 
         'apply_input_code' : '$(Isyn) += ($(E) - $(V)) * $(x);',
 
-        'param_names' : ['tau', 'E'],
-
-        'var_name_types' : [('x', 'scalar')],
+        'vars' : {'tau': 'scalar',
+                  'E': 'scalar',
+                  'x': 'scalar'},
     },
     # translations
     (

@@ -1,4 +1,5 @@
 import numpy
+from six import iteritems
 from pyNN import recording
 from . import simulator
 
@@ -60,7 +61,7 @@ class Monitor(object):
 
         if (t % self.sampling_interval < 1):
             self.time.append(t)
-            for idd, i in self.id_data_idx_map.items():
+            for idd, i in iteritems(self.id_data_idx_map):
                 self.data[i].append(self.data_view[idd])
 
 

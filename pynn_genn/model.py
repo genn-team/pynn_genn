@@ -1,5 +1,6 @@
 from itertools import groupby
 from copy import deepcopy
+import numpy as np
 from pygenn.genn_model import (create_custom_neuron_class, create_custom_postsynaptic_class,
                                create_custom_current_source_class)
 
@@ -9,6 +10,7 @@ from pyNN.standardmodels import (StandardModelType,
                                  StandardCurrentSource,
                                  build_translations)
 from conversions import convert_to_single, convert_to_array, convert_init_values
+from six import iteritems, iterkeys
 
 class GeNNStandardModelType(StandardModelType):
 
@@ -37,55 +39,89 @@ class GeNNStandardModelType(StandardModelType):
 
         return native_params
 
+    def build_genn_model(self, defs, native_params, init_vals,
+                         create_custom_model, prefix=""):
+        assert not defs.native
+
+        # Take a deep copy of the definitions
+        genn_defs = deepcopy(defs.definitions)
+
+        # Check that it doesn't already have its
+        # variables and parameters seperated out
+        assert "param_names" not in genn_defs
+        assert "var_name_types" not in genn_defs
+
+        # Extract variables from copy of defs and remove
+        # **NOTE** all vars are by default GeNN variables
+        vars = genn_defs["vars"]
+        del genn_defs["vars"]
+
+        # Start with an empty list of parameterss
+        param_names = []
+
+        # Loop through native parameters
+        prefix_len = len(prefix)
+        for field_name, param in native_params.items():
+            # If parameter is is_homogeneous, has correct prefix
+            # and, without the prefix, it is in vars
+            if param.is_homogeneous and field_name.startswith(prefix) and field_name[prefix_len:] in vars:
+                # Remove from vars
+                del vars[field_name[prefix_len:]]
+
+                # Add it to params
+                param_names.append(field_name[prefix_len:])
+
+        # Copy updated vars and parameters back into defs
+        genn_defs["var_name_types"] = vars.items()
+        genn_defs["param_names"] = param_names
+
+        # Create custom model
+        genn_model = create_custom_model(**genn_defs)()
+
+        # Simplify each of the native parameters
+        # which have been implemented as GeNN parameters
+        neuron_params = {n: native_params[prefix + n].evaluate(simplify=True)
+                         for n in genn_defs["param_names"]}
+
+
+        # Get set of native parameter names
+        native_param_keys = set(native_params.keys())
+
+        # Build dictionary mapping from the GeNN name of state variables to their PyNN name
+        init_val_lookup = {self.translations[n]["translated_name"]: n
+                           for n, v in init_vals.items()
+                           if n in self.translations}
+
+        # Loop through native parameters which have b
+        neuron_ini = {}
+        for n in iterkeys(vars):
+            pref_n = prefix + n
+            # If this variable is a native parameter,
+            # evaluate it into neuron_ini
+            if pref_n in native_param_keys:
+                neuron_ini[n] = native_params[pref_n].evaluate(simplify=False)
+            # Otherwise if there is an initial value associated with it
+            elif pref_n in init_val_lookup:
+                # Get its PyNN name from the lookup
+                pynn_n = init_val_lookup[pref_n]
+                neuron_ini[n] = init_vals[pynn_n].evaluate(simplify=False)
+            # Otherwise if this variable is manually initialised
+            elif n in self.genn_extra_parameters:
+                neuron_ini[n] = np.ones(shape=native_params.shape, dtype=np.float32) * self.genn_extra_parameters[n]
+            else:
+                raise Exception('Variable "{}" not correctly initialised'.format(n))
+
+        return genn_model, neuron_params, neuron_ini
+
+
+
 class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def __init__(self, **parameters):
         super(GeNNStandardCellType, self).__init__(**parameters);
         self.translations = build_translations(
             *(self.neuron_defs.translations + self.postsyn_defs.translations))
-        self._genn_neuron = None
         self._genn_postsyn = None
-        self._params_to_vars = set([])
-
-        for p in self.native_parameters.keys():
-            if not self.native_parameters[p].is_homogeneous:
-                self.params_to_vars = [p]
-
-    def get_neuron_params(self, native_parameters, init_values):
-        param_names = list(self.genn_neuron.get_param_names())
-
-        # parameters are single-valued in GeNN
-        return convert_to_array(
-                 self.get_native_params(native_parameters,
-                                        init_values,
-                                        param_names))
-
-    def get_neuron_vars(self, native_parameters, init_values):
-        var_names = [vnt[0] for vnt in self.genn_neuron.get_vars()]
-
-        return convert_init_values(
-                    self.get_native_params(native_parameters,
-                                           init_values,
-                                           var_names))
-
-    def get_postsynaptic_params(self, native_parameters, init_values, prefix):
-        param_names = list(self.genn_postsyn.get_param_names())
-
-        # parameters are single-valued in GeNN
-        return convert_to_array(
-                 self.get_native_params(native_parameters,
-                                        init_values,
-                                        param_names,
-                                        prefix))
-
-    def get_postsynaptic_vars(self, native_parameters, init_values, prefix):
-        var_names = [vnt[0] for vnt in self.genn_postsyn.get_vars()]
-
-        return convert_init_values(
-                    self.get_native_params(native_parameters,
-                                           init_values,
-                                           var_names,
-                                           prefix))
 
     def get_extra_global_params(self, native_parameters, init_values):
         var_names = [vnt[0] for vnt in self.genn_neuron.get_extra_global_params()]
@@ -97,27 +133,23 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
         # this function in order to convert values properly.
         return egps
 
-    @property
-    def genn_neuron(self):
-        if self.neuron_defs.native:
-            return getattr(genn_wrapper.NeuronModels, self.genn_neuron_name)()
-        genn_defs = self.neuron_defs.get_definitions(self._params_to_vars)
-        return create_custom_neuron_class(self.genn_neuron_name, **genn_defs)()
+    def build_genn_psm(self, native_params, init_vals, prefix):
+        # Build lambda function to create a custom PSM from defs
+        creator = lambda **defs : create_custom_postsynaptic_class(
+            self.genn_postsyn_name, **defs)
 
-    @property
-    def genn_postsyn(self):
-        if self.postsyn_defs.native:
-            return getattr(genn_wrapper.PostsynapticModels, self.genn_postsyn_name)()
-        genn_defs = self.postsyn_defs.get_definitions()
-        return create_custom_postsynaptic_class(self.genn_postsyn_name, **genn_defs)()
+        # Build model
+        return self.build_genn_model(self.postsyn_defs, native_params,
+                                     init_vals, creator, prefix)
 
-    @property
-    def params_to_vars(self):
-        return self._params_to_vars
+    def build_genn_neuron(self, native_params, init_vals):
+        # Build lambda function to create a custom neuron model from defs
+        creator = lambda **defs : create_custom_neuron_class(
+            self.genn_neuron_name, **defs)
 
-    @params_to_vars.setter
-    def params_to_vars(self, params_to_vars):
-        self._params_to_vars = self._params_to_vars.union(set(params_to_vars))
+        # Build model
+        return self.build_genn_model(self.neuron_defs, native_params,
+                                     init_vals, creator)
 
 
 class GeNNStandardSynapseType(GeNNStandardModelType):
@@ -243,32 +275,18 @@ class GeNNDefinitions(object):
 
     def __init__(self, definitions, translations, native=False):
         self.native = native
-        self._definitions = definitions.keys()
+        self.definitions = definitions
         self.translations = translations
-        for key, value in definitions.items():
-            setattr(self, key, value)
-
-    @property
-    def translations(self):
-        return self._translations
-
-    @translations.setter
-    def translations(self, translations):
-        self._translations = translations
-
-    @property
-    def definitions(self):
-        return {defname : getattr(self, defname) for defname in self._definitions}
 
     def get_definitions(self, params_to_vars=None):
         """get definition for GeNN model
         Args:
         params_to_vars -- list with parameters which should be treated as variables in GeNN
         """
-        defs = self.definitions
+        defs = deepcopy(self.definitions)
         if params_to_vars is not None:
-            par_names = list(self.param_names)
-            var_names = list(self.var_name_types)
+            par_names = defs["param_names"]
+            var_names = defs["var_name_types"]
             for par in params_to_vars:
                 par_names.remove(par)
                 var_names.append((par, 'scalar'))

@@ -338,16 +338,16 @@ class Projection(common.Projection, ContextMixin):
         else:
             prefix = 'exc_'
 
-        postsyn_parameters = postPop.celltype.get_postsynaptic_params(
-                postPop._parameters, postPop.initial_values, prefix)
-        postsyn_ini = postPop.celltype.get_postsynaptic_vars(
-                postPop._parameters, postPop.initial_values, prefix)
+        # Build GeNN postsynaptic model
+        self._psm_nmodel, psm_params, psm_ini =\
+            postPop.celltype.build_genn_psm(postPop._parameters,
+                                            postPop.initial_values, prefix)
 
         self._pop = simulator.state.model.add_synapse_population(
             self.label, matrixType, delay_steps,
             prePop._pop, postPop._pop,
             self.synapse_type.genn_weight_update, wupdate_parameters, wupdate_ini, wupdate_pre_ini, wupdate_post_ini,
-            self.post.celltype.genn_postsyn, postsyn_parameters, postsyn_ini)
+            self._psm_nmodel, psm_params, psm_ini)
 
         # If connectivity is sparse, configure sparse connectivity
         if self.use_sparse:

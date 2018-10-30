@@ -1,3 +1,5 @@
+from copy import deepcopy
+from six import iteritems
 import numpy
 from pyNN import common
 from pyNN.standardmodels import StandardCellType
@@ -82,13 +84,14 @@ class Population(common.Population):
             return (id % simulator.state.num_processes) == simulator.state.mpi_rank
         self._mask_local = is_local(self.all_cells)
 
+        # Take a deep copy of cell type parameters
         if isinstance(self.celltype, StandardCellType):
-            parameter_space = self.celltype.native_parameters
+            self._parameters = deepcopy(self.celltype.native_parameters)
         else:
-            parameter_space = self.celltype.parameter_space
-        parameter_space.shape = (self.size,)
-        parameter_space.evaluate(mask=self._mask_local, simplify=False)
-        self._parameters = parameter_space.as_dict()
+            self._parameters = deepcopy(self.celltype.parameter_space)
+
+        # Set shape
+        self._parameters.shape = (self.size,)
 
         for id in self.all_cells:
             id.parent = self
@@ -99,25 +102,21 @@ class Population(common.Population):
         """Create a GeNN population
             This function is supposed to be called by the simulator
         """
-        neuron_params = self.celltype.get_neuron_params(
-                self._parameters,
-                self.initial_values
-        )
-        neuron_ini = self.celltype.get_neuron_vars(
-                self._parameters,
-                self.initial_values
-        )
+        # Build GeNN neuon model
+        self._genn_nmodel, neuron_params, neuron_ini =\
+            self.celltype.build_genn_neuron(self._parameters, self.initial_values)
 
         self._pop = simulator.state.model.add_neuron_population(
-            self.label, self.size, self.celltype.genn_neuron,
+            self.label, self.size, self._genn_nmodel,
             neuron_params, neuron_ini)
 
-        extra_global = self.celltype.get_extra_global_params(
-                self._parameters,
-                self.initial_values
-        )
+        #extra_global = self.celltype.get_extra_global_params(
+        #        self._parameters,
+        #        self.initial_values
+        #)
+        extra_global = {}
 
-        for n, v in extra_global.items():
+        for n, v in iteritems(extra_global):
             self._pop.add_extra_global_param(n, v)
 
         for label, inj_curr, inj_cells in self._injected_currents:
@@ -131,7 +130,7 @@ class Population(common.Population):
 
             extra_global = inj_curr.get_extra_global_params()
 
-            for n, v in extra_global.items():
+            for n, v in iteritems(extra_global):
                 cs.add_extra_global_param(n, v)
 
     def _set_initial_value_array(self, variable, initial_values):
@@ -151,6 +150,5 @@ class Population(common.Population):
 
     def _set_parameters(self, parameter_space):
         """parameter_space should contain native parameters"""
-        parameter_space.evaluate(simplify=False, mask=self._mask_local)
         for name, value in parameter_space.items():
-            self._parameters[name] = value
+            self._parameters[name] = deepcopy(value)
