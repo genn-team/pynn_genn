@@ -1,5 +1,6 @@
 from itertools import groupby
 from copy import deepcopy
+from lazyarray import larray
 import numpy as np
 from pygenn.genn_model import (create_custom_neuron_class, create_custom_postsynaptic_class,
                                create_custom_current_source_class, create_custom_weight_update_class)
@@ -34,40 +35,62 @@ class GeNNStandardModelType(StandardModelType):
         # Check that it doesn't already have its
         # variables and parameters seperated out
         assert "param_names" not in genn_defs
-        assert "var_name_types" not in genn_defs
 
-        # Extract variables from copy of defs and remove
-        # **NOTE** all vars are by default GeNN variables
-        vars = genn_defs["vars"]
-        del genn_defs["vars"]
+        # Start with variables that definitions say MUST be variables
+        var_name_types = genn_defs["var_name_types"]
 
-        # Start with an empty list of parameterss
-        param_names = []
+        # **NOTE** all parameters are by default GeNN parameters
+        param_name_types = genn_defs["param_name_types"]
+        del genn_defs["param_name_types"]
 
         # Loop through native parameters
         prefix_len = len(prefix)
         for field_name, param in native_params.items():
-            # If parameter is is_homogeneous, has correct prefix
-            # and, without the prefix, it is in vars
-            if param.is_homogeneous and field_name.startswith(prefix) and field_name[prefix_len:] in vars:
-                # Remove from vars
-                del vars[field_name[prefix_len:]]
+            field_name_no_prefix = field_name[prefix_len:]
 
-                # Add it to params
-                param_names.append(field_name[prefix_len:])
+            # If parameter is NOT homogeneous, has correct prefix
+            # and, without the prefix, it is in parameters
+            if not param.is_homogeneous and field_name.startswith(prefix) and field_name_no_prefix in param_name_types:
+                # Add it to variables
+                var_name_types.append((field_name, param_name_types[field_name_no_prefix]))
 
-        # Copy updated vars and parameters back into defs
-        genn_defs["var_name_types"] = vars.items()
-        genn_defs["param_names"] = param_names
+                # Remove from parameters
+                del param_name_types[field_name_no_prefix]
+
+        # Loop through any extra parameters provided by model
+        extra_param_values = {}
+        for param_name, param_val in iteritems(defs.extra_param_values):
+            param_name_no_prefix = param_name[prefix_len:]
+
+            # If prefix matches
+            if param_name.startswith(prefix):
+                # If extra parameter is callable
+                if callable(param_val):
+                    # Evaluate it
+                    # **NOTE** this is basically a way of providing 
+                    # more GeNN parameters than there are PyNN parameters
+                    ini = deepcopy(param_val(**self.parameter_space))
+                # Otherwise create larray directly from value
+                else:
+                    ini = larray(param_val)
+
+                # Add value to dictionary
+                ini.shape = native_params.shape
+                extra_param_values[param_name] = ini
+
+                # If parameter is not homogeneous
+                if not ini.is_homogeneous:
+                   # Add it to variables
+                    var_name_types.append((param_name, param_name_types[param_name_no_prefix]))
+
+                    # Remove from parameters
+                    del param_name_types[field_name_no_prefix]
+
+        # Set parameter names in defs
+        genn_defs["param_names"] = param_name_types.keys()
 
         # Create custom model
         genn_model = create_custom_model(**genn_defs)()
-
-        # Simplify each of the native parameters
-        # which have been implemented as GeNN parameters
-        neuron_params = {n: native_params[prefix + n].evaluate(simplify=True)
-                         for n in genn_defs["param_names"]}
-
 
         # Get set of native parameter names
         native_param_keys = set(native_params.keys())
@@ -77,9 +100,23 @@ class GeNNStandardModelType(StandardModelType):
                            for n, v in init_vals.items()
                            if n in self.translations}
 
-        # Loop through native parameters which have b
+        # Loop through GeNN parameters
+        neuron_params = {}
+        for n in genn_defs["param_names"]:
+            pref_n = prefix + n
+
+            # If this variable is a native parameter,
+            # evaluate it into neuron_params and simplify
+            if pref_n in native_param_keys:
+                neuron_params[n] = native_params[pref_n].evaluate(simplify=True)
+            elif pref_n in extra_param_values:
+                neuron_params[n] = extra_param_values[pref_n].evaluate(simplify=True)
+            else:
+                raise Exception('Property "{}" not correctly initialised'.format(n))
+
+        # Loop through GeNN variables
         neuron_ini = {}
-        for n, t in iteritems(vars):
+        for n, t in var_name_types:
             pref_n = prefix + n
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
@@ -91,12 +128,14 @@ class GeNNStandardModelType(StandardModelType):
                 pynn_n = init_val_lookup[pref_n]
                 neuron_ini[n] = init_vals[pynn_n].evaluate(simplify=False)
             # Otherwise if this variable is manually initialised
-            elif n in self.genn_extra_parameters:
-                # Convert dtype from GeNNto numpy
-                dtype = genn_to_numpy_types[t] if t in genn_to_numpy_types else np.float32
+            elif pref_n in extra_param_values:
+                # Set data type
+                extra_param_values[pref_n].dtype = (genn_to_numpy_types[t] 
+                                                    if t in genn_to_numpy_types 
+                                                    else np.float32)
 
-                # Fill with extra parameter value
-                neuron_ini[n] = np.ones(shape=native_params.shape, dtype=dtype) * self.genn_extra_parameters[n]
+                # Evaluate values into neuron initialiser
+                neuron_ini[n] = extra_param_values[pref_n].evaluate(simplify=False)
             else:
                 raise Exception('Variable "{}" not correctly initialised'.format(n))
 
@@ -237,7 +276,8 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
 
 class GeNNDefinitions(object):
 
-    def __init__(self, definitions, translations, native=False):
+    def __init__(self, definitions, translations, extra_param_values={}, native=False):
         self.native = native
         self.definitions = definitions
         self.translations = translations
+        self.extra_param_values = extra_param_values

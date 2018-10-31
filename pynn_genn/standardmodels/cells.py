@@ -7,6 +7,7 @@ Standard cells for the GeNN module.
 """
 
 from copy import deepcopy
+from functools import partial
 import numpy as np
 import lazyarray as la
 from pyNN.standardmodels import cells, build_translations
@@ -17,21 +18,25 @@ from pygenn.genn_model import create_custom_neuron_class
 
 logger = logging.getLogger("PyNN")
 
-# Convert membrane time constant to exponential decay
-def tauMToDecay(tau_m, **kwargs):
-    return la.exp(-state.dt / tau_m)
+# Function to convert time constants to exponential decay
+def tauToDecay(tau_param_name, **kwargs):
+    return la.exp(-state.dt / kwargs[tau_param_name])
 
-def tauSfaToDecay(tau_sfa, **kwargs):
-    return la.exp(-state.dt / tau_sfa)
-
-def tauRrToDecay(tau_rr, **kwargs):
-    return la.exp(-state.dt / tau_rr)
+def tauToInit(tau_param_name, **kwargs):
+    tau = kwargs[tau_param_name]
     
+    init = 1.0 - la.exp(-state.dt / tau)
+    return init * (tau / state.dt)
+
+# Function to convert mean 'rate' parameter 
+# to mean interspike interval (in timesteps)
 def rateToISI(rate, **kwargs):
     return (1000.0 / rate) * state.dt 
 
+# Function to convert mean interspike interval 
+# 'isi' (in timesteps) to mean rate in Hz
 def isiToRate(isi, **kwargs):
-    return (1000.0 / rate) * state.dt 
+    return (1000.0 / isi) * state.dt 
 
 genn_neuron_defs = {}
 
@@ -55,27 +60,34 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
             $(RefracTime) = $(TauRefrac);
         ''',
 
-        'vars' : {'V': 'scalar',
-                  'RefracTime': 'scalar',
-                  'Rmembrane': 'scalar',  # Membrane resistance
-                  'ExpTC': 'scalar',       # Membrane time constant [ms]
-                  'Vrest': 'scalar',      # Resting membrane potential [mV]
-                  'Vreset': 'scalar',     # Reset voltage [mV]
-                  'Vthresh': 'scalar',    # Spiking threshold [mV]
-                  'Ioffset': 'scalar',    # Offset current
-                  'TauRefrac': 'scalar'}
+        'var_name_types' : [
+            ('V', 'scalar'),
+            ('RefracTime', 'scalar')],
+        
+        'param_name_types': {
+            'Rmembrane': 'scalar',  # Membrane resistance
+            'ExpTC': 'scalar',       # Membrane time constant [ms]
+            'Vrest': 'scalar',      # Resting membrane potential [mV]
+            'Vreset': 'scalar',     # Reset voltage [mV]
+            'Vthresh': 'scalar',    # Spiking threshold [mV]
+            'Ioffset': 'scalar',    # Offset current
+            'TauRefrac': 'scalar'}
     },
     # translations
     (
         ('v_rest',     'Vrest'),
         ('v_reset',    'Vreset'),
         ('cm',         'Rmembrane',     "tau_m / cm", ""),
-        ('tau_m',      'ExpTC',         tauMToDecay, None),
+        ('tau_m',      'ExpTC',         partial(tauToDecay, "tau_m"), None),
         ('tau_refrac', 'TauRefrac'),
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
-    )
+    ),
+    # extra params
+    {
+        'RefracTime' : 0.0,
+    }
 )
 
 genn_neuron_defs['Adapt'] = GeNNDefinitions(
@@ -102,43 +114,50 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
             $(GRr) += $(QRr);
         ''',
 
-        'vars' : {'V': 'scalar',
-                  'RefracTime': 'scalar',
-                  'GSfa': 'scalar',
-                  'GRr': 'scalar',
-                  'Rmembrane': 'scalar',  # Membrane resistance
-                  'ExpTC': 'scalar',      # Membrane decay
-                  'Vrest': 'scalar',      # Resting membrane potential [mV]
-                  'Vreset': 'scalar',     # Reset voltage [mV]
-                  'Vthresh': 'scalar',    # Spiking threshold [mV]
-                  'Ioffset': 'scalar',    # Offset current [nA]
-                  'TauRefrac': 'scalar',  # Refractoriness [ms]
-                  'ExpSFA': 'scalar',     # Spike frequency adaptation decay
-                  'ExpRr': 'scalar',      # Relative refractoriness decay
-                  'ESfa': 'scalar',       # Spike frequency adaptation reversal potention [mV]
-                  'ERr': 'scalar',        # Relative refractoriness reversal potention [mV]
-                  'QSfa': 'scalar',       # Quantal spike frequency adaptation conductance increase [pS]
-                  'QRr': 'scalar'}        # Quantal relative refractoriness conductance increase [pS]
+        'var_name_types' : [
+            ('V', 'scalar'),
+            ('RefracTime', 'scalar'),
+            ('GSfa', 'scalar'),
+            ('GRr', 'scalar')],
+        
+        'param_name_types': {
+            'Rmembrane': 'scalar',  # Membrane resistance
+            'ExpTC': 'scalar',      # Membrane decay
+            'Vrest': 'scalar',      # Resting membrane potential [mV]
+            'Vreset': 'scalar',     # Reset voltage [mV]
+            'Vthresh': 'scalar',    # Spiking threshold [mV]
+            'Ioffset': 'scalar',    # Offset current [nA]
+            'TauRefrac': 'scalar',  # Refractoriness [ms]
+            'ExpSFA': 'scalar',     # Spike frequency adaptation decay
+            'ExpRr': 'scalar',      # Relative refractoriness decay
+            'ESfa': 'scalar',       # Spike frequency adaptation reversal potention [mV]
+            'ERr': 'scalar',        # Relative refractoriness reversal potention [mV]
+            'QSfa': 'scalar',       # Quantal spike frequency adaptation conductance increase [pS]
+            'QRr': 'scalar'}        # Quantal relative refractoriness conductance increase [pS]
     },
     # translations
     (
         ('v_rest',     'Vrest'),
         ('v_reset',    'Vreset'),
         ('cm',         'Rmembrane',     "tau_m / cm",   ""),
-        ('tau_m',      'ExpTC',         tauMToDecay,    None),
+        ('tau_m',      'ExpTC',         partial(tauToDecay, "tau_m"),    None),
         ('tau_refrac', 'TauRefrac'),
         ('v_thresh',   'Vthresh'),
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
-        ('tau_sfa',    'ExpSFA',        tauSfaToDecay,  None),
+        ('tau_sfa',    'ExpSFA',        partial(tauToDecay, "tau_sfa"),  None),
         ('e_rev_sfa',  'ESfa'),
-        ('tau_rr',     'ExpRr',         tauRrToDecay,   None),
+        ('tau_rr',     'ExpRr',         partial(tauToDecay, "tau_rr"),   None),
         ('e_rev_rr',   'ERr'),
         ('g_s',        'GSfa', 0.001),
         ('g_r',        'GRr', 0.001),
         ('q_sfa',      'QSfa', 0.001),
         ('q_rr',       'QRr', 0.001)
-    )
+    ),
+    # extra params
+    {
+        'RefracTime' : 0.0,
+    }
 )
 
 #  genn_neuron_defs['GIF'] = GeNNNeuronDefinitions(
@@ -191,19 +210,22 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             $(W) += ($(b));
         ''',
 
-        'vars' : {'V': 'scalar',
-                  'W': 'scalar', # adaptation current, [nA]
-                  'C': 'scalar',        # Membrane capacitance [nF]
-                  'TauM': 'scalar',     # Membrane time constant [ms]
-                  'Vrest': 'scalar',    # Resting membrane voltage (Leak reversal potential) [mV]
-                  'deltaT': 'scalar',   # Slope factor [mV]
-                  'vThresh': 'scalar',  # Threshold voltage [mV]
-                  'vSpike': 'scalar',   # Artificial spike height [mV]
-                  'vReset': 'scalar',   # Reset voltage [mV]
-                  'tauW': 'scalar',     # Adaption time constant [ms]
-                  'a': 'scalar',        # Subthreshold adaption [pS]
-                  'b': 'scalar',        # Spike-triggered adaptation [nA]
-                  'iOffset': 'scalar'}, # Offset current [nA]
+        'var_name_types' : [
+            ('V', 'scalar'),
+            ('W', 'scalar')], # adaptation current, [nA]
+        
+        'param_name_types': {
+            'C': 'scalar',        # Membrane capacitance [nF]
+            'TauM': 'scalar',     # Membrane time constant [ms]
+            'Vrest': 'scalar',    # Resting membrane voltage (Leak reversal potential) [mV]
+            'deltaT': 'scalar',   # Slope factor [mV]
+            'vThresh': 'scalar',  # Threshold voltage [mV]
+            'vSpike': 'scalar',   # Artificial spike height [mV]
+            'vReset': 'scalar',   # Reset voltage [mV]
+            'tauW': 'scalar',     # Adaption time constant [ms]
+            'a': 'scalar',        # Subthreshold adaption [pS]
+            'b': 'scalar',        # Spike-triggered adaptation [nA]
+                'iOffset': 'scalar'}, # Offset current [nA]
     },
     # translations
     (
@@ -237,17 +259,24 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
 
-        'vars' : {'isi': 'scalar',
-                  'timeStepToSpike': 'scalar',
-                  'spikeStart': 'scalar',
-                  'duration': 'scalar'},
+        'var_name_types': [
+            ('timeStepToSpike', 'scalar')],
+        
+        'param_name_types': {
+            'isi': 'scalar',
+            'spikeStart': 'scalar',
+            'duration': 'scalar'},
     },
     # translations
     (
         ('rate',     'isi',         rateToISI,  isiToRate),
         ('start',    'spikeStart'),
         ('duration', 'duration')
-    )
+    ),
+    # extra params
+    {
+        'timeStepToSpike' : 0.0,
+    }
 )
 
 genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
@@ -266,12 +295,15 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
 
         'reset_code' : '$(RefracTime) = $(TauRefrac)',
 
-        'vars' : {'isi': 'scalar',
-                  'TauRefrac': 'scalar',
-                  'timeStepToSpike': 'scalar',
-                  'spikeStart': 'scalar',
-                  'duration': 'scalar',
-                  'RefracTime': 'scalar'},
+        'var_name_types' : [
+            ('timeStepToSpike', 'scalar'),
+            ('RefracTime', 'scalar')],
+        'param_name_types': {    
+            'isi': 'scalar',
+            'TauRefrac': 'scalar',
+            'spikeStart': 'scalar',
+            'duration': 'scalar',
+           },
     },
     # translations
     (
@@ -279,7 +311,12 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
         ('start',      'spikeStart'),
         ('duration',   'duration'),
         ('tau_refrac', 'TauRefrac')
-    )
+    ),
+    # extra params
+    {
+        'timeStepToSpike' : 0.0,
+        'RefraTime' : 0.0
+    }
 )
 
 genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
@@ -300,13 +337,15 @@ genn_neuron_defs['Izhikevich'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(V) >= 29.99',
 
-        'vars' : {'V': 'scalar',
-                  'U': 'scalar',
-                  'a': 'scalar',
-                  'b': 'scalar',
-                  'c': 'scalar',
-                  'd': 'scalar',
-                  'Ioffset': 'scalar'},
+        'var_name_types' : [
+            ('V', 'scalar'),
+            ('U', 'scalar')],
+        'param_name_types': {    
+            'a': 'scalar',
+            'b': 'scalar',
+            'c': 'scalar',
+            'd': 'scalar',
+            'Ioffset': 'scalar'},
     },
     # translations
     (
@@ -363,18 +402,20 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(V) >= 0.0',
 
-        'vars' : {'gNa': 'scalar',
-                  'ENa': 'scalar',
-                  'gK': 'scalar',
-                  'EK': 'scalar',
-                  'gl': 'scalar',
-                  'El': 'scalar',
-                  'C': 'scalar',
-                  'Ioffset': 'scalar',
-                  'V': 'scalar',
-                  'm': 'scalar',
-                  'h': 'scalar',
-                  'n': 'scalar'}
+        'var_name_types' : [
+            ('V', 'scalar'),
+            ('m', 'scalar'),
+            ('h', 'scalar'),
+            ('n', 'scalar')],
+        'param_name_types': {  
+            'gNa': 'scalar',
+            'ENa': 'scalar',
+            'gK': 'scalar',
+            'EK': 'scalar',
+            'gl': 'scalar',
+            'El': 'scalar',
+            'C': 'scalar',
+            'Ioffset': 'scalar'}
     },
     # translations
     (
@@ -388,24 +429,38 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
         ('v',          'V'),
         ('v_offset',   'V_OFFSET'),
         ('i_offset',   'Ioffset'),
-    )
+    ),
+    # extra params
+    {
+        'm' : 0.0529324,
+        'h' : 0.3176767,
+        'n' : 0.5961207
+    }
 )
 
 genn_postsyn_defs = {}
 genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
     # definitions
     {
-        'decay_code' : '$(inSyn)*= exp(-DT / $(tau));',
+        'decay_code' : '$(inSyn)*=$(expDecay);',
 
-        'apply_input_code' : '$(Isyn) += ($(tau) * (1.0 - exp(-DT / $(tau)))) * (1.0 / DT) * $(inSyn);',
+        'apply_input_code' : '$(Isyn) += $(init) * $(inSyn);',
 
-        'vars' : {'tau': 'scalar'}
+        'var_name_types' : [],
+        'param_name_types' : {
+            'expDecay': 'scalar',
+            'init': 'scalar'}
     },
     # translations
     (
-        ('tau_syn_E',  'exc_tau'),
-        ('tau_syn_I',  'inh_tau'),
-    )
+        ('tau_syn_E',  'exc_expDecay',  partial(tauToDecay, "tau_syn_E"),   None),
+        ('tau_syn_I',  'inh_expDecay',  partial(tauToDecay, "tau_syn_I"),   None),
+    ),
+    # extra params
+    {
+        'exc_init': partial(tauToInit, 'tau_syn_E'),
+        'inh_init': partial(tauToInit, 'tau_syn_I')
+    }
 )
 
 genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
@@ -418,14 +473,21 @@ genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
 
         'apply_input_code' : '$(Isyn) += $(x);',
 
-        'vars' : {'tau': 'scalar',
-                  'x': 'scalar'},
+        'var_name_types' : [
+            ('x', 'scalar')],
+        'param_name_types' : {
+            'tau': 'scalar'}
     },
     # translations
     (
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
-    )
+    ),
+    # extra params
+    {
+        'exc_x' : 0.0,
+        'inh_x' : 0.0,
+    }
 )
 genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
     # definitions
@@ -436,10 +498,12 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
         ''',
 
         'apply_input_code' : '$(Isyn) += ($(E) - $(V)) * $(x);',
-
-        'vars' : {'tau': 'scalar',
-                  'E': 'scalar',
-                  'x': 'scalar'},
+        
+        'var_name_types' : [
+            ('x', 'scalar')],
+        'param_name_types' : {
+            'tau': 'scalar',
+            'E': 'scalar'}
     },
     # translations
     (
@@ -447,7 +511,12 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
         ('e_rev_I',    'inh_E'),
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
-    )
+    ),
+    # extra params
+    {
+        'exc_x' : 0.0,
+        'inh_x' : 0.0,
+    }
 )
 
 genn_postsyn_defs['ExpCond'] = GeNNDefinitions({},
@@ -471,11 +540,6 @@ class IF_curr_alpha(cells.IF_curr_alpha, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
     
-    genn_extra_parameters = {
-        'RefracTime' : 0.0,
-        'x'          : 0.0
-    }
-
 class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
     __doc__ = cells.IF_curr_exp.__doc__
 
@@ -484,10 +548,6 @@ class IF_curr_exp(cells.IF_curr_exp, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    genn_extra_parameters = {
-        'RefracTime' : 0.0,
-    }
-
 class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
     __doc__ = cells.IF_cond_alpha.__doc__
 
@@ -495,11 +555,6 @@ class IF_cond_alpha(cells.IF_cond_alpha, GeNNStandardCellType):
     genn_postsyn_name = 'AlphaCond'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
-    
-    genn_extra_parameters = {
-        'RefracTime' : 0.0,
-        'x'          : 0.0
-    }
 
 class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp.__doc__
@@ -508,10 +563,6 @@ class IF_cond_exp(cells.IF_cond_exp, GeNNStandardCellType):
     genn_postsyn_name = 'ExpCond'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
-    
-    genn_extra_parameters = {
-        'RefracTime' : 0.0,
-    }
 
 class IF_facets_hardware1(cells.IF_facets_hardware1):
     __doc__ = cells.IF_facets_hardware1.__doc__
@@ -525,12 +576,6 @@ class HH_cond_exp(cells.HH_cond_exp, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    genn_extra_parameters = {
-        'm' : 0.0529324,
-        'h' : 0.3176767,
-        'n' : 0.5961207
-    }
-
 class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
     __doc__ = cells.IF_cond_exp_gsfa_grr.__doc__
 
@@ -539,30 +584,17 @@ class IF_cond_exp_gsfa_grr(cells.IF_cond_exp_gsfa_grr, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    genn_extra_parameters = {
-        'RefracTime' : 0.0,
-    }
-
 class SpikeSourcePoisson(cells.SpikeSourcePoisson, GeNNStandardCellType):
     __doc__ = cells.SpikeSourcePoisson.__doc__
 
     genn_neuron_name = 'Poisson'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
 
-    genn_extra_parameters = {
-        'timeStepToSpike' : 0.0,
-    }
-
 class SpikeSourcePoissonRefractory(cells.SpikeSourcePoissonRefractory, GeNNStandardCellType):
     __doc__ = cells.SpikeSourcePoissonRefractory.__doc__
 
     genn_neuron_name = 'PoissonRef'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
-
-    genn_extra_parameters = {
-        'timeStepToSpike' : 0.0,
-        'RefraTime' : 0.0
-    }
 
 class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
@@ -624,20 +656,12 @@ class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellT
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
-    genn_extra_parameters = {
-        'x'  : 0.0
-    }
-
 class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_exp_isfa_ista.__doc__
     genn_neuron_name = 'AdExp'
     genn_postsyn_name = 'ExpCond'
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
-
-    genn_extra_parameters = {
-        'x'  : 0.0
-    }
 
 class Izhikevich(cells.Izhikevich, GeNNStandardCellType):
     __doc__ = cells.Izhikevich.__doc__
