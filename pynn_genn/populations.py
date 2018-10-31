@@ -121,12 +121,12 @@ class Population(common.Population):
         for label, inj_curr, inj_cells in self._injected_currents:
             # Take a copy of current source parameters and
             # set its shape to match population
-            cs_params = deepcopy(inj_curr.native_parameters)
-            cs_params.shape = (self.size,)
+            inj_params = deepcopy(inj_curr.native_parameters)
+            inj_params.shape = (self.size,)
 
             # Build current source model
             genn_cs, cs_params, cs_ini =\
-                inj_curr.build_genn_current_source(cs_params)
+                inj_curr.build_genn_current_source(inj_params)
 
             # Extract the applyInj variable
             apply_inj = cs_ini["applyIinj"]
@@ -141,7 +141,7 @@ class Population(common.Population):
             cs = simulator.state.model.add_current_source(
                 label, genn_cs, self.label, cs_params, cs_ini)
 
-            extra_global = inj_curr.get_extra_global_params(cs_params)
+            extra_global = inj_curr.get_extra_global_params(inj_params)
 
             for n, v in iteritems(extra_global):
                 cs.add_extra_global_param(n, v)

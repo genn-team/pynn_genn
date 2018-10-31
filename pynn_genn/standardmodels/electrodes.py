@@ -7,6 +7,7 @@ Standard electrodes for the GeNN module.
 """
 import numpy as np
 from functools import partial
+from lazyarray import larray
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
@@ -25,6 +26,12 @@ def freqToOmega(frequency, **kwargs):
 
 def phaseToRad(phase, **kwargs):
     return phase / 180.0 * np.pi
+
+def stepStart(times, **kwargs):
+    return larray(times.base_value.value[0])
+
+def stepStop(times, **kwargs):
+    return larray(times.base_value.value[-1])
 
 class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     __doc__ = electrodes.DCSource.__doc__
@@ -84,24 +91,19 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
     ),
     # extra param values
     {
-        'tStart' : None,
-        'tStop'  : None,
+        'tStart' : stepStart,
+        'tStop'  : stepStop,
         'currStep' : 0,
         'applyIinj' : 0
     })
 
-
-    def get_currentsource_params(self):
-        ret = {}
-        ret['tStart'] = self.native_parameters['stepTimes'].base_value[0].value[0]
-        ret['tStop'] = self.native_parameters['stepTimes'].base_value[0].value[-1]
-        return ret
-
-    def get_extra_global_params(self):
-        egps = super(StepCurrentSource, self).get_extra_global_params()
-        return {k : np.concatenate([convert_to_array(seq) for seq in v])
-                for k, v in egps.items()}
-
+    def get_extra_global_params(self, native_params):
+        # Concatenate together step amplitudes and times to form extra global parameter
+        return {
+            "stepAmpls" : np.concatenate([seq.value
+                                           for seq in native_params["stepAmpls"]]),
+            "stepTimes" : np.concatenate([seq.value
+                                           for seq in native_params["stepTimes"]])}
 
 
 class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
