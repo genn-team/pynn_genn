@@ -84,7 +84,7 @@ genn_neuron_defs['IF'] = GeNNDefinitions(
         ('i_offset',   'Ioffset'),
         ('v',          'V'),
     ),
-    # extra params
+    # extra param values
     {
         'RefracTime' : 0.0,
     }
@@ -154,7 +154,7 @@ genn_neuron_defs['Adapt'] = GeNNDefinitions(
         ('q_sfa',      'QSfa', 0.001),
         ('q_rr',       'QRr', 0.001)
     ),
-    # extra params
+    # extra param values
     {
         'RefracTime' : 0.0,
     }
@@ -273,7 +273,7 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
         ('start',    'spikeStart'),
         ('duration', 'duration')
     ),
-    # extra params
+    # extra param values
     {
         'timeStepToSpike' : 0.0,
     }
@@ -312,7 +312,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
         ('duration',   'duration'),
         ('tau_refrac', 'TauRefrac')
     ),
-    # extra params
+    # extra param values
     {
         'timeStepToSpike' : 0.0,
         'RefraTime' : 0.0
@@ -430,7 +430,7 @@ genn_neuron_defs['HH'] = GeNNDefinitions(
         ('v_offset',   'V_OFFSET'),
         ('i_offset',   'Ioffset'),
     ),
-    # extra params
+    # extra param values
     {
         'm' : 0.0529324,
         'h' : 0.3176767,
@@ -456,7 +456,7 @@ genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
         ('tau_syn_E',  'exc_expDecay',  partial(tauToDecay, "tau_syn_E"),   None),
         ('tau_syn_I',  'inh_expDecay',  partial(tauToDecay, "tau_syn_I"),   None),
     ),
-    # extra params
+    # extra param values
     {
         'exc_init': partial(tauToInit, 'tau_syn_E'),
         'inh_init': partial(tauToInit, 'tau_syn_I')
@@ -483,7 +483,7 @@ genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
     ),
-    # extra params
+    # extra param values
     {
         'exc_x' : 0.0,
         'inh_x' : 0.0,
@@ -512,7 +512,7 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
         ('tau_syn_E',  'exc_tau'),
         ('tau_syn_I',  'inh_tau'),
     ),
-    # extra params
+    # extra param values
     {
         'exc_x' : 0.0,
         'inh_x' : 0.0,
