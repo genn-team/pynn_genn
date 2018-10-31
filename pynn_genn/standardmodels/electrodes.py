@@ -5,7 +5,8 @@ Standard electrodes for the GeNN module.
 :copyright: Copyright 2006-2016 by the PyNN team, see AUTHORS.
 :license: CeCILL, see LICENSE for details.
 """
-import numpy
+import numpy as np
+from functools import partial
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
@@ -13,6 +14,17 @@ from pygenn.genn_model import create_dpf_class
 from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
+
+# Function to convert mean 'rate' parameter 
+# to mean interspike interval (in timesteps)
+def mulDT(param_name, dt, **kwargs):
+    return kwargs[param_name] * dt
+
+def freqToOmega(frequency, **kwargs):
+    return frequency * 2.0 * np.pi / 1000.0
+
+def phaseToRad(phase, **kwargs):
+    return phase / 180.0 * np.pi
 
 class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     __doc__ = electrodes.DCSource.__doc__
@@ -25,10 +37,12 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
                 $(injectCurrent, $(amplitude));
             }
         ''',
-        'vars' : {'tStart': 'scalar',
-                  'tStop': 'scalar',
-                  'amplitude': 'scalar',
-                  'applyIinj': 'unsigned char'}
+        'var_name_types': [
+            ('applyIinj', "unsigned char")],
+        'param_name_types' : {
+            'tStart': 'scalar',
+            'tStop': 'scalar',
+            'amplitude': 'scalar'}
     },
     # translations
     (
@@ -36,9 +50,10 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
         ('stop',       'tStop'),
         ('amplitude',  'amplitude')
     ),
-    )
-
-    genn_extra_parameters = {'applyIinj' : 0}
+    # extra param values
+    {
+        'applyIinj' : 0
+    })
 
 class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource):
     __doc__ = electrodes.StepCurrentSource.__doc__
@@ -53,10 +68,12 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
                 $(injectCurrent, $(stepAmpls)[$(currStep)-1]);
             }
         ''',
-        'vars' : {'tStart': 'scalar',
-                  'tStop': 'scalar',
-                  'applyIinj': 'unsigned char',
-                  'currStep': 'int'},
+        'var_name_types': [
+            ('applyIinj', "unsigned char"),
+            ('currStep', 'int')],
+        'param_name_types' : {
+            'tStart': 'scalar',
+            'tStop': 'scalar'},
 
         'extra_global_params' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
     },
@@ -65,14 +82,14 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
         ('amplitudes',  'stepAmpls'),
         ('times',       'stepTimes')
     ),
-    )
-
-    genn_extra_parameters = {
+    # extra param values
+    {
         'tStart' : None,
         'tStop'  : None,
         'currStep' : 0,
         'applyIinj' : 0
-    }
+    })
+
 
     def get_currentsource_params(self):
         ret = {}
@@ -82,7 +99,7 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
 
     def get_extra_global_params(self):
         egps = super(StepCurrentSource, self).get_extra_global_params()
-        return {k : numpy.concatenate([convert_to_array(seq) for seq in v])
+        return {k : np.concatenate([convert_to_array(seq) for seq in v])
                 for k, v in egps.items()}
 
 
@@ -98,24 +115,29 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
                 $(injectCurrent, $(Ampl) * sin($(Omega) * $(t) + $(PhaseRad)) + $(Offset));
             }
         ''',
-        'param_names' : ['tStart', 'tStop', 'Ampl', 'Freq', 'Phase', 'Offset'],
-        'var_name_types' : [('applyIinj', 'unsigned char')],
-        'derived_params' : [
-            ('Omega', create_dpf_class(lambda pars, dt: pars[3] * 2 * numpy.pi / 1000.0)()),
-            ('PhaseRad', create_dpf_class(lambda pars, dt: pars[4] / 180 * numpy.pi)())]
+        'var_name_types': [
+            ('applyIinj', "unsigned char")],
+        'param_name_types' : {
+            'tStart': 'scalar', 
+            'tStop': 'scalar', 
+            'Ampl': 'scalar', 
+            'Omega': 'scalar', 
+            'PhaseRad': 'scalar', 
+            'Offset': 'scalar'},
     },
     # translations
     (
         ('start',      'tStart'),
         ('stop',       'tStop'),
         ('amplitude',  'Ampl'),
-        ('frequency',  'Freq'),
-        ('phase',      'Phase'),
+        ('frequency',  'Omega',     freqToOmega,    None),
+        ('phase',      'PhaseRad',  phaseToRad,     None),
         ('offset',     'Offset')
     ),
-    )
-
-    genn_extra_parameters = {'applyIinj' : 0}
+    # extra param values
+    {
+        'applyIinj' : 0
+    })
 
 class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSource):
     __doc__ = electrodes.NoisyCurrentSource.__doc__
@@ -128,20 +150,24 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
                 $(injectCurrent, $(meanDT) + $(gennrand_normal) * $(sdDT));
             }
         ''',
-        'param_names' : ['tStart', 'tStop', 'mean', 'sd', '_DT'],
-        'var_name_types' : [('applyIinj', 'unsigned char')],
-        'derived_params' : [
-            ('meanDT', create_dpf_class(lambda pars, dt: pars[2] * pars[4])()),
-            ('sdDT', create_dpf_class(lambda pars, dt: pars[3] * pars[4])())]
+        
+        'var_name_types': [
+            ('applyIinj', "unsigned char")],
+        'param_name_types' : {
+            'tStart': 'scalar', 
+            'tStop': 'scalar', 
+            'meanDT': 'scalar', 
+            'sdDT': 'scalar'}
     },
     # translations
     (
         ('start',      'tStart'),
         ('stop',       'tStop'),
-        ('mean',       'mean'),
-        ('stdev',      'sd'),
+        ('mean',       'meanDT',    partial(mulDT, "mean"),     None),
+        ('stdev',      'sdDT',      partial(mulDT, "stdev"),    None),
         ('dt',         '_DT'),
     ),
-    )
-
-    genn_extra_parameters = {'applyIinj' : 0}
+    # extra param values
+    {
+        'applyIinj' : 0
+    })
