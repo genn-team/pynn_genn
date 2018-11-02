@@ -27,8 +27,6 @@ class GeNNStandardModelType(StandardModelType):
 
     def build_genn_model(self, defs, native_params, init_vals,
                          create_custom_model, prefix=""):
-        assert not defs.native
-
         # Take a deep copy of the definitions
         genn_defs = deepcopy(defs.definitions)
 
@@ -276,8 +274,7 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
 
 class GeNNDefinitions(object):
 
-    def __init__(self, definitions, translations, extra_param_values={}, native=False):
-        self.native = native
+    def __init__(self, definitions, translations, extra_param_values={}):
         self.definitions = definitions
         self.translations = translations
         self.extra_param_values = extra_param_values

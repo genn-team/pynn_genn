@@ -462,6 +462,33 @@ genn_postsyn_defs['ExpCurr'] = GeNNDefinitions(
         'inh_init': partial(tauToInit, 'tau_syn_I')
     }
 )
+    
+genn_postsyn_defs['ExpCond'] = GeNNDefinitions(
+    # definitions
+    {
+        'decay_code' : '$(inSyn)*=$(expDecay);',
+
+        'apply_input_code' : '$(Isyn) += $(init) * $(inSyn) * ($(E) - $(V));',
+
+        'var_name_types' : [],
+        'param_name_types' : {
+            'expDecay': 'scalar',
+            'init': 'scalar',
+            'E': 'scalar'}
+    },
+    # translations
+    (
+        ('e_rev_E',    'exc_E'),
+        ('e_rev_I',    'inh_E'),
+        ('tau_syn_E',  'exc_expDecay',  partial(tauToDecay, "tau_syn_E"),   None),
+        ('tau_syn_I',  'inh_expDecay',  partial(tauToDecay, "tau_syn_I"),   None)
+    ),
+    # extra param values
+    {
+        'exc_init': partial(tauToInit, 'tau_syn_E'),
+        'inh_init': partial(tauToInit, 'tau_syn_I')
+    }
+)
 
 genn_postsyn_defs['AlphaCurr'] = GeNNDefinitions(
     # definitions
@@ -517,17 +544,6 @@ genn_postsyn_defs['AlphaCond'] = GeNNDefinitions(
         'exc_x' : 0.0,
         'inh_x' : 0.0,
     }
-)
-
-genn_postsyn_defs['ExpCond'] = GeNNDefinitions({},
-    # translations
-    (
-        ('e_rev_E',    'exc_E'),
-        ('e_rev_I',    'inh_E'),
-        ('tau_syn_E',  'exc_tau'),
-        ('tau_syn_I',  'inh_tau')
-    ),
-    True # use native
 )
 
 genn_postsyn_defs['DeltaCurr'] = GeNNDefinitions({}, (), True)
