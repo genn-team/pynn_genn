@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 from six import iteritems
 from pyNN import recording
 from . import simulator
@@ -33,7 +33,8 @@ class Monitor(object):
             [self.data.append([]) for i in range(len(self.id_set) - old_id_len)]
 
         iimap_len = len(self.id_data_idx_map)
-        self.id_data_idx_map.update({idd - self.start_id : i + iimap_len for i, idd in enumerate(new_ids)})
+        self.id_data_idx_map.update({idd - self.start_id : i + iimap_len 
+                                     for i, idd in enumerate(new_ids)})
 
         self.sampling_interval = sampling_interval or 1
 
@@ -45,7 +46,9 @@ class Monitor(object):
 
         data_ids = [self.id_data_idx_map[idd] for idd in ids]
 
-        return numpy.array(self.data)[data_ids,:].T if len(self.data) > 1 else numpy.array(self.data).T
+        return (np.array(self.data)[data_ids,:].T 
+                if len(self.data) > 1 
+                else np.array(self.data).T)
 
     def get_time(self):
         return self.time
@@ -62,7 +65,7 @@ class Monitor(object):
         if (t % self.sampling_interval < 1):
             self.time.append(t)
             for idd, i in iteritems(self.id_data_idx_map):
-                self.data[i].append(self.data_view[idd])
+                self.data[i].append(np.copy(self.data_view[idd]))
 
 
 class StateMonitor(Monitor):
@@ -128,7 +131,7 @@ class Recorder(recording.Recorder):
 
     def _get_spiketimes(self, id):
         if 'spikes' not in self.monitors:
-            spikes = numpy.array([])
+            spikes = np.array([])
         else:
             spikes = self.monitors['spikes'].get_data(id)
         return spikes

@@ -212,10 +212,29 @@ class Projection(common.Projection, ContextMixin):
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
-    def _get_attributes_as_arrays(self, *names):
-        assert False
+    def _get_attributes_as_arrays(self, names, multiple_synapses="sum"):
+         # Dig out reference to GeNN model
+        genn_model = self._simulator.state.model
 
-    def _get_attributes_as_list(self, *names):
+        # Pull projection state from device
+        genn_model.pull_state_from_device(self.label)
+
+        # If projection is sparse
+        variables = []
+        if self.use_sparse:
+            raise Exception("Reading attributes of sparse projections "
+                            "into arrays is currently not supported")
+        # Otherwise 
+        else:
+            # Loop through variables
+            for n in names[0]:
+                variables.append(np.reshape(self._pop.get_var_values(n), 
+                                            (self.pre.size, self.post.size)))
+
+        # Return variables as tuple
+        return tuple(variables)
+    
+    def _get_attributes_as_list(self, names):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
@@ -223,19 +242,22 @@ class Projection(common.Projection, ContextMixin):
         genn_model.pull_state_from_device(self.label)
 
         # Loop through names of variables that are required
-        # **NOTE** no idea why they come as a list inside a tuple
         variables = []
-        for n in names[0]:
+        for n in names:
             if n == "presynaptic_index":
+                # If projection is sparse
                 if self.use_sparse:
-                    assert False
+                    raise Exception("Reading presynaptic indices of sparse "
+                                    "projections is currently not supported")
                 # Otherwise generate presynaptic indices for dense structure
                 else:
                     variables.append(np.repeat(np.arange(self.pre.size),
                                                self.post.size))
             elif n == "postsynaptic_index":
+                # If projection is sparse
                 if self.use_sparse:
-                    assert False
+                    raise Exception("Reading postsynaptic indices of sparse "
+                                    "projections is currently not supported")
                 # Otherwise generate postsynaptic indices for dense structure
                 else:
                     variables.append(np.tile(np.arange(self.post.size),
