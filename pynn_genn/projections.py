@@ -227,9 +227,20 @@ class Projection(common.Projection, ContextMixin):
         variables = []
         for n in names[0]:
             if n == "presynaptic_index":
-                assert False
+                if self.use_sparse:
+                    assert False
+                # Otherwise generate presynaptic indices for dense structure
+                else:
+                    variables.append(np.repeat(np.arange(self.pre.size),
+                                               self.post.size))
             elif n == "postsynaptic_index":
-                assert False
+                if self.use_sparse:
+                    assert False
+                # Otherwise generate postsynaptic indices for dense structure
+                else:
+                    variables.append(np.tile(np.arange(self.post.size),
+                                             self.pre.size))
+
             # Otherwise add view of GeNN variable to list
             else:
                 variables.append(self._pop.get_var_values(n))
