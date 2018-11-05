@@ -13,7 +13,7 @@ from pyNN.connectors import AllToAllConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 from . import simulator
-
+from model import sanitize_label
 from contexts import ContextMixin
 '''
 class Connection(common.Connection):
@@ -102,22 +102,10 @@ class Projection(common.Projection, ContextMixin):
     def __init__(self, presynaptic_population, postsynaptic_population,
                  connector, synapse_type, source=None, receptor_type=None,
                  space=Space(), label=None):
-        if label is None:
-            # override label autogeneration because GeNN does not support unicode
-            pre_label = presynaptic_population.label
-            post_label = postsynaptic_population.label
-            if pre_label and post_label:
-                # adding a number to each projection to avoid collisions
-                # there can be several projections between two populations
-                label = '{}_{}_{}'.format(pre_label, post_label,
-                        len(self._simulator.state.projections))
-        # make sure that the label is alphanumeric
-        else:
-            label = ''.join(c for c in label if c.isalnum())
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
                                    space, label)
-        
+
         # Initialise the context stack
         ContextMixin.__init__(self, {})
 
@@ -193,6 +181,10 @@ class Projection(common.Projection, ContextMixin):
                 self.subprojections[-1].connections -= (0, post_cum_size)
                 post_cum_size += post_pop.size
         else:
+            # Give projection a unique GeNN label
+            # **NOTE** superclass will always populate label PROPERTY with something moderately useful
+            self._genn_label = "projection_%u_%s" % (Projection._nProj, sanitize_label(self.label))
+
             # add projection to the simulator only if it does not have complex assemblies
             # otherwise subprojections are added above
             self._simulator.state.projections.append(self)
@@ -226,7 +218,7 @@ class Projection(common.Projection, ContextMixin):
         genn_model = self._simulator.state.model
 
         # Pull projection state from device
-        genn_model.pull_state_from_device(self.label)
+        genn_model.pull_state_from_device(self._genn_label)
 
         # If projection is sparse
         variables = []
@@ -248,7 +240,7 @@ class Projection(common.Projection, ContextMixin):
         genn_model = self._simulator.state.model
 
         # Pull projection state from device
-        genn_model.pull_state_from_device(self.label)
+        genn_model.pull_state_from_device(self._genn_label)
 
         # Loop through names of variables that are required
         variables = []
@@ -340,11 +332,13 @@ class Projection(common.Projection, ContextMixin):
                 if hasattr(pop, 'parent'):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
             pre_indices = [idx for idx in idc for idc in popsIdc]
-
-        # if population view
+        # Otherwise, if presynaptic population is a view
         elif hasattr(prePop, 'parent'):
-            assert False
-            pre_indices = prePop.index_in_grandparent(list(pre_indices))
+            # Convert indices in presynaptic view into indices
+            # in grandparent presynaptic population
+            pre_indices = prePop.index_in_grandparent(pre_indices)
+
+            # Use grandparent presynaptic population as prepop
             prePop = prePop.grandparent;
 
         postPop = self.post
@@ -364,16 +358,19 @@ class Projection(common.Projection, ContextMixin):
                 if hasattr(pop, 'parent'):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
             pre_indices = [idx for idc in popsIdc for idx in idc]
-        # if population view
+        # Otherwise, if the postsynaptic population is a view
         elif hasattr(postPop, 'parent'):
-            assert Falses
+            # Convert indices in postsynaptic view into indices
+            # in grandparent postsynaptic population
             post_indices = postPop.index_in_grandparent(post_indices)
+
+            # Use grandparent presynaptic population as post pop
             postPop = postPop.grandparent;
 
-        if self.receptor_type == 'inhibitory':
-            prefix = 'inh_'
-        else:
-            prefix = 'exc_'
+        # Set prefix based on receptor type
+        # **NOTE** this is used to translate the right set of
+        # neuron parameters into postsynaptic model parameters
+        prefix = 'inh_' if self.receptor_type == 'inhibitory' else 'exc_'
 
         # Build GeNN postsynaptic model
         self._psm_model, psm_params, psm_ini =\
@@ -385,7 +382,7 @@ class Projection(common.Projection, ContextMixin):
             self.synapse_type.build_genn_wum(conn_params, self.initial_values)
 
         self._pop = simulator.state.model.add_synapse_population(
-            self.label, matrixType, delay_steps,
+            self._genn_label, matrixType, delay_steps,
             prePop._pop, postPop._pop,
             self._wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
             self._psm_model, psm_params, psm_ini)

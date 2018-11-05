@@ -122,9 +122,9 @@ class Recorder(recording.Recorder):
     def _record_vars(self, t):
         if len(self.recorded) > 0:
             if 'spikes' in self.recorded:
-                self._simulator.state.model.pull_current_spikes_from_device(self.population.label)
+                self._simulator.state.model.pull_current_spikes_from_device(self.population._genn_label)
             if len(self.recorded) - ('spikes' in self.recorded) > 0:
-                self._simulator.state.model.pull_state_from_device(self.population.label)
+                self._simulator.state.model.pull_state_from_device(self.population._genn_label)
 
         for monitor in self.monitors.values():
             monitor(t)

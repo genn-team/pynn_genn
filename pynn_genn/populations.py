@@ -6,8 +6,7 @@ from pyNN.standardmodels import StandardCellType
 from pyNN.parameters import ParameterSpace, Sequence, simplify
 from . import simulator
 from .recording import Recorder
-from .standardmodels.cells import SpikeSourceArray
-
+from model import sanitize_label
 
 class Assembly(common.Assembly):
     _simulator = simulator
@@ -68,11 +67,16 @@ class Population(common.Population):
         """
         Create a population of neurons all of the same type.
         """
-        # make sure that the label is alphanumeric
-        if label is not None:
-            label = ''.join( c for c in label if c.isalnum())
         super(Population, self).__init__(size, cellclass, cellparams, structure,
                 initial_values, label)
+
+        # Give population a unique GeNN label
+        # If a label is passed we include a sanitized version of this in it
+        # **NOTE** while superclass will always populate label PROPERTY the result isn't useful
+        if label is None:
+            self._genn_label = "population_%u" % Population._nPop
+        else:
+            self._genn_label = "population_%u_%s" % (Population._nPop, sanitize_label(label))
 
     def _create_cells(self):
         id_range = np.arange(simulator.state.id_counter,
@@ -107,7 +111,7 @@ class Population(common.Population):
             self.celltype.build_genn_neuron(self._parameters, self.initial_values)
 
         self._pop = simulator.state.model.add_neuron_population(
-            self.label, self.size, self._genn_nmodel,
+            self._genn_label, self.size, self._genn_nmodel,
             neuron_params, neuron_ini)
 
         # Get any extra global parameters defined by the model
@@ -139,7 +143,7 @@ class Population(common.Population):
             apply_inj[inj_indices] = 1
 
             cs = simulator.state.model.add_current_source(
-                label, genn_cs, self.label, cs_params, cs_ini)
+                label, genn_cs, self._genn_label, cs_params, cs_ini)
 
             extra_global = inj_curr.get_extra_global_params(inj_params)
 

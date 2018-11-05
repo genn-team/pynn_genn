@@ -21,6 +21,13 @@ genn_to_numpy_types = {
     'int': np.int32,
     'unsigned int': np.uint32}
 
+def sanitize_label(label):
+    # Convert unicode label to ASCII
+    ascii_label = label.encode("ascii", "ignore")
+
+    # Strip out any non-alphanumerical characters
+    return "".join(c for c in ascii_label if c.isalnum())
+
 class GeNNStandardModelType(StandardModelType):
 
     genn_extra_parameters = {}
@@ -255,7 +262,7 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
         __doc__ = StandardCurrentSource.inject_into.__doc__
         for pop, cs in groupby(cells, key=lambda c: c.parent):
             pop._injected_currents.append(
-                    (pop.label + '_' + self.__class__.__name__ + '_' + str(pop._simulator.state.num_current_sources),
+                    ("%s_%s_%u" % (pop._genn_label, self.__class__.__name__, pop._simulator.state.num_current_sources),
                      self,
                      list(cs)) )
             pop._simulator.state.num_current_sources += 1
