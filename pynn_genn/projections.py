@@ -126,13 +126,20 @@ class Projection(common.Projection, ContextMixin):
                            else True)
     
         # process assemblies
+        # **THINK** I don't think we want to add child PROJECTIONS here - 
+        # Perhaps just build list of sub connections and expand each of these seperately
+        # If presynaptic population has 'populations' attribute i.e. it is an assembly
         if hasattr(self.pre, 'populations') and not self.pre.single_population():
             assert False
             setattr(self, 'subprojections', [])
             self.subprojections = []
             pre_pops = self.pre.populations
+            
+            # If postsynaptic population is also an assembly
             if hasattr(self.post, 'populations') and not self.post.single_population():
                 post_pops = self.post.populations
+                
+                # Loop through all combinations of pre and postsynaptic populations
                 pre_cum_size = 0
                 for pre_pop in pre_pops:
                     post_cum_size = 0
@@ -151,7 +158,9 @@ class Projection(common.Projection, ContextMixin):
                         subconns -= Connection(pre_cum_size, post_cum_size)
                         post_cum_size += post_pop.size
                     pre_cum_size += pre_pop.size
+            # Otherwise, if postsynaptic population isn't assembly
             else:
+                # Loop through presynaptic populations
                 pre_cum_size = 0
                 for pre_pop in pre_pops:
                     subconns = self.connections[
