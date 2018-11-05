@@ -229,10 +229,10 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                       for n in genn_defs["param_names"]}
 
         # Convert variables to arrays with correct data type
-        wum_init = {n: np.asarray(conn_params[n],
-                                  dtype=(genn_to_numpy_types[t]
-                                         if t in genn_to_numpy_types
-                                         else np.float32))
+        wum_init = {n: conn_params[n].astype(genn_to_numpy_types[t]
+                                             if t in genn_to_numpy_types
+                                             else np.float32,
+                                             copy=False)
                     for n, t in iteritems(vars)}
 
         # Zero all presynaptic variables

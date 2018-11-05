@@ -112,82 +112,13 @@ class Projection(common.Projection, ContextMixin):
         # **TODO** leave type up to Connector types
         self.use_sparse = (False if isinstance(connector, AllToAllConnector)
                            else True)
-    
-        # process assemblies
-        # **THINK** I don't think we want to add child PROJECTIONS here - 
-        # Perhaps just build list of sub connections and expand each of these seperately
-        # If presynaptic population has 'populations' attribute i.e. it is an assembly
-        if hasattr(self.pre, 'populations') and not self.pre.single_population():
-            assert False
-            setattr(self, 'subprojections', [])
-            self.subprojections = []
-            pre_pops = self.pre.populations
-            
-            # If postsynaptic population is also an assembly
-            if hasattr(self.post, 'populations') and not self.post.single_population():
-                post_pops = self.post.populations
-                
-                # Loop through all combinations of pre and postsynaptic populations
-                pre_cum_size = 0
-                for pre_pop in pre_pops:
-                    post_cum_size = 0
-                    for post_pop in post_pops:
-                        subconns = self.connections[
-                                np.logical_and(
-                                    self.connections >= Connection(pre_cum_size, post_cum_size),
-                                    self.connections < Connection(pre_cum_size + pre_pop.size - 1,
-                                                                  post_cum_size + post_pop.size))]
-                        if len(subconns) == 0:
-                            continue
-                        self.subprojections.append(
-                                Projection(pre_pop, post_pop, connector,
-                                            synapse_type, source, receptor_type,
-                                            space, None))
-                        subconns -= Connection(pre_cum_size, post_cum_size)
-                        post_cum_size += post_pop.size
-                    pre_cum_size += pre_pop.size
-            # Otherwise, if postsynaptic population isn't assembly
-            else:
-                # Loop through presynaptic populations
-                pre_cum_size = 0
-                for pre_pop in pre_pops:
-                    subconns = self.connections[
-                            np.logical_and(
-                                self.connections >= Connection(pre_cum_size, 0),
-                                self.connections < Connection(pre_cum_size + pre_pop.size, 0))]
-                    if len(subconns) == 0:
-                        continue
-                    self.subprojections.append(Projection(pre_pop, self.post,
-                        connector, synapse_type, source, receptor_type, space, None))
-                    subconns -= Connection(pre_cum_size, 0)
-                    self.subprojections[-1].connections = subconns
-                    pre_cum_size += pre_pop.size
 
-        elif hasattr(self.post, 'populations') and not self.post.single_population():
-            assert False
-            setattr(self, 'subprojections', [])
-            self.subprojections = []
-            post_pops = self.post.populations
-            post_cum_size = 0
-            for post_pop in post_pops:
-                self.subprojections.append(
-                    Projection(self.pre, post_pop, connector, synapse_type,
-                                source, receptor_type, space, None))
-                self.subprojections[-1].connections = self.connections[
-                        np.logical_and(
-                            self.connections >= Connection(0, post_cum_size),
-                            self.connections < Connection(self.pre.size,
-                                                          post_cum_size + post_pop.size))]
-                self.subprojections[-1].connections -= (0, post_cum_size)
-                post_cum_size += post_pop.size
-        else:
-            # Give projection a unique GeNN label
-            # **NOTE** superclass will always populate label PROPERTY with something moderately useful
-            self._genn_label = "projection_%u_%s" % (Projection._nProj, sanitize_label(self.label))
+        # Give projection a unique GeNN label
+        # **NOTE** superclass will always populate label PROPERTY with something moderately useful
+        self._genn_label = "projection_%u_%s" % (Projection._nProj, sanitize_label(self.label))
 
-            # add projection to the simulator only if it does not have complex assemblies
-            # otherwise subprojections are added above
-            self._simulator.state.projections.append(self)
+        # Add projection to the simulator
+        self._simulator.state.projections.append(self)
 
     def __len__(self):
         return len(self.connections)
@@ -286,13 +217,21 @@ class Projection(common.Projection, ContextMixin):
         conn_params = defaultdict(list)
 
         # Build connectivity
+        # **NOTE** this build connector matching shape of PROJECTION
+        # this means that it will match pre and post view or assembly
         with self.get_new_context(conn_pre_indices=pre_indices, 
                                   conn_post_indices=post_indices,
                                   conn_params=conn_params):
             self._connector.connect(self)
-        
+
+        # Convert pre and postsynaptic indices to numpy arrays
         pre_indices = np.asarray(pre_indices, dtype=np.uint32)
         post_indices = np.asarray(post_indices, dtype=np.uint32)
+
+        # Convert connection parameters to numpy arrays
+        # **THINK** should we do something with types here/use numpy record array?
+        for c in conn_params:
+            conn_params[c] = np.asarray(conn_params[c])
 
         num_synapses = len(pre_indices)
         if num_synapses == 0:
@@ -315,9 +254,13 @@ class Projection(common.Projection, ContextMixin):
         else:
             delay_steps = int(delay_steps[0])
         
+        # If presynaptic population is assembly
         prePop = self.pre
-        # if assembly with one base population
-        if hasattr(self.pre, 'populations'):
+        #pre_populations = []
+        if isinstance(self.pre, common.Assembly):
+            # Loop through populations that make up presynaptic assembly
+            for p in self.pre.populations:
+                ss
             assert False
             prePop = self.pre.populations[0]
             if hasattr(prePop, 'parent'):
@@ -333,7 +276,7 @@ class Projection(common.Projection, ContextMixin):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
             pre_indices = [idx for idx in idc for idc in popsIdc]
         # Otherwise, if presynaptic population is a view
-        elif hasattr(prePop, 'parent'):
+        if isinstance(self.pre, common.PopulationView):
             # Convert indices in presynaptic view into indices
             # in grandparent presynaptic population
             pre_indices = prePop.index_in_grandparent(pre_indices)
@@ -341,15 +284,10 @@ class Projection(common.Projection, ContextMixin):
             # Use grandparent presynaptic population as prepop
             prePop = prePop.grandparent;
 
+        # If postsynaptic population is assembly
         postPop = self.post
-        # if assembly with one base population
-        if hasattr(self.post, 'populations'):
+        if isinstance(self.post, common.Assembly):
             assert False
-            postPop = self.post.populations[0]
-            if hasattr(postPop, 'parent'):
-                postPop = postPop.grandparent;
-            popsIdc = []
-            cumSize = 0
             for pop in self.post.populations:
                 mask = np.logical_and(cumSize <=  post_indices, 
                                       post_indices < (cumSize + pop.size))
@@ -359,7 +297,7 @@ class Projection(common.Projection, ContextMixin):
                     popsIdc[-1] = pop.index_in_grandparent(popsIdc[-1])
             pre_indices = [idx for idc in popsIdc for idx in idc]
         # Otherwise, if the postsynaptic population is a view
-        elif hasattr(postPop, 'parent'):
+        if isinstance(self.post, common.PopulationView):
             # Convert indices in postsynaptic view into indices
             # in grandparent postsynaptic population
             post_indices = postPop.index_in_grandparent(post_indices)
