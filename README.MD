@@ -5,7 +5,7 @@ This project bridges [GeNN](http://genn-team.github.io/genn/), a GPU enhanced Ne
 ### Installing PyGeNN
  - clone GeNN (https://github.com/genn-team/genn)
  - **TEMPORARILY** checkout the ``python_wrapper_update_take_2`` branch
- - set the ``GENN_PATH`` environment variable to 
+ - set the ``GENN_PATH`` environment variable to point to the GeNN directory.
  - from the GeNN directory, build GeNN as a dynamic library using ``make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/``
  - install with setup tools using ``python setup.py install`` command
  
