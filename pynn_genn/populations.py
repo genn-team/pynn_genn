@@ -11,23 +11,11 @@ from model import sanitize_label
 class Assembly(common.Assembly):
     _simulator = simulator
 
-    def single_population(self):
-        ref_label = self.populations[0].label
-        if hasattr(self.populations[0], 'parent'):
-            ref_label = self.populations[0].grandparent.label
-        for pop in self.populations:
-            label = pop.label
-            if hasattr(pop, 'parent'):
-                label = pop.grandparent.label
-            if label != ref_label:
-                return False
-        return True
-
     @property
-    def base_populations(self):
-        return [pop.grandparent if hasattr(pop, 'parent') else pop
-                 for pop in self.populations]
-
+    def local_size(self):
+        """for reasons unknown, assemblies don't implement this
+        which breaks connection building if there is a callback"""
+        return sum(p.local_size for p in self.populations)
 
 class PopulationView(common.PopulationView):
     _assembly_class = Assembly
