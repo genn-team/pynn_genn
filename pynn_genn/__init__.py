@@ -72,8 +72,6 @@ def end(compatible_output=True):
         io = get_io(filename)
         population.write_data(io, variables)
     simulator.state.write_on_end = []
-    # should have common implementation of end()
-    simulator.state.clear()
 
 run, run_until = common.build_run(simulator)
 run_for = run
