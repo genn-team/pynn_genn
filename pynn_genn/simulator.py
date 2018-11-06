@@ -24,8 +24,23 @@ class State(common.control.BaseState):
         self.num_current_sources = 0
 
     @property
-    def tt( self ):
-        return self.model.T
+    def t( self ):
+        if self._built:
+            return self.model.t
+        else:
+            return 0.0
+
+    @t.setter
+    def t(self, t):
+        if self._built:
+            self.model.t = t
+            self.model.timestep = int(round(t / self.dt))
+        elif t != 0.0:
+            assert False
+
+    @t.setter
+    def dt( self, _dt ):
+        self.model.dT = _dt
 
     @property
     def dt( self ):
@@ -54,12 +69,23 @@ class State(common.control.BaseState):
         if not self.running:
             for rec in self.recorders:
                 rec.init_data_views()
+
+        # Simulate
         self.running = True
-        while self.t < tstop:
+        while True:
+            # Get time at start of step (this is correct timestamp for recorded data)
+            step_time = self.t
+
+            # Advance model time
             self.model.step_time()
-            self.t += self.dt
+
+            # Record any variables being recorded
             for rec in self.recorders:
-                rec._record_vars(self.t)
+                rec._record_vars(step_time)
+
+            # If we've passed stop time, stop
+            if self.t > tstop:
+                break
 
     def clear(self):
         self.model = GeNNModel('float', 'GeNNModel')

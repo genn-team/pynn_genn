@@ -1,4 +1,5 @@
 import numpy as np
+from math import fmod
 from six import iteritems
 from pyNN import recording
 from . import simulator
@@ -21,8 +22,7 @@ class Monitor(object):
         self._id_set = _id_set
         self.ids = [idd - self.start_id for idd in self._id_set]
 
-    def record(self, new_ids, sampling_interval):
-
+    def record(self, new_ids):
         if self.data is None:
             self.id_set = new_ids
             self.data = [[] for _ in new_ids]
@@ -35,8 +35,6 @@ class Monitor(object):
         iimap_len = len(self.id_data_idx_map)
         self.id_data_idx_map.update({idd - self.start_id : i + iimap_len 
                                      for i, idd in enumerate(new_ids)})
-
-        self.sampling_interval = sampling_interval or 1
 
     def get_data(self, ids):
         if isinstance(ids, list):
@@ -53,18 +51,12 @@ class Monitor(object):
     def get_time(self):
         return self.time
 
-    def enlarge_storage(self, idx):
-        self.data_size[idx] *= 2
-        self.data[idx].resize((self.data_size[idx],))
-        if self.data_size[idx]/2 <= len(self.time):
-            self.time.resize((self.data_size[idx],))
-
     def __call__(self, t):
         """Fetch new data"""
-
-        if (t % self.sampling_interval < 1):
+        if fmod(t, self.recorder.sampling_interval) < 1.0e-6:
             self.time.append(t)
             for idd, i in iteritems(self.id_data_idx_map):
+                # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
 
 
@@ -73,8 +65,7 @@ class StateMonitor(Monitor):
     def __init__(self, parent, variable):
         super(StateMonitor, self).__init__(parent)
         self.var = variable
-        self.translated = (parent.population.celltype.translations
-                [variable]['translated_name'])
+        self.translated = (parent.population.celltype.translations[variable]['translated_name'])
 
     def init_data_view(self):
         self.data_view = (self.recorder.population._pop.vars[self.translated].view)
@@ -93,8 +84,7 @@ class SpikeMonitor(Monitor):
 
     def __call__(self, t):
         """Fetch new data"""
-
-        if (t % self.sampling_interval < 1):
+        if fmod(t, self.recorder.sampling_interval) < 1.0e-6:
             for i in self.recorder.population._pop.current_spikes:
                 if i in self.id_data_idx_map:
                     self.data[self.id_data_idx_map[i]].append(t)
@@ -108,12 +98,17 @@ class Recorder(recording.Recorder):
         self.monitors = {}
 
     def _record(self, variable, new_ids, sampling_interval=None):
+        # Cache sampling interval
+        # **NOTE** base class sets default
+        if sampling_interval is not None:
+            self.sampling_interval = sampling_interval
+
         if variable not in self.monitors:
             if variable == 'spikes':
                 self.monitors[variable] = SpikeMonitor(self)
             else:
                 self.monitors[variable] = StateMonitor(self, variable)
-            self.monitors[variable].record(new_ids, sampling_interval)
+            self.monitors[variable].record(new_ids)
 
     def init_data_views(self):
         for monitor in self.monitors.values():
