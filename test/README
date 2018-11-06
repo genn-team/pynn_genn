@@ -1,0 +1,8 @@
+PyNN testing is divided into several different types of test:
+    * checking the API is syntactically consistent between different backends
+    * unit tests
+    * system tests
+    * running the example scripts
+    * doctests    
+
+For full documentation on testing, see:http://neuralensemble.org/docs/PyNN/developers/contributing.html#testing
