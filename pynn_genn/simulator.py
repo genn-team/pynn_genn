@@ -74,14 +74,14 @@ class State(common.control.BaseState):
         self.running = True
         while True:
             # Get time at start of step (this is correct timestamp for recorded data)
-            step_time = self.t
+            timestep = self.model.timestep
 
             # Advance model time
             self.model.step_time()
 
             # Record any variables being recorded
             for rec in self.recorders:
-                rec._record_vars(step_time)
+                rec._record_vars(timestep)
 
             # If we've passed stop time, stop
             if self.t > tstop:

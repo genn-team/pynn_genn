@@ -22,7 +22,9 @@ class Monitor(object):
         self._id_set = _id_set
         self.ids = [idd - self.start_id for idd in self._id_set]
 
-    def record(self, new_ids):
+    def record(self, new_ids, sampling_timesteps):
+        self.sampling_timesteps = sampling_timesteps
+
         if self.data is None:
             self.id_set = new_ids
             self.data = [[] for _ in new_ids]
@@ -51,10 +53,10 @@ class Monitor(object):
     def get_time(self):
         return self.time
 
-    def __call__(self, t):
+    def __call__(self, timestep):
         """Fetch new data"""
-        if fmod(t, self.recorder.sampling_interval) < 1.0e-6:
-            self.time.append(t)
+        if timestep % self.sampling_timesteps == 0:
+            self.time.append(timestep * self.recorder._simulator.state.dt)
             for idd, i in iteritems(self.id_data_idx_map):
                 # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
@@ -82,9 +84,10 @@ class SpikeMonitor(Monitor):
     def get_data(self, ids):
         return self.data[ids-self.start_id]
 
-    def __call__(self, t):
+    def __call__(self, timestep):
         """Fetch new data"""
-        if fmod(t, self.recorder.sampling_interval) < 1.0e-6:
+        if timestep % self.sampling_timesteps == 0:
+            t = timestep * self.recorder._simulator.state.dt
             for i in self.recorder.population._pop.current_spikes:
                 if i in self.id_data_idx_map:
                     self.data[self.id_data_idx_map[i]].append(t)
@@ -103,12 +106,16 @@ class Recorder(recording.Recorder):
         if sampling_interval is not None:
             self.sampling_interval = sampling_interval
 
+        # Convert to timesteps
+        sampling_timesteps =\
+            int(round(self.sampling_interval / self._simulator.state.dt))
+
         if variable not in self.monitors:
             if variable == 'spikes':
                 self.monitors[variable] = SpikeMonitor(self)
             else:
                 self.monitors[variable] = StateMonitor(self, variable)
-            self.monitors[variable].record(new_ids)
+            self.monitors[variable].record(new_ids, sampling_timesteps)
 
     def init_data_views(self):
         for monitor in self.monitors.values():
