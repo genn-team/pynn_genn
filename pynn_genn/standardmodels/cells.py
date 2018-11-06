@@ -31,12 +31,12 @@ def tauToInit(tau_param_name, **kwargs):
 # Function to convert mean 'rate' parameter 
 # to mean interspike interval (in timesteps)
 def rateToISI(rate, **kwargs):
-    return (1000.0 / rate) * state.dt 
+    return 1000.0 / (rate * state.dt)
 
 # Function to convert mean interspike interval 
 # 'isi' (in timesteps) to mean rate in Hz
 def isiToRate(isi, **kwargs):
-    return (1000.0 / isi) * state.dt 
+    return 1000.0 / (isi * state.dt)
 
 genn_neuron_defs = {}
 
@@ -293,7 +293,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
 
         'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
 
-        'reset_code' : '$(RefracTime) = $(TauRefrac)',
+        'reset_code' : '$(RefracTime) = $(TauRefrac);',
 
         'var_name_types' : [
             ('timeStepToSpike', 'scalar'),
@@ -315,7 +315,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
     # extra param values
     {
         'timeStepToSpike' : 0.0,
-        'RefraTime' : 0.0
+        'RefracTime' : 0.0
     }
 )
 
