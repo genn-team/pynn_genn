@@ -257,7 +257,7 @@ genn_neuron_defs['Poisson'] = GeNNDefinitions(
             $(timeStepToSpike) -= 1.0;
         ''',
 
-        'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
+        'threshold_condition_code' : '$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0',
 
         'var_name_types': [
             ('timeStepToSpike', 'scalar')],
@@ -291,7 +291,7 @@ genn_neuron_defs['PoissonRef'] = GeNNDefinitions(
             $(RefracTime) -= DT;
         ''',
 
-        'threshold_condition_code' : '$(t) > $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
+        'threshold_condition_code' : '$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0',
 
         'reset_code' : '$(RefracTime) = $(TauRefrac);',
 
@@ -647,8 +647,8 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
         spk_times = native_params["spikeTimes"]
 
         # Create empty numpy arrays to hold start and end spikes indices
-        start_spike = np.empty(shape=native_params.shape, dtype=np.float32)
-        end_spike = np.empty(shape=native_params.shape, dtype=np.float32)
+        start_spike = np.empty(shape=native_params.shape, dtype=np.uint32)
+        end_spike = np.empty(shape=native_params.shape, dtype=np.uint32)
 
         # Calculate indices for each sequence
         cum_size = 0
