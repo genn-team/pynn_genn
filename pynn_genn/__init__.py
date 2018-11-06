@@ -54,8 +54,15 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
         # Get the parent frame from our current frame (whatever called setup)
         calframe = inspect.getouterframes(inspect.currentframe(), 1)
 
-        # Remove extension from its filename and use as model name
-        simulator.state.model.model_name = os.path.splitext(calframe[1][1])[0]
+        # Extract model name and path
+        model_name = os.path.splitext(os.path.basename(calframe[1][1]))[0]
+        model_path = os.path.dirname(calframe[1][1])
+
+        # Set model name and path (adding ./ if path is relative)
+        simulator.state.model.model_name = model_name
+        simulator.state.model_path = (model_path + os.sep
+                                      if os.path.isabs(model_path)
+                                      else "./" + model_path + os.sep)
     return rank()
 
 
