@@ -11,7 +11,7 @@ from lazyarray import larray
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
-from pygenn.genn_model import create_dpf_class
+from pygenn.genn_model import create_custom_current_source_class
 from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
@@ -40,7 +40,7 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     # definitions
     {
         'injection_code' : '''
-            if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
+            if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(amplitude));
             }
         ''',
@@ -69,33 +69,62 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
     # definitions
     {
         'injection_code' : '''
-            if ($(applyIinj) && $(t) >= $(tStart) && $(t) <= $(tStop)) {
-                if ($(t) >= $(stepTimes)[$(currStep)])
-                    ++$(currStep); // having step variable for each neuron is not optimal, but avoids concurrency issues
-                $(injectCurrent, $(stepAmpls)[$(currStep)-1]);
+            if ($(applyIinj)) {
+                if ($(startStep) < ($(endStep) - 1) && $(t) >= $(stepTimes)[$(startStep) + 1]) {
+                    $(startStep)++;
+                }
+
+                if($(t) >= $(stepTimes)[$(startStep)]) {
+                    $(injectCurrent, $(stepAmpls)[$(startStep)]);
+                }
             }
         ''',
         'var_name_types': [
             ('applyIinj', "unsigned char"),
-            ('currStep', 'int')],
-        'param_name_types' : {
-            'tStart': 'scalar',
-            'tStop': 'scalar'},
-
+            ("startStep", "unsigned int"),
+            ("endStep", "unsigned int")],
         'extra_global_params' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
     },
     # translations
     (
         ('amplitudes',  'stepAmpls'),
         ('times',       'stepTimes')
-    ),
-    # extra param values
-    {
-        'tStart' : stepStart,
-        'tStop'  : stepStop,
-        'currStep' : 0,
-        'applyIinj' : 0
-    })
+    ))
+
+    def get_extra_global_params(self, native_params):
+        # Concatenate together step amplitudes and times to form extra global parameter
+        return {
+            "stepAmpls" : np.concatenate([seq.value
+                                           for seq in native_params["stepAmpls"]]),
+            "stepTimes" : np.concatenate([seq.value
+                                           for seq in native_params["stepTimes"]])}
+
+    def build_genn_current_source(self, native_params):
+        # Create model using unmodified defs
+        genn_model = create_custom_current_source_class(
+            self.genn_currentsource_name, **self.currentsource_defs.definitions)()
+
+        # Get spike times
+        step_times = native_params["stepTimes"]
+
+        # Create empty numpy arrays to hold start and end spikes indices
+        start_step = np.empty(shape=native_params.shape, dtype=np.float32)
+        end_step = np.empty(shape=native_params.shape, dtype=np.float32)
+
+        # Calculate indices for each sequence
+        cum_size = 0
+        for i, seq in enumerate(step_times):
+            start_step[i] = cum_size
+            cum_size += len(seq.value)
+            end_step[i] = cum_size
+
+        # Build initialisation dictionary
+        cs_ini = {"startStep": start_step,
+                  "endStep": end_step,
+                  "applyIinj": np.zeros(shape=native_params.shape, dtype=np.uint8)}
+
+        # Return with model
+        return genn_model, [], cs_ini
 
     def get_extra_global_params(self, native_params):
         # Concatenate together step amplitudes and times to form extra global parameter
@@ -113,7 +142,7 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
     # definitions
     {
         'injection_code' : '''
-            if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
+            if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(Ampl) * sin($(Omega) * $(t) + $(PhaseRad)) + $(Offset));
             }
         ''',
@@ -148,7 +177,7 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
     # definitions
     {
         'injection_code' : '''
-            if ($(applyIinj) && $(t) > $(tStart) && $(t) < $(tStop)) {
+            if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(meanDT) + $(gennrand_normal) * $(sdDT));
             }
         ''',
