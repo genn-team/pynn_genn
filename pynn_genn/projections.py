@@ -109,6 +109,8 @@ class Projection(common.Projection, ContextMixin):
     def __init__(self, presynaptic_population, postsynaptic_population,
                  connector, synapse_type=None, source=None, receptor_type=None,
                  space=Space(), label=None):
+        # Make a deep copy of synapse type so projection can independently change parameters
+        synapse_type = deepcopy(synapse_type)
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
                                    space, label)
@@ -127,11 +129,10 @@ class Projection(common.Projection, ContextMixin):
         # Add projection to the simulator
         self._simulator.state.projections.append(self)
 
-    def __len__(self):
-        return len(self.connections)
-
     def set(self, **attributes):
-        raise NotImplementedError
+        # Loop through attributes to set and
+        for n, v in iteritems(attributes):
+            self.synapse_type.parameter_space[n] = v
 
     @ContextMixin.use_contextual_arguments()
     def _convergent_connect(self, presynaptic_indices, postsynaptic_index,
