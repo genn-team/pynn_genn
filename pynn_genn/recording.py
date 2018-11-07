@@ -1,6 +1,6 @@
 import numpy as np
 from math import fmod
-from six import iteritems
+from six import iteritems, itervalues
 from pyNN import recording
 from . import simulator
 
@@ -61,12 +61,20 @@ class Monitor(object):
                 # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
 
+    def store_to_cache(self):
+        # If anything is being recorded
+        if self.data is not None:
+            # Empty list of times
+            self.time = []
+
+            # Create an empty list to hold recorded data for each ID
+            self.data = [[] for _ in range(len(self.id_set))]
+
 
 class StateMonitor(Monitor):
 
     def __init__(self, parent, variable):
         super(StateMonitor, self).__init__(parent)
-        self.var = variable
         self.translated = (parent.population.celltype.translations[variable]['translated_name'])
 
     def init_data_view(self):
@@ -155,4 +163,13 @@ class Recorder(recording.Recorder):
         pass
 
     def _reset(self):
-        pass
+        # Reset what is recorded
+        self.monitors = {}
+
+    def store_to_cache(self, annotations=None):
+        # Allow base recorder to do ITS reinitialisation
+        super(Recorder, self).store_to_cache(annotations)
+
+        # Clear out data
+        for m in itervalues(self.monitors):
+            m.store_to_cache()

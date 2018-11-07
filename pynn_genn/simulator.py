@@ -1,5 +1,6 @@
 from pyNN import common
 from pygenn import GeNNModel
+from six import iteritems, itervalues
 
 name = "genn"
 
@@ -59,10 +60,10 @@ class State(common.control.BaseState):
         self.model.load()
 
         self._built = True
-        
+
     def run(self, simtime):
         self.run_until(self.t + simtime)
-            
+
     def run_until(self, tstop):
         if not self._built:
             self.finalize()
@@ -102,8 +103,11 @@ class State(common.control.BaseState):
         self.running = False
         self.t = 0
         self.t_start = 0
+
+        # reinitialise model if it has already been built
         if self._built:
-            self.model.load()
+            self.model.reinitialise()
+
         self.segment_counter += 1
 
 state = State()
