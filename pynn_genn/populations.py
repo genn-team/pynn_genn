@@ -1,9 +1,11 @@
 from copy import deepcopy
 from six import iteritems
+from collections import Sized
 import numpy as np
 from pyNN import common
 from pyNN.standardmodels import StandardCellType
-from pyNN import parameters
+from pyNN.parameters import Sequence
+from pyNN.parameters import simplify as simplify_params
 from . import simulator
 from .recording import Recorder
 from model import sanitize_label
@@ -29,6 +31,21 @@ class PopulationView(common.PopulationView):
             # Expand parent parameters
             param_vals = parent_params[n].evaluate(simplify=False)
 
+            # If parameter is a sequence and value has a length
+            # **NOTE** following logic comes from pyNN.parameters.ParameterSpace
+            if parent_params[n].dtype is Sequence and isinstance(v, Sized):
+                # If it's empty, replace v with empty sequence
+                if len(v) == 0:
+                    v = Sequence([])
+                # Otherwise, if v isn't a sequence of sequences
+                elif not isinstance(v[0], Sequence):
+                    # If v is a sequence of some other things with length,
+                    if isinstance(v[0], Sized):
+                        v = type(v)([Sequence(x) for x in v])
+                    # Otherwise, convert v into a Sequence
+                    else:
+                        v = Sequence(v)
+
             # Replace masked section of values
             param_vals[self.mask] = v
 
@@ -43,10 +60,10 @@ class PopulationView(common.PopulationView):
         parent_params = self.parent._parameters
         if isinstance(parameter_names, basestring):
             val = parent_params[parameter_names][self.mask]
-            return (parameters.simplify(val) if simplify else val)
+            return (simplify_params(val) if simplify else val)
         # Otherwise, if we should simplify
         elif simplify:
-            return [parameters.simplify(parent_params[n][self.mask])
+            return [simplify_params(parent_params[n][self.mask])
                     for n in parameter_names]
         # Otherwise
         else:
