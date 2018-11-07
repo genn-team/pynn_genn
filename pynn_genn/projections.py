@@ -130,9 +130,7 @@ class Projection(common.Projection, ContextMixin):
         self._simulator.state.projections.append(self)
 
     def set(self, **attributes):
-        # Loop through attributes to set and
-        for n, v in iteritems(attributes):
-            self.synapse_type.parameter_space[n] = v
+        self.synapse_type.parameter_space.update(**attributes)
 
     @ContextMixin.use_contextual_arguments()
     def _convergent_connect(self, presynaptic_indices, postsynaptic_index,
@@ -348,7 +346,7 @@ class Projection(common.Projection, ContextMixin):
 
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
-                post_pop.celltype.build_genn_psm(post_pop._parameters,
+                post_pop.celltype.build_genn_psm(post_pop._native_parameters,
                                                     post_pop.initial_values, prefix)
 
             # Build GeNN weight update model

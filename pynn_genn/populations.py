@@ -3,10 +3,11 @@ from six import iteritems
 import numpy as np
 from pyNN import common
 from pyNN.standardmodels import StandardCellType
-from pyNN.parameters import ParameterSpace, Sequence, simplify
+from pyNN import parameters
 from . import simulator
 from .recording import Recorder
 from model import sanitize_label
+from lazyarray import larray
 
 class Assembly(common.Assembly):
     _simulator = simulator
@@ -21,20 +22,35 @@ class PopulationView(common.PopulationView):
     _assembly_class = Assembly
     _simulator = simulator
 
-    def _get_parameters(self, *names):
-        """return a ParameterSpace containing native parameters"""
-        parameter_dict = {}
-        for name in names:
-            value = self.parent._get_parameters(name)
-            if isinstance(value, np.ndarray):
-                value = value[self.mask]
-            parameter_dict[name] = simplify(value)
-        return ParameterSpace(parameter_dict, shape=(self.size,))  # or local size?
+    def set(self, **parameters):
+        # Loop through all parameters
+        parent_params = self.parent._parameters
+        for n, v in iteritems(parameters):
+            # Expand parent parameters
+            param_vals = parent_params[n].evaluate(simplify=False)
 
-    def _set_parameters(self, parameter_space):
-        """parameter_space should contain native parameters"""
-        for name, value in parameter_space.items():
-            self.parent._parameters[name][self.mask] = value.evaluate(simplify=True)
+            # Replace masked section of values
+            param_vals[self.mask] = v
+
+            # Convert result back into lazy array
+            parent_params[n] = larray(param_vals,
+                                      dtype=parent_params[n].dtype,
+                                      shape=parent_params[n].shape)
+
+    def get(self, parameter_names, gather=False, simplify=True):
+        # if all the cells have the same value for a parameter, should
+        # we return just the number, rather than an array?
+        parent_params = self.parent._parameters
+        if isinstance(parameter_names, basestring):
+            val = parent_params[parameter_names][self.mask]
+            return (parameters.simplify(val) if simplify else val)
+        # Otherwise, if we should simplify
+        elif simplify:
+            return [parameters.simplify(parent_params[n][self.mask])
+                    for n in parameter_names]
+        # Otherwise
+        else:
+            return [parent_params[n][self.mask] for n in parameter_names]
 
     def _set_initial_value_array(self, variable, initial_values):
         pass
@@ -77,10 +93,8 @@ class Population(common.Population):
         self._mask_local = is_local(self.all_cells)
 
         # Take a deep copy of cell type parameters
-        if isinstance(self.celltype, StandardCellType):
-            self._parameters = deepcopy(self.celltype.native_parameters)
-        else:
-            self._parameters = deepcopy(self.celltype.parameter_space)
+        # **NOTE** we always use PyNN parameters here
+        self._parameters = deepcopy(self.celltype.parameter_space)
 
         # Set shape
         self._parameters.shape = (self.size,)
@@ -95,8 +109,9 @@ class Population(common.Population):
             This function is supposed to be called by the simulator
         """
         # Build GeNN neuon model
+        native_parameters = self._native_parameters
         self._genn_nmodel, neuron_params, neuron_ini =\
-            self.celltype.build_genn_neuron(self._parameters, self.initial_values)
+            self.celltype.build_genn_neuron(native_parameters, self.initial_values)
 
         self._pop = simulator.state.model.add_neuron_population(
             self._genn_label, self.size, self._genn_nmodel,
@@ -104,7 +119,7 @@ class Population(common.Population):
 
         # Get any extra global parameters defined by the model
         extra_global = self.celltype.get_extra_global_neuron_params(
-            self._parameters, self.initial_values)
+            native_parameters, self.initial_values)
 
         # Add to underlying neuron group
         for n, v in iteritems(extra_global):
@@ -144,16 +159,20 @@ class Population(common.Population):
     def _get_view(self, selector, label=None):
         return PopulationView(self, selector, label)
 
-    def _get_parameters(self, *names):
-        """
-        return a ParameterSpace containing native parameters
-        """
-        parameter_dict = {}
-        for name in names:
-            parameter_dict[name] = simplify(self._parameters[name])
-        return ParameterSpace(parameter_dict, shape=(self.local_size,))
+    def set(self, **parameters):
+        self._parameters.update(**parameters)
 
-    def _set_parameters(self, parameter_space):
-        """parameter_space should contain native parameters"""
-        for name, value in parameter_space.items():
-            self._parameters[name] = deepcopy(value)
+    def get(self, parameter_names, gather=False, simplify=True):
+        # if all the cells have the same value for a parameter, should
+        # we return just the number, rather than an array?
+        if isinstance(parameter_names, basestring):
+            param = self._parameters[parameter_names]
+            return param.evaluate(simplify=simplify)
+        # Otherwise
+        else:
+            return [self._parameters[n].evaluate(simplify=simplify)
+                    for n in parameter_names]
+
+    @property
+    def _native_parameters(self):
+        return self.celltype.translate(self._parameters)
