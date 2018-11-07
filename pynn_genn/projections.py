@@ -13,6 +13,7 @@ from pyNN.connectors import AllToAllConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 from . import simulator
+from .standardmodels.synapses import StaticSynapse
 from model import sanitize_label
 from contexts import ContextMixin
 
@@ -103,9 +104,10 @@ class Connection(common.Connection):
 class Projection(common.Projection, ContextMixin):
     __doc__ = common.Projection.__doc__
     _simulator = simulator
+    _static_synapse_class = StaticSynapse
 
     def __init__(self, presynaptic_population, postsynaptic_population,
-                 connector, synapse_type, source=None, receptor_type=None,
+                 connector, synapse_type=None, source=None, receptor_type=None,
                  space=Space(), label=None):
         common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
                                    connector, synapse_type, source, receptor_type,
@@ -138,7 +140,7 @@ class Projection(common.Projection, ContextMixin):
         num_synapses = len(presynaptic_indices)
         conn_pre_indices.extend(presynaptic_indices)
         conn_post_indices.extend(repeat(postsynaptic_index, times=num_synapses))
-        
+
         # Loop through connection _parameters
         for p_name, p_val in iteritems(connection_parameters):
             if isinstance(p_val, Iterable):
@@ -186,7 +188,7 @@ class Projection(common.Projection, ContextMixin):
 
         # Return variables as tuple
         return tuple(variables)
-    
+
     def _get_attributes_as_list(self, names):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
@@ -320,7 +322,7 @@ class Projection(common.Projection, ContextMixin):
             logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
                             'Using mean value {} ms for all connections.'.format(
                                 self.label,
-                                average_delay * simulator.state.dt))
+                                delay_steps * simulator.state.dt))
         else:
             delay_steps = int(delay_steps[0])
 
