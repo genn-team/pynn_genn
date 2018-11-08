@@ -121,7 +121,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         // If GeNN exists
                         if(fileExists("genn")) {
                             echo "Updating GeNN";
-                            sh "git pull";
+                            
+                            // Pull from repository
+                            dir("genn") {
+                                sh "git pull";
+                            }
                         }
                         else {
                             echo "Cloning GeNN";
@@ -133,10 +137,10 @@ for(b = 0; b < builderNodes.size; b++) {
 
                         // Create new one
                         echo "Creating virtualenv";
-                        sh "virtualenv --system-site-packages pynn_genn";
+                        sh "virtualenv --system-site-packages virtualenv";
 
-                        // Activate it
-                        dir("pynn_genn") {
+                        // Activate virtualenv
+                        dir("virtualenv") {
                             sh ". bin/activate";
                         }
 
@@ -146,6 +150,7 @@ for(b = 0; b < builderNodes.size; b++) {
                 }
 
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
+                    // Install packages
                     sh "pip install neo pynn quantities nose nose_testconfig";
                 }
 
