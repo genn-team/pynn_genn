@@ -148,7 +148,7 @@ for(b = 0; b < builderNodes.size; b++) {
                     // Activate virtualenv and intall packages
                     sh """
                     . virtualenv/bin/activate
-                    pip install neo pynn quantities nose nose_testconfig
+                    pip install neo pynn quantities nose nose_testconfig lazyarray
                     """;
                 }
 
@@ -160,7 +160,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         def uniqueLibGeNNBuildMsg = "ligenn_build_" + env.NODE_NAME;
                         if("cpu_only" in nodeLabel) {
                             sh """
-                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 CPU_ONLY=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}
+                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 CPU_ONLY=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
                             """
 
                             // If node is a mac, re-label library
@@ -170,7 +170,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         else {
                             sh """
-                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}
+                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
                             """
 
                             // If node is a mac, re-label library
