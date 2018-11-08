@@ -144,6 +144,7 @@ for(b = 0; b < builderNodes.size; b++) {
         
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
                     // Activate virtualenv and intall packages
+                    // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
                     sh """
                     . virtualenv/bin/activate
                     pip install neo pynn quantities nose nose_testconfig lazyarray coverage codecov numpy
@@ -174,9 +175,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         
                         // Add remainder of make incantation
-                        makeCommand += """
-                        LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
-                        """
+                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ 1> \"" + uniqueLibGeNNBuildMsg + "\" 2> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
                         sh makeCommand;
