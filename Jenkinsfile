@@ -178,7 +178,10 @@ for(b = 0; b < builderNodes.size; b++) {
                         makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ 1> \"" + uniqueLibGeNNBuildMsg + "\" 2> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
-                        sh makeCommand;
+                        def makeStatusCode = sh script:makeCommand, returnStatus:true
+                        if(makeStatusCode != 0) {
+                            setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
+                        }
                         
                         // If node is a mac, re-label library
                         if("mac" in nodeLabel) {
@@ -192,10 +195,14 @@ for(b = 0; b < builderNodes.size; b++) {
                         
                         // Activate virtualenv, build module and archive output
                         echo "Building Python module";
-                        sh """
+                        script = """
                         . ../virtualenv/bin/activate
                         python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
                         """
+                        def installStatusCode = sh script:script, returnStatus:true
+                        if(installStatusCode != 0) {
+                            setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
+                        }
                         
                         archive uniquePluginBuildMsg;
                     }
