@@ -157,8 +157,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Build dynamic LibGeNN
                         // **TODO** only do this stage if anything's changed in GeNN
                         echo "Building LibGeNN";
+                        def uniqueLibGeNNBuildMsg = "ligenn_build_" + env.NODE_NAME;
                         if("cpu_only" in nodeLabel) {
-                            sh "make -f lib/GNUMakefileLibGeNN DYNAMIC=1 CPU_ONLY=1 LIBGENN_PATH=pygenn/genn_wrapper/";
+                            sh """
+                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 CPU_ONLY=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}
+                            """
 
                             // If node is a mac, re-label library
                             if("mac" in nodeLabel) {
@@ -166,40 +169,43 @@ for(b = 0; b < builderNodes.size; b++) {
                             }
                         }
                         else {
-                            sh "make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/";
+                            sh """
+                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}
+                            """
 
                             // If node is a mac, re-label library
                             if("mac" in nodeLabel) {
                                 sh "install_name_tool -id \"@loader_path/libgenn_DYNAMIC.dylib\" pygenn/genn_wrapper/libgenn_DYNAMIC.dylib";
                             }
                         }
+                        archive uniqueLibGeNNBuildMsg
+                        
+                        def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
                         
                         // Activate virtualenv and build module
                         echo "Building Python module";
                         sh """
                         . ../virtualenv/bin/activate
-                        python setup.py install
+                        python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
                         """
+                        
+                        archive uniquePluginBuildMsg;
                     }
                 }
 
                 buildStep("Running tests (" + env.NODE_NAME + ")") {
-                    // Activate virtualenv
-                    
-                    
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
-                        def uniqueMsg = "msg_" + env.NODE_NAME;
+                        def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
                         
                         // Activate virtualenv and run tests
-                        // **TODO** piping output to message file
                         sh """
-                        . virtualenv/bin/activate
-                        nosetests -s --with-xunit test_genn.py
+                        . ../../../virtualenv/bin/activate
+                        nosetests -s --with-xunit test_genn.py 1> "${uniqueTestOutputMsg}" 2> "${uniqueTestOutputMsg}"
                         """
                         
                         // Archive output
-                        //archive uniqueMsg;
+                        archive uniqueTestOutputMsg;
                     }
                 }
 
