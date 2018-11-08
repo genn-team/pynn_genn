@@ -194,7 +194,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         echo "Building Python module";
                         sh """
                         . ../virtualenv/bin/activate
-                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
+                        python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
                         """
                         
                         archive uniquePluginBuildMsg;
@@ -220,7 +220,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Activate virtualenv and run tests
                         sh """
                         . ../../../virtualenv/bin/activate
-                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
+                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1> "${uniqueTestOutputMsg}" 2> "${uniqueTestOutputMsg}"
                         mv .coverage ${uniqueCoverageFile}
                         """
                         
