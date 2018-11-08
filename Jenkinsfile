@@ -139,17 +139,17 @@ for(b = 0; b < builderNodes.size; b++) {
                         echo "Creating virtualenv";
                         sh "virtualenv --system-site-packages virtualenv";
 
-                        // Activate virtualenv
-                        dir("virtualenv") {
-                            sh ". bin/activate";
-                        }
-
                     } catch (Exception e) {
                         setBuildStatus(installationStageName, "FAILURE");
                     }
                 }
 
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
+                    // Activate virtualenv
+                    dir("virtualenv") {
+                        sh ". bin/activate";
+                    }
+                    
                     // Install packages
                     sh "pip install neo pynn quantities nose nose_testconfig";
                 }
@@ -175,13 +175,22 @@ for(b = 0; b < builderNodes.size; b++) {
                                 sh "install_name_tool -id \"@loader_path/libgenn_DYNAMIC.dylib\" pygenn/genn_wrapper/libgenn_DYNAMIC.dylib";
                             }
                         }
-
+                        
+                        // Activate virtualenv
+                        dir("virtualenv") {
+                            sh ". bin/activate";
+                        }
                         echo "Building Python module";
                         sh "python setup.py install"
                     }
                 }
 
                 buildStep("Running tests (" + env.NODE_NAME + ")") {
+                    // Activate virtualenv
+                    dir("virtualenv") {
+                        sh ". bin/activate";
+                    }
+                    
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
                         def uniqueMsg = "msg_" + env.NODE_NAME;
