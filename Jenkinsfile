@@ -143,7 +143,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         setBuildStatus(installationStageName, "FAILURE");
                     }
                 }
-
+        
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
                     // Activate virtualenv and intall packages
                     sh """
@@ -192,7 +192,17 @@ for(b = 0; b < builderNodes.size; b++) {
                         archive uniquePluginBuildMsg;
                     }
                 }
-
+                
+                buildStep("Installing PyNN GeNN (" + env.NODE_NAME + ")") {
+                    dir("pynn_genn") {
+                        // Activate virtualenv and install PyNN GeNN
+                        sh """
+                        . ../virtualenv/bin/activate
+                        python setup.py install
+                        """;
+                    }
+                }
+                
                 buildStep("Running tests (" + env.NODE_NAME + ")") {
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
