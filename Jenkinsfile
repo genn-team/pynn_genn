@@ -72,8 +72,6 @@ for(b in desiredBuilds) {
     for(n in availableNodes) {
         // If, after subtracting this node's labels, all build properties are satisfied
         if((b - n.value).size() == 0) {
-            print "${n.key} -> ${b}";
-            
             // Add node's name to list of builders and remove it from dictionary of available nodes
             // **YUCK** for some reason tuples aren't serializable so need to add an arraylist
             builderNodes.add([n.key, n.value])
@@ -148,7 +146,7 @@ for(b = 0; b < builderNodes.size; b++) {
                     // Activate virtualenv and intall packages
                     sh """
                     . virtualenv/bin/activate
-                    pip install neo pynn quantities nose nose_testconfig lazyarray coverage codecov
+                    pip install neo pynn quantities nose nose_testconfig lazyarray coverage codecov numpy
                     """;
                 }
 
