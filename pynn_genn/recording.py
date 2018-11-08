@@ -25,6 +25,7 @@ class Monitor(object):
     def record(self, new_ids, sampling_timesteps):
         self.sampling_timesteps = sampling_timesteps
 
+        # If no data has yet been allocated
         if self.data is None:
             self.id_set = new_ids
             self.data = [[] for _ in new_ids]
@@ -32,7 +33,8 @@ class Monitor(object):
         else:
             old_id_len = len(self.id_set)
             self.id_set = self.id_set.union(new_ids)
-            [self.data.append([]) for i in range(len(self.id_set) - old_id_len)]
+
+            self.data.extend([] for _ in range(len(self.id_set) - old_id_len))
 
         iimap_len = len(self.id_data_idx_map)
         self.id_data_idx_map.update({idd - self.start_id : i + iimap_len 
@@ -118,12 +120,15 @@ class Recorder(recording.Recorder):
         sampling_timesteps =\
             int(round(self.sampling_interval / self._simulator.state.dt))
 
+        # If there isn't already a monitor for this variable
         if variable not in self.monitors:
             if variable == 'spikes':
                 self.monitors[variable] = SpikeMonitor(self)
             else:
                 self.monitors[variable] = StateMonitor(self, variable)
-            self.monitors[variable].record(new_ids, sampling_timesteps)
+
+        # Tell monitor to record these ids
+        self.monitors[variable].record(new_ids, sampling_timesteps)
 
     def init_data_views(self):
         for monitor in self.monitors.values():
