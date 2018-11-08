@@ -158,31 +158,42 @@ for(b = 0; b < builderNodes.size; b++) {
                         // **TODO** only do this stage if anything's changed in GeNN
                         echo "Building LibGeNN";
                         def uniqueLibGeNNBuildMsg = "ligenn_build_" + env.NODE_NAME;
+                        
+                        // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
+                        makeCommand = "";
+                        libGeNNName = "libgenn_DYNAMIC"
+                        if("dev_toolset" in nodeLabel) {
+                            makeCommand += ". /opt/rh/devtoolset-6/enable\n"
+                        }
+                        
+                        // Add start of make command
+                        makeCommand += "make -f lib/GNUMakefileLibGeNN DYNAMIC=1 ";
+                        
+                        // Add CPU only options
                         if("cpu_only" in nodeLabel) {
-                            sh """
-                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 CPU_ONLY=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
-                            """
-
-                            // If node is a mac, re-label library
-                            if("mac" in nodeLabel) {
-                                sh "install_name_tool -id \"@loader_path/libgenn_CPU_ONLY_DYNAMIC.dylib\" pygenn/genn_wrapper/libgenn_CPU_ONLY_DYNAMIC.dylib";
-                            }
+                            makeCommand += "CPU_ONLY=1 ";
+                            libGeNNName = "libgenn_CPU_ONLY_DYNAMIC"
                         }
-                        else {
-                            sh """
-                            make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
-                            """
-
-                            // If node is a mac, re-label library
-                            if("mac" in nodeLabel) {
-                                sh "install_name_tool -id \"@loader_path/libgenn_DYNAMIC.dylib\" pygenn/genn_wrapper/libgenn_DYNAMIC.dylib";
-                            }
+                        
+                        // Add remainder of make incantation
+                        makeCommand += """
+                        LIBGENN_PATH=pygenn/genn_wrapper/ 1> "${uniqueLibGeNNBuildMsg}" 2> "${uniqueLibGeNNBuildMsg}"
+                        """
+                        
+                        // Make
+                        sh makeCommand;
+                        
+                        // If node is a mac, re-label library
+                        if("mac" in nodeLabel) {
+                            sh "install_name_tool -id \"@loader_path/" + libGeNNName + ".dylib\" pygenn/genn_wrapper/" + libGeNNName + ".dylib";
                         }
+                        
+                        // Archive build message
                         archive uniqueLibGeNNBuildMsg
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
                         
-                        // Activate virtualenv and build module
+                        // Activate virtualenv, build module and archive output
                         echo "Building Python module";
                         sh """
                         . ../virtualenv/bin/activate
