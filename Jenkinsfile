@@ -155,7 +155,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Build dynamic LibGeNN
                         // **TODO** only do this stage if anything's changed in GeNN
                         echo "Building LibGeNN";
-                        def uniqueLibGeNNBuildMsg = "ligenn_build_" + env.NODE_NAME;
+                        def uniqueLibGeNNBuildMsg = "libgenn_build_" + env.NODE_NAME;
                         
                         // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
                         makeCommand = "";
@@ -195,7 +195,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         echo "Building Python module";
                         sh """
                         . ../virtualenv/bin/activate
-                        python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
+                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
                         """
                         
                         archive uniquePluginBuildMsg;
@@ -221,13 +221,15 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Activate virtualenv and run tests
                         sh """
                         . ../../../virtualenv/bin/activate
-                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1> "${uniqueTestOutputMsg}" 2> "${uniqueTestOutputMsg}"
+                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
                         mv .coverage ${uniqueCoverageFile}
                         """
                         
-                        // Archive output and coverage
+                        // Archive output
                         archive uniqueTestOutputMsg;
-                        archive uniqueCoverageFile;
+                        
+                        // Stash coverage
+                        stash name: nodeName + "_coverage", includes: uniqueCoverageFile
                     }
                 }
 
@@ -257,13 +259,12 @@ node {
             for(b = 0; b < builderNodes.size; b++) {
                 // **YUCK** meed to bind the label variable before the closure - can't do 'for (label in labels)'
                 def nodeName = builderNodes.get(b).get(0)
-                def nodeCoverageName = ".coverage." + nodeName
-                
+      
                 // Unstash coverage
-                unstash nodeCoverageName
+                unstash nodeName + "_coverage"
                 
                 // If coverage file exists in stash
-                if(fileExists(nodeCoverageName)) {
+                if(fileExists(".coverage." + nodeName)) {
                     anyCoverage = true;
                 }
                 else {
