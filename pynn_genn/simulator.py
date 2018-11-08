@@ -63,6 +63,10 @@ class State(common.control.BaseState):
             # Get time at start of step (this is correct timestamp for recorded data)
             timestep = self.model.timestep
 
+            # Record any variables being recorded
+            for rec in self.recorders:
+                rec._record_vars(timestep)
+
             # Also update our t from the GeNN timestep
             # **NOTE** GeNN steps time at end of timestep and PyNN expects opposite
             # **NOTE** GeNN often using 32-bit float timesteps which fail a lot of tests
@@ -70,10 +74,6 @@ class State(common.control.BaseState):
 
             # Advance model time
             self.model.step_time()
-
-            # Record any variables being recorded
-            for rec in self.recorders:
-                rec._record_vars(timestep)
 
     def clear(self):
         self.model = GeNNModel('float', 'GeNNModel')
