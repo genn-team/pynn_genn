@@ -16,7 +16,7 @@ from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, DEFAULT_MIN
 from pyNN.connectors import *
 from pyNN.recording import *
 from pyNN.standardmodels import StandardCellType
-import simulator
+from . import simulator
 from .standardmodels.cells import *
 from .standardmodels.synapses import *
 from .standardmodels.electrodes import *

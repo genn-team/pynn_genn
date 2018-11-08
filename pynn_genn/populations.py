@@ -1,15 +1,18 @@
 from copy import deepcopy
 from six import iteritems
 from collections import Sized
+from lazyarray import larray
 import numpy as np
+
 from pyNN import common
 from pyNN.standardmodels import StandardCellType
 from pyNN.parameters import Sequence
 from pyNN.parameters import simplify as simplify_params
+
 from . import simulator
 from .recording import Recorder
-from model import sanitize_label
-from lazyarray import larray
+from .model import sanitize_label
+
 
 class Assembly(common.Assembly):
     _simulator = simulator

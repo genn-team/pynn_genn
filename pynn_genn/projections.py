@@ -8,14 +8,16 @@ try:
 except ImportError:
     izip = zip  # Python 3 zip returns an iterator already
 import numpy as np
+
 from pyNN import common
 from pyNN.connectors import AllToAllConnector
 from pyNN.core import ezip
 from pyNN.space import Space
+
 from . import simulator
 from .standardmodels.synapses import StaticSynapse
-from model import sanitize_label
-from contexts import ContextMixin
+from .model import sanitize_label
+from .contexts import ContextMixin
 
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection", ["genn_label", "pre_pop", "post_pop",
