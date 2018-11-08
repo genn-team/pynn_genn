@@ -217,12 +217,16 @@ for(b = 0; b < builderNodes.size; b++) {
                         def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
                         def uniqueCoverageFile = ".coverage." + env.NODE_NAME;
                         
-                        // Activate virtualenv and run tests
-                        sh """
+                        // Activate virtualenv and run tests, keeping return status
+                        def script = """
                         . ../../../virtualenv/bin/activate
                         nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1> "${uniqueTestOutputMsg}" 2> "${uniqueTestOutputMsg}"
                         mv .coverage ${uniqueCoverageFile}
                         """
+                        def statusCode = sh script:script, returnStatus:true
+                        if(statusCode != 0) {
+                            setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
+                        }
                         
                         // Archive output
                         archive uniqueTestOutputMsg;
