@@ -146,7 +146,7 @@ for(b = 0; b < builderNodes.size; b++) {
 
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
                     // Activate virtualenv
-                    sh "source virtualenv/bin/activate";
+                    sh ". virtualenv/bin/activate";
                     
                     // Install packages
                     sh "pip install neo pynn quantities nose nose_testconfig";
@@ -175,7 +175,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         
                         // Activate virtualenv
-                        sh "source virtualenv/bin/activate";
+                        sh ". virtualenv/bin/activate";
                         echo "Building Python module";
                         sh "python setup.py install"
                     }
@@ -183,7 +183,7 @@ for(b = 0; b < builderNodes.size; b++) {
 
                 buildStep("Running tests (" + env.NODE_NAME + ")") {
                     // Activate virtualenv
-                    sh "source virtualenv/bin/activate";
+                    sh ". virtualenv/bin/activate";
                     
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
