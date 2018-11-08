@@ -121,7 +121,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // If GeNN exists
                         if(fileExists("genn")) {
                             echo "Updating GeNN";
-                            sh "git update";
+                            sh "git pull";
                         }
                         else {
                             echo "Cloning GeNN";
@@ -146,7 +146,7 @@ for(b = 0; b < builderNodes.size; b++) {
                 }
 
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
-                    sh "pip install neo pynn quanities nose nose_testconfig";
+                    sh "pip install neo pynn quantities nose nose_testconfig";
                 }
 
                 buildStep("Building PyGeNN (" + env.NODE_NAME + ")") {
