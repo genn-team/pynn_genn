@@ -177,7 +177,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Activate virtualenv and build module
                         echo "Building Python module";
                         sh """
-                        . virtualenv/bin/activate
+                        . ../virtualenv/bin/activate
                         python setup.py install
                         """
                     }
