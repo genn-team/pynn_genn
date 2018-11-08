@@ -145,11 +145,11 @@ for(b = 0; b < builderNodes.size; b++) {
                 }
 
                 buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
-                    // Activate virtualenv
-                    sh ". virtualenv/bin/activate";
-                    
-                    // Install packages
-                    sh "pip install neo pynn quantities nose nose_testconfig";
+                    // Activate virtualenv and intall packages
+                    sh """
+                    . virtualenv/bin/activate
+                    pip install neo pynn quantities nose nose_testconfig
+                    """;
                 }
 
                 buildStep("Building PyGeNN (" + env.NODE_NAME + ")") {
@@ -174,26 +174,32 @@ for(b = 0; b < builderNodes.size; b++) {
                             }
                         }
                         
-                        // Activate virtualenv
-                        sh ". virtualenv/bin/activate";
+                        // Activate virtualenv and build module
                         echo "Building Python module";
-                        sh "python setup.py install"
+                        sh """
+                        . virtualenv/bin/activate
+                        python setup.py install
+                        """
                     }
                 }
 
                 buildStep("Running tests (" + env.NODE_NAME + ")") {
                     // Activate virtualenv
-                    sh ". virtualenv/bin/activate";
+                    
                     
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
                         def uniqueMsg = "msg_" + env.NODE_NAME;
                         
-                        // Run tests, piping output to message file
-                        sh "nosetests -s --with-xunit test_genn.py 1> \"" + uniqueMsg + "\" 2> \"" + uniqueMsg + "\"";
+                        // Activate virtualenv and run tests
+                        // **TODO** piping output to message file
+                        sh """
+                        . virtualenv/bin/activate
+                        nosetests -s --with-xunit test_genn.py
+                        """
                         
                         // Archive output
-                        archive uniqueMsg;
+                        //archive uniqueMsg;
                     }
                 }
 
