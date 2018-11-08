@@ -69,6 +69,12 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
 def end(compatible_output=True):
     """Do any necessary cleaning up before exiting."""
     for (population, variables, filename) in simulator.state.write_on_end:
+        # Make directories if necessary
+        dir = os.path.dirname(filename)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+        # Get NEO IO for filename
         io = get_io(filename)
         population.write_data(io, variables)
     simulator.state.write_on_end = []
