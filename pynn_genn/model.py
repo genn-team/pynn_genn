@@ -77,7 +77,7 @@ class GeNNStandardModelType(StandardModelType):
                     ini = deepcopy(param_val(**self.parameter_space))
                 # Otherwise create larray directly from value
                 else:
-                    ini = larray(param_val)
+                    ini = larray(deepcopy(param_val))
 
                 # Add value to dictionary
                 ini.shape = native_params.shape

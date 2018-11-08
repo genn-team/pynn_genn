@@ -81,7 +81,6 @@ class Population(common.Population):
     _simulator = simulator
     _recorder_class = Recorder
     _assembly_class = Assembly
-    _injected_currents = []
 
     def __init__(self, size, cellclass, cellparams=None, structure=None,
                  initial_values={}, label=None):
@@ -90,6 +89,9 @@ class Population(common.Population):
         """
         super(Population, self).__init__(size, cellclass, cellparams, structure,
                 initial_values, label)
+
+        # Create empty list to hold injected currents
+        self._injected_currents = []
 
         # Give population a unique GeNN label
         # If a label is passed we include a sanitized version of this in it
