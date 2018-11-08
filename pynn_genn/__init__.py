@@ -71,19 +71,13 @@ def end(compatible_output=True):
     for (population, variables, filename) in simulator.state.write_on_end:
         # Make directories if necessary
         dir = os.path.dirname(filename)
-        if dir and os.path.exists(dir):
+        if dir and not os.path.exists(dir):
             os.makedirs(dir)
 
         # Get NEO IO for filename
         io = get_io(filename)
         population.write_data(io, variables)
     simulator.state.write_on_end = []
-
-def savecounter():
-    print("Unloading PyGeNN")
-
-import atexit
-atexit.register(savecounter)
 
 run, run_until = common.build_run(simulator)
 run_for = run
