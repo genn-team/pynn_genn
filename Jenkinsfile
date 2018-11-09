@@ -250,7 +250,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         
                         // Archive output
                         archive uniqueTestOutputMsg;
-                        
+                        archive uniqueCoverageFile;
                         // Stash coverage
                         stash name: nodeName + "_coverage", includes: uniqueCoverageFile
                     }
@@ -277,7 +277,6 @@ node {
         // and so coverage reports gets deleted with rest of GeNN at install-time
         dir("pynn_genn/test/system") {
             // Loop through builders
-            def coverageCommand = "coverage combine";
             def anyCoverage = false
             for(b = 0; b < builderNodes.size; b++) {
                 // **YUCK** meed to bind the label variable before the closure - can't do 'for (label in labels)'
