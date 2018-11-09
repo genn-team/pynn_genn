@@ -19,7 +19,7 @@ class State(common.control.BaseState):
         common.control.BaseState.__init__(self)
         self.mpi_rank = 0
         self.num_processes = 1
-        self.min_delay = 0
+        self._min_delay = "auto"
         self.clear()
         self.dt = 0.1
         self.t = 0.0
@@ -32,6 +32,17 @@ class State(common.control.BaseState):
     @dt.setter
     def dt( self, _dt ):
         self.model.dT = _dt
+
+    @property
+    def min_delay(self):
+        if self._min_delay == "auto":
+            return min(p.min_delay for p in self.projections)
+        else:
+            return self._min_delay
+
+    @min_delay.setter
+    def min_delay(self, d):
+        self._min_delay = d
 
     def finalize(self):
         for pop in self.populations:

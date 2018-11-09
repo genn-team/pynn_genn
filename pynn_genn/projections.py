@@ -323,9 +323,13 @@ class Projection(common.Projection, ContextMixin):
             logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
                             'Using mean value {} ms for all connections.'.format(
                                 self.label,
-                                delay_steps * simulator.state.dt))
+                                delay_steps * self._simulator.state.dt))
         else:
             delay_steps = int(delay_steps[0])
+
+        # As delay is homogeneous, use to obtain minimum delay
+        # **TODO** this is a pretty hacky solution
+        self.min_delay = (delay_steps + 1) * self._simulator.state.dt
 
         # Build lists of actual pre and postsynaptic populations we are connecting
         # (i.e. rather than views, assemblies etc)
