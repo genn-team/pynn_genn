@@ -157,6 +157,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         // **TODO** only do this stage if anything's changed in GeNN
                         echo "Building LibGeNN";
                         def uniqueLibGeNNBuildMsg = "libgenn_build_" + env.NODE_NAME;
+
+                        // Remove existing logs
+                        sh """
+                        rm -f ${uniqueLibGeNNBuildMsg}
+                        """;
                         
                         // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
                         makeCommand = "";
@@ -175,7 +180,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         
                         // Add remainder of make incantation
-                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ &> \"" + uniqueLibGeNNBuildMsg + "\""
+                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
                         def makeStatusCode = sh script:makeCommand, returnStatus:true
@@ -192,13 +197,15 @@ for(b = 0; b < builderNodes.size; b++) {
                         archive uniqueLibGeNNBuildMsg
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
-                        
-                        // Activate virtualenv, clean, build module and archive output
+
+
+                        // Activate virtualenv, remove existing logs, clean, build module and archive output
                         echo "Building Python module";
                         script = """
                         . ../virtualenv/bin/activate
+                        rm -f ${uniquePluginBuildMsg}
                         python setup.py clean --all
-                        python setup.py install &> "${uniquePluginBuildMsg}"
+                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
                         """
                         def installStatusCode = sh script:script, returnStatus:true
                         if(installStatusCode != 0) {
@@ -225,10 +232,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
                         def uniqueCoverageFile = ".coverage." + env.NODE_NAME;
                         
-                        // Activate virtualenv and run tests, keeping return status
+                        // Activate virtualenv, remove log, run tests and keeping return status
                         def script = """
                         . ../../../virtualenv/bin/activate
-                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py &> "${uniqueTestOutputMsg}"
+                        rm -f ${uniqueTestOutputMsg}
+                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
                         mv .coverage ${uniqueCoverageFile}
                         """
                         def statusCode = sh script:script, returnStatus:true
