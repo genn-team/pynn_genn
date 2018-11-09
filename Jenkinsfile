@@ -250,7 +250,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         
                         // Archive output
                         archive uniqueTestOutputMsg;
-                        archive uniqueCoverageFile;
+
                         // Stash coverage
                         stash name: nodeName + "_coverage", includes: uniqueCoverageFile
                     }
@@ -296,12 +296,16 @@ node {
             
             // If any coverage reports were found
             if(anyCoverage) {
-                // Activate virtualenv, combine coverage
+                // Activate virtualenv, combine coverage, convert to xml and upload
                 sh """
                 . ../../../virtualenv/bin/activate
-                coverage combine
-                codecov --token=1460b8f4-e4af-4acd-877e-353c9449111c
+                coverage combine 
+                coverage xml
+                codecov --token 1460b8f4-e4af-4acd-877e-353c9449111c --file coverage.xml
                 """
+                
+                // Archive coverage
+                archive "coverage.xml"
             }
             else {
                 echo "No coverage reports found"
