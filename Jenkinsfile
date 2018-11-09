@@ -135,7 +135,7 @@ for(b = 0; b < builderNodes.size; b++) {
 
                         // Create new one
                         echo "Creating virtualenv";
-                        sh "virtualenv --system-site-packages virtualenv";
+                        sh "virtualenv virtualenv";
 
                     } catch (Exception e) {
                         setBuildStatus(installationStageName, "FAILURE");
@@ -147,7 +147,7 @@ for(b = 0; b < builderNodes.size; b++) {
                     // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
                     sh """
                     . virtualenv/bin/activate
-                    pip install neo pynn quantities nose nose_testconfig lazyarray coverage codecov numpy
+                    pip install nose nose_testconfig coverage codecov
                     """;
                 }
 
