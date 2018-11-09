@@ -175,7 +175,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         
                         // Add remainder of make incantation
-                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ 1> \"" + uniqueLibGeNNBuildMsg + "\" 2> \"" + uniqueLibGeNNBuildMsg + "\""
+                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ &> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
                         def makeStatusCode = sh script:makeCommand, returnStatus:true
@@ -198,7 +198,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         script = """
                         . ../virtualenv/bin/activate
                         python setup.py clean --all
-                        python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
+                        python setup.py install &> "${uniquePluginBuildMsg}"
                         """
                         def installStatusCode = sh script:script, returnStatus:true
                         if(installStatusCode != 0) {
@@ -228,7 +228,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Activate virtualenv and run tests, keeping return status
                         def script = """
                         . ../../../virtualenv/bin/activate
-                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1> "${uniqueTestOutputMsg}" 2> "${uniqueTestOutputMsg}"
+                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py &> "${uniqueTestOutputMsg}"
                         mv .coverage ${uniqueCoverageFile}
                         """
                         def statusCode = sh script:script, returnStatus:true
@@ -287,7 +287,7 @@ node {
             if(anyCoverage) {
                 // Activate virtualenv, combine coverage
                 sh """
-                . ../../virtualenv/bin/activate
+                . ../../../virtualenv/bin/activate
                 coverage combine
                 codecov --token=1460b8f4-e4af-4acd-877e-353c9449111c
                 """
