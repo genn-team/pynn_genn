@@ -1,3 +1,4 @@
+import sys
 from itertools import groupby
 from copy import deepcopy
 from lazyarray import larray
@@ -22,11 +23,15 @@ genn_to_numpy_types = {
     'unsigned int': np.uint32}
 
 def sanitize_label(label):
-    # Convert unicode label to ASCII
-    ascii_label = label.encode("ascii", "ignore")
+    # Strip out any non-alphanumerical characters
+    clean_label = "".join(c for c in label if c.isalnum())
+
+    # If this is Python 2, convert unicode-encoded label to ASCII
+    if sys.version_info < (3, 0):
+        clean_label = clean_label.encode("ascii", "ignore")
 
     # Strip out any non-alphanumerical characters
-    return "".join(c for c in ascii_label if c.isalnum())
+    return clean_label
 
 class GeNNStandardModelType(StandardModelType):
 
@@ -92,7 +97,7 @@ class GeNNStandardModelType(StandardModelType):
                     del param_name_types[field_name_no_prefix]
 
         # Set parameter names in defs
-        genn_defs["param_names"] = param_name_types.keys()
+        genn_defs["param_names"] = list(param_name_types.keys())
 
         # Create custom model
         genn_model = create_custom_model(**genn_defs)()
