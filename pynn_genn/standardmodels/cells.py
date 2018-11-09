@@ -179,26 +179,33 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
         'sim_code' : '''
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
-            const scalar i = $(Isyn) + $(iOffset);
+
             // If voltage is above artificial spike height
             if($(V) >= $(vSpike)) {
-               $(V) = $(vReset);
+                $(V) = $(vReset);
             }
-            // Calculate RK4 terms
-            const scalar v1 = DV($(V), $(W));
-            const scalar w1 = DW($(V), $(W));
-            const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-            const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-            const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-            const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-            const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
-            const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
-            // Update V
-            $(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
-            // If we're not above peak, update w
-            // **NOTE** it's not safe to do this at peak as wn may well be huge
-            if($(V) <= -40.0) {
-               $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
+
+            if ($(RefracTime) <= 0.0) {
+                const scalar i = $(Isyn) + $(iOffset);
+                // Calculate RK4 terms
+                const scalar v1 = DV($(V), $(W));
+                const scalar w1 = DW($(V), $(W));
+                const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
+                const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+                // Update V
+                $(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
+                // If we're not above peak, update w
+                // **NOTE** it's not safe to do this at peak as wn may well be huge
+                if($(V) <= -40.0) {
+                    $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
+                }
+            }
+            else {
+                $(RefracTime) -= DT;
             }
         ''',
 
@@ -208,15 +215,18 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             // **NOTE** we reset v to arbitrary plotting peak rather than to actual reset voltage
             $(V) = $(vSpike);
             $(W) += ($(b));
+            $(RefracTime) = $(TauRefrac);
         ''',
 
         'var_name_types' : [
             ('V', 'scalar'),
-            ('W', 'scalar')], # adaptation current, [nA]
+            ('W', 'scalar'),# adaptation current, [nA]
+            ('RefracTime', 'scalar')],
         
         'param_name_types': {
             'C': 'scalar',        # Membrane capacitance [nF]
             'TauM': 'scalar',     # Membrane time constant [ms]
+            'TauRefrac': 'scalar',  # Refractoriness [ms]
             'Vrest': 'scalar',    # Resting membrane voltage (Leak reversal potential) [mV]
             'deltaT': 'scalar',   # Slope factor [mV]
             'vThresh': 'scalar',  # Threshold voltage [mV]
@@ -225,12 +235,12 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
             'tauW': 'scalar',     # Adaption time constant [ms]
             'a': 'scalar',        # Subthreshold adaption [pS]
             'b': 'scalar',        # Spike-triggered adaptation [nA]
-                'iOffset': 'scalar'}, # Offset current [nA]
+            'iOffset': 'scalar'}, # Offset current [nA]
     },
     # translations
     (
         ('cm',         'C'),
-        ('tau_refrac', '_TAU_REFRAC'),
+        ('tau_refrac', 'TauRefrac'),
         ('v_spike',    'vSpike'),
         ('v_reset',    'vReset'),
         ('v_rest',     'Vrest'),
@@ -243,7 +253,11 @@ genn_neuron_defs['AdExp'] = GeNNDefinitions(
         ('v_thresh',   'vThresh'),
         ('v',          'V'),
         ('w',          'W'),
-    )
+    ),
+    # extra param values
+    {
+        'RefracTime' : 0.0,
+    }
 )
 
 genn_neuron_defs['Poisson'] = GeNNDefinitions(
