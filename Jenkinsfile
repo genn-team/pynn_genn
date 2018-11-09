@@ -237,12 +237,16 @@ for(b = 0; b < builderNodes.size; b++) {
                         . ../../../virtualenv/bin/activate
                         rm -f ${uniqueTestOutputMsg}
                         nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
-                        mv .coverage ${uniqueCoverageFile}
                         """
                         def statusCode = sh script:script, returnStatus:true
                         if(statusCode != 0) {
                             setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
                         }
+                        
+                        // Rename coverage with unique names
+                        sh """
+                        mv -f .coverage ${uniqueCoverageFile}
+                        """
                         
                         // Archive output
                         archive uniqueTestOutputMsg;
