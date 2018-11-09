@@ -193,10 +193,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
                         
-                        // Activate virtualenv, build module and archive output
+                        // Activate virtualenv, clean, build module and archive output
                         echo "Building Python module";
                         script = """
                         . ../virtualenv/bin/activate
+                        python setup.py clean --all
                         python setup.py install 1> "${uniquePluginBuildMsg}" 2> "${uniquePluginBuildMsg}"
                         """
                         def installStatusCode = sh script:script, returnStatus:true
