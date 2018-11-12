@@ -275,14 +275,14 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrixType = 'RAGGED_INDIVIDUALG'
+            matrixType = "RAGGED_INDIVIDUALG"
         else:
-            matrixType = 'DENSE_INDIVIDUALG'
+            matrixType = "DENSE_INDIVIDUALG"
 
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
         # neuron parameters into postsynaptic model parameters
-        prefix = 'inh_' if self.receptor_type == 'inhibitory' else 'exc_'
+        prefix = "inh_" if self.receptor_type == "inhibitory" else "exc_"
 
         #  Create connections rows to hold synapses
         pre_indices = []
@@ -320,8 +320,8 @@ class Projection(common.Projection, ContextMixin):
         if not np.allclose(delay_steps, delay_steps[0]):
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))
-            logging.warning('Projection {}: GeNN does not support variable delays for a single projection. '
-                            'Using mean value {} ms for all connections.'.format(
+            logging.warning("Projection {}: GeNN does not support variable delays for a single projection. "
+                            "Using mean value {} ms for all connections.".format(
                                 self.label,
                                 delay_steps * self._simulator.state.dt))
         else:

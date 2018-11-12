@@ -26,23 +26,23 @@ def delayStepsToMs(delaySteps, **kwargs):
     return (delaySteps + 1.0) * state.dt
 
 class DDTemplate(Template):
-    '''Template string class with the delimiter overridden with double $'''
-    delimiter = '$$'
+    """Template string class with the delimiter overridden with double $"""
+    delimiter = "$$"
 
 class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
 
     wum_defs = {
-        'sim_code' : "$(addToInSyn, $(g));\n",
-        'vars' : {'g': 'scalar'}}
+        "sim_code" : "$(addToInSyn, $(g));\n",
+        "vars" : {"g": "scalar"}}
 
     translations = build_translations(
-        ('weight', 'g'),
-        ('delay', 'delaySteps', delayMsToSteps, delayStepsToMs))
+        ("weight", "g"),
+        ("delay", "delaySteps", delayMsToSteps, delayStepsToMs))
 
     def _get_minimum_delay(self):
         d = state.min_delay
-        if d == 'auto':
+        if d == "auto":
             d = state.dt
         return d
 
@@ -51,17 +51,17 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
 
     default_parameters = synapses.TsodyksMarkramSynapse.default_parameters
     default_parameters.update({
-        'tau_psc' : 1.0,
+        "tau_psc" : 1.0,
     })
     default_initial_values = synapses.TsodyksMarkramSynapse.default_initial_values
     default_initial_values.update({
-        'x' : 1.0,
-        'y' : 0.0,
-        'z' : 0.0
+        "x" : 1.0,
+        "y" : 0.0,
+        "z" : 0.0
     })
 
     wum_defs = {
-        'sim_code' : '''
+        "sim_code" : """
             scalar deltaST = $(t) - $(sT_pre);
             $(z) *= exp( -deltaST / $(tauRec) );
             $(z) += $(y) * ( exp( -deltaST / $(tauPsc) ) -
@@ -76,35 +76,35 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
             $(y) += $(x) * $(u);
             $(addToInSyn, $(g) * $(x) * $(u));
             $(updatelinsyn);
-        ''',
-        'vars' : {
-            'U': 'scalar',        # asymptotic value of probability of release
-            'tauRec': 'scalar',   # recovery time from synaptic depression [ms]
-            'tauFacil': 'scalar', # time constant for facilitation [ms]
-            'tauPsc': 'scalar',    # decay time constant of postsynaptic current [ms]
-            'g': 'scalar',
-            'u': 'scalar',
-            'x': 'scalar',
-            'y': 'scalar',
-            'z': 'scalar'},
+        """,
+        "vars" : {
+            "U": "scalar",        # asymptotic value of probability of release
+            "tauRec": "scalar",   # recovery time from synaptic depression [ms]
+            "tauFacil": "scalar", # time constant for facilitation [ms]
+            "tauPsc": "scalar",    # decay time constant of postsynaptic current [ms]
+            "g": "scalar",
+            "u": "scalar",
+            "x": "scalar",
+            "y": "scalar",
+            "z": "scalar"},
 
-        'is_pre_spike_time_required' : True}
+        "is_pre_spike_time_required" : True}
 
     translations = build_translations(
-        ('weight',    'g'),
-        ('delay',     'delaySteps', delayMsToSteps, delayStepsToMs),
-        ('U',         'U'),
-        ('tau_rec',   'tauRec'),
-        ('tau_facil', 'tauFacil'),
-        ('tau_psc',   'tauPsc'),
-        ('u',         'u'),
-        ('x',         'x'),
-        ('y',         'y'),
-        ('z',         'z'))
+        ("weight",    "g"),
+        ("delay",     "delaySteps", delayMsToSteps, delayStepsToMs),
+        ("U",         "U"),
+        ("tau_rec",   "tauRec"),
+        ("tau_facil", "tauFacil"),
+        ("tau_psc",   "tauPsc"),
+        ("u",         "u"),
+        ("x",         "x"),
+        ("y",         "y"),
+        ("z",         "z"))
 
     def _get_minimum_delay(self):
         d = state.min_delay
-        if d == 'auto':
+        if d == "auto":
             d = state.dt
         return d
 
@@ -114,32 +114,32 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
     mutable_vars = set(["g"])
 
     base_translations = build_translations(
-        ('weight', 'g'),
-        ('delay', 'delaySteps', delayMsToSteps, delayStepsToMs),
-        ('dendritic_delay_fraction', '_dendritic_delay_fraction'))
+        ("weight", "g"),
+        ("delay", "delaySteps", delayMsToSteps, delayStepsToMs),
+        ("dendritic_delay_fraction", "_dendritic_delay_fraction"))
 
     base_defs = {
-        'vars' : {'g': 'scalar'},
-        'pre_var_name_types': [],
-        'post_var_name_types': [],
+        "vars" : {"g": "scalar"},
+        "pre_var_name_types": [],
+        "post_var_name_types": [],
 
-        'sim_code' : DDTemplate('''
+        "sim_code" : DDTemplate("""
             $(addToInSyn, $(g));
             scalar dt = $(t) - $(sT_post);
             $${TD_CODE}
-        '''),
-        'learn_post_code' : DDTemplate('''
+        """),
+        "learn_post_code" : DDTemplate("""
             scalar dt = $(t) - $(sT_pre);
             $${TD_CODE}
-        '''),
+        """),
 
-        'is_pre_spike_time_required' : True,
-        'is_post_spike_time_required' : True,
+        "is_pre_spike_time_required" : True,
+        "is_post_spike_time_required" : True,
     }
 
     def _get_minimum_delay(self):
         d = state.min_delay
-        if d == 'auto':
+        if d == "auto":
             d = state.dt
         return d
 
@@ -188,8 +188,8 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
 class WeightDependence(object):
 
     vars = {
-        'Wmin': 'scalar',   # td + 1 - Minimum weight
-        'Wmax': 'scalar'    # td + 2 - Maximum weight
+        "Wmin": "scalar",   # td + 1 - Minimum weight
+        "Wmax": "scalar"    # td + 2 - Maximum weight
     }
 
     depression_update_code = None
@@ -197,17 +197,17 @@ class WeightDependence(object):
     potentiation_update_code = None
 
     wd_translations = (
-        ('w_max',     'Wmax'),
-        ('w_min',     'Wmin'),
+        ("w_max",     "Wmax"),
+        ("w_min",     "Wmin"),
     )
 
 
 class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependence):
     __doc__ = synapses.AdditiveWeightDependence.__doc__
 
-    depression_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) - (($(Wmax) - $(Wmin)) * update)));\n'
+    depression_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) - (($(Wmax) - $(Wmin)) * update)));\n"
 
-    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n'
+    potentiation_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -215,9 +215,9 @@ class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependen
 class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, WeightDependence):
     __doc__ = synapses.MultiplicativeWeightDependence.__doc__
 
-    depression_update_code = '$(g) -= ($(g) - $(Wmin)) * update;\n'
+    depression_update_code = "$(g) -= ($(g) - $(Wmin)) * update;\n"
 
-    potentiation_update_code = '$(g) += ($(Wmax) - $(g)) * update;\n'
+    potentiation_update_code = "$(g) += ($(Wmax) - $(g)) * update;\n"
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -225,9 +225,9 @@ class MultiplicativeWeightDependence(synapses.MultiplicativeWeightDependence, We
 class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiationMultiplicativeDepression, WeightDependence):
     __doc__ = synapses.AdditivePotentiationMultiplicativeDepression.__doc__
 
-    depression_update_code = '$(g) -= ($(g) - $(Wmin)) * update;\n'
+    depression_update_code = "$(g) -= ($(g) - $(Wmin)) * update;\n"
 
-    potentiation_update_code = '$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n'
+    potentiation_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -236,84 +236,84 @@ class GutigWeightDependence(synapses.GutigWeightDependence, WeightDependence):
     __doc__ = synapses.GutigWeightDependence.__doc__
 
     vars = deepcopy(WeightDependence.vars)
-    vars.update({'muPlus': 'scalar',
-                 'muMinus': 'scalar'})
+    vars.update({"muPlus": "scalar",
+                 "muMinus": "scalar"})
 
-    depression_update_code = '$(g) -=  pow(($(g) - $(Wmin)), $(muMinus)) * update;\n'
+    depression_update_code = "$(g) -=  pow(($(g) - $(Wmin)), $(muMinus)) * update;\n"
 
-    potentiation_update_code = '$(g) += pow(($(Wmax) - $(g)), $(muPlus)) * update;\n'
+    potentiation_update_code = "$(g) += pow(($(Wmax) - $(g)), $(muPlus)) * update;\n"
 
     translations = build_translations(
-        ('mu_plus',  'muPlus'),
-        ('mu_minus', 'muMinus'),
+        ("mu_plus",  "muPlus"),
+        ("mu_minus", "muMinus"),
         *WeightDependence.wd_translations)
 
 class SpikePairRule(synapses.SpikePairRule):
     __doc__ = synapses.SpikePairRule.__doc__
 
-    vars = {'tauPlus': 'scalar',  # 0 - Potentiation time constant (ms)
-            'tauMinus': 'scalar', # 1 - Depression time constant (ms)
-            'Aplus': 'scalar',    # 2 - Rate of potentiation
-            'Aminus': 'scalar'}   # 3 - Rate of depression
+    vars = {"tauPlus": "scalar",  # 0 - Potentiation time constant (ms)
+            "tauMinus": "scalar", # 1 - Depression time constant (ms)
+            "Aplus": "scalar",    # 2 - Rate of potentiation
+            "Aminus": "scalar"}   # 3 - Rate of depression
 
     pre_var_name_types = [("preTrace", "scalar")]
     post_var_name_types = [("postTrace", "scalar")]
 
     # using {.brc} for left{ or right} so that .format() does not freak out
-    sim_code = DDTemplate('''
+    sim_code = DDTemplate("""
         if (dt > 0)
         {
             const scalar update = $(Aminus) * $(postTrace) * exp(-dt / $(tauMinus));
             $${WD_CODE}
         }
-        ''')
+        """)
 
-    learn_post_code = DDTemplate('''
+    learn_post_code = DDTemplate("""
         if (dt > 0)
         {
             const scalar update = $(Aplus) * $(preTrace) * exp(-dt / $(tauPlus));
             $${WD_CODE}
         }
-        ''')
+        """)
 
-    pre_spike_code = '''\
+    pre_spike_code = """\
         const scalar dt = $(t) - $(sT_pre);
         $(preTrace) = $(preTrace) * exp(-dt / $(tauPlus)) + 1.0;
-        '''
+        """
 
-    post_spike_code = '''\
+    post_spike_code = """\
         const scalar dt = $(t) - $(sT_post);
         $(postTrace) = $(postTrace) * exp(-dt / $(tauMinus)) + 1.0;
-        '''
+        """
 
     translations = build_translations(
-        ('tau_plus',   'tauPlus'),
-        ('tau_minus',  'tauMinus'),
-        ('A_plus',     'Aplus'),
-        ('A_minus',    'Aminus'))
+        ("tau_plus",   "tauPlus"),
+        ("tau_minus",  "tauMinus"),
+        ("A_plus",     "Aplus"),
+        ("A_minus",    "Aminus"))
 
 
 class Vogels2011Rule(synapses.Vogels2011Rule):
     __doc__ = synapses.Vogels2011Rule.__doc__
 
-    vars = {'Tau': 'scalar',      # 0 - Plasticity time constant (ms)
-            'Rho': 'scalar',      # 1 - Target rate
-            'Eta': 'scalar'}      # 2 - Learning rate
+    vars = {"Tau": "scalar",      # 0 - Plasticity time constant (ms)
+            "Rho": "scalar",      # 1 - Target rate
+            "Eta": "scalar"}      # 2 - Learning rate
 
-    sim_code = DDTemplate('''
+    sim_code = DDTemplate("""
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
         const scalar update = scale * (exp(-dt / $(Tau)) - $(Rho));
         $${WD_CODE}
-    ''')
+    """)
 
-    learn_post_code = DDTemplate('''
+    learn_post_code = DDTemplate("""
         const scalar scale = ($(Wmax) - $(Wmin)) * $(Eta);
         const scalar update = -scale * exp(-dt / $(Tau));
         $${WD_CODE}
-    ''')
+    """)
 
     translations = build_translations(
-        ('tau', 'Tau'),
-        ('eta', 'Eta'),
-        ('rho', 'Rho'))
+        ("tau", "Tau"),
+        ("eta", "Eta"),
+        ("rho", "Rho"))
 

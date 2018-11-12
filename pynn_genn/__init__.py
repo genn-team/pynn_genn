@@ -36,19 +36,19 @@ def list_standard_models():
 def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
           **extra_params):
 
-    max_delay = extra_params.get('max_delay', DEFAULT_MAX_DELAY)
+    max_delay = extra_params.get("max_delay", DEFAULT_MAX_DELAY)
     common.setup(timestep, min_delay, **extra_params)
     simulator.state.clear()
     simulator.state.dt = timestep  # move to common.setup?
     simulator.state.min_delay = min_delay
     simulator.state.max_delay = max_delay
-    simulator.state.mpi_rank = extra_params.get('rank', 0)
-    simulator.state.num_processes = extra_params.get('num_processes', 1)
-    simulator.state.model.cpu_only = extra_params.get('cpu_only', False)
+    simulator.state.mpi_rank = extra_params.get("rank", 0)
+    simulator.state.num_processes = extra_params.get("num_processes", 1)
+    simulator.state.model.cpu_only = extra_params.get("cpu_only", False)
 
     # If a model name is specified, use that
-    if 'model_name' in extra_params:
-        simulator.state.model.model_name = extra_params['model_name']
+    if "model_name" in extra_params:
+        simulator.state.model.model_name = extra_params["model_name"]
     # Otherwise
     else:
         # Get the parent frame from our current frame (whatever called setup)
@@ -96,6 +96,6 @@ connect = common.build_connect(Projection, FixedProbabilityConnector, StaticSyna
 
 record = common.build_record(simulator)
 
-record_v = lambda source, filename: record(['v'], source, filename)
+record_v = lambda source, filename: record(["v"], source, filename)
 
-record_gsyn = lambda source, filename: record(['gsyn_exc', 'gsyn_inh'], source, filename)
+record_gsyn = lambda source, filename: record(["gsyn_exc', 'gsyn_inh"], source, filename)

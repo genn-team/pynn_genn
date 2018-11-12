@@ -77,7 +77,7 @@ class StateMonitor(Monitor):
 
     def __init__(self, parent, variable):
         super(StateMonitor, self).__init__(parent)
-        self.translated = (parent.population.celltype.translations[variable]['translated_name'])
+        self.translated = (parent.population.celltype.translations[variable]["translated_name"])
 
     def init_data_view(self):
         self.data_view = (self.recorder.population._pop.vars[self.translated].view)
@@ -122,7 +122,7 @@ class Recorder(recording.Recorder):
 
         # If there isn't already a monitor for this variable
         if variable not in self.monitors:
-            if variable == 'spikes':
+            if variable == "spikes":
                 self.monitors[variable] = SpikeMonitor(self)
             else:
                 self.monitors[variable] = StateMonitor(self, variable)
@@ -136,19 +136,19 @@ class Recorder(recording.Recorder):
 
     def _record_vars(self, t):
         if len(self.recorded) > 0:
-            if 'spikes' in self.recorded:
+            if "spikes" in self.recorded:
                 self._simulator.state.model.pull_current_spikes_from_device(self.population._genn_label)
-            if len(self.recorded) - ('spikes' in self.recorded) > 0:
+            if len(self.recorded) - ("spikes" in self.recorded) > 0:
                 self._simulator.state.model.pull_state_from_device(self.population._genn_label)
 
         for monitor in self.monitors.values():
             monitor(t)
 
     def _get_spiketimes(self, id):
-        if 'spikes' not in self.monitors:
+        if "spikes" not in self.monitors:
             spikes = np.array([])
         else:
-            spikes = self.monitors['spikes'].get_data(id)
+            spikes = self.monitors["spikes"].get_data(id)
         return spikes
 
     def _get_all_signals(self, variable, ids, clear=False):
@@ -157,7 +157,7 @@ class Recorder(recording.Recorder):
 
     def _local_count(self, variable, filter_ids=None):
         N = {}
-        if variable == 'spikes':
+        if variable == "spikes":
             for id in self.filter_recorded(variable, filter_ids):
                 N[int(id)] = 2
         else:

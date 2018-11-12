@@ -15,12 +15,12 @@ from six import iteritems, iterkeys
 
 # Mapping from GeNN to numpy types
 genn_to_numpy_types = {
-    'scalar': np.float32,
-    'float': np.float32,
-    'double': np.float64,
-    'unsigned char': np.uint8,
-    'int': np.int32,
-    'unsigned int': np.uint32}
+    "scalar": np.float32,
+    "float": np.float32,
+    "double": np.float64,
+    "unsigned char": np.uint8,
+    "int": np.int32,
+    "unsigned int": np.uint32}
 
 def sanitize_label(label):
     # Strip out any non-alphanumerical characters

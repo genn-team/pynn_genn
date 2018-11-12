@@ -35,40 +35,40 @@ def stepStop(times, **kwargs):
 
 class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     __doc__ = electrodes.DCSource.__doc__
-    genn_currentsource_name = 'DCSource'
+    genn_currentsource_name = "DCSource"
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injection_code' : '''
+        "injection_code" : """
             if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(amplitude));
             }
-        ''',
-        'var_name_types': [
-            ('applyIinj', "unsigned char")],
-        'param_name_types' : {
-            'tStart': 'scalar',
-            'tStop': 'scalar',
-            'amplitude': 'scalar'}
+        """,
+        "var_name_types": [
+            ("applyIinj", "unsigned char")],
+        "param_name_types" : {
+            "tStart": "scalar",
+            "tStop": "scalar",
+            "amplitude": "scalar"}
     },
     # translations
     (
-        ('start',      'tStart'),
-        ('stop',       'tStop'),
-        ('amplitude',  'amplitude')
+        ("start",      "tStart"),
+        ("stop",       "tStop"),
+        ("amplitude",  "amplitude")
     ),
     # extra param values
     {
-        'applyIinj' : 0
+        "applyIinj" : 0
     })
 
 class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource):
     __doc__ = electrodes.StepCurrentSource.__doc__
-    genn_currentsource_name = 'StepCurrentSource'
+    genn_currentsource_name = "StepCurrentSource"
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injection_code' : '''
+        "injection_code" : """
             if ($(applyIinj)) {
                 if ($(startStep) < ($(endStep) - 1) && $(t) >= $(stepTimes)[$(startStep) + 1]) {
                     $(startStep)++;
@@ -78,17 +78,17 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
                     $(injectCurrent, $(stepAmpls)[$(startStep)]);
                 }
             }
-        ''',
-        'var_name_types': [
-            ('applyIinj', "unsigned char"),
+        """,
+        "var_name_types": [
+            ("applyIinj", "unsigned char"),
             ("startStep", "unsigned int"),
             ("endStep", "unsigned int")],
-        'extra_global_params' : [('stepAmpls', 'scalar*'), ('stepTimes', 'scalar*')]
+        "extra_global_params" : [("stepAmpls", "scalar*"), ("stepTimes", "scalar*")]
     },
     # translations
     (
-        ('amplitudes',  'stepAmpls'),
-        ('times',       'stepTimes')
+        ("amplitudes",  "stepAmpls"),
+        ("times",       "stepTimes")
     ))
 
     def get_extra_global_params(self, native_params):
@@ -137,68 +137,68 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
 
 class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
     __doc__ = electrodes.ACSource.__doc__
-    genn_currentsource_name = 'ACSource'
+    genn_currentsource_name = "ACSource"
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injection_code' : '''
+        "injection_code" : """
             if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(Ampl) * sin($(Omega) * $(t) + $(PhaseRad)) + $(Offset));
             }
-        ''',
-        'var_name_types': [
-            ('applyIinj', "unsigned char")],
-        'param_name_types' : {
-            'tStart': 'scalar', 
-            'tStop': 'scalar', 
-            'Ampl': 'scalar', 
-            'Omega': 'scalar', 
-            'PhaseRad': 'scalar', 
-            'Offset': 'scalar'},
+        """,
+        "var_name_types": [
+            ("applyIinj", "unsigned char")],
+        "param_name_types" : {
+            "tStart": "scalar",
+            "tStop": "scalar",
+            "Ampl": "scalar",
+            "Omega": "scalar",
+            "PhaseRad": "scalar",
+            "Offset": "scalar"},
     },
     # translations
     (
-        ('start',      'tStart'),
-        ('stop',       'tStop'),
-        ('amplitude',  'Ampl'),
-        ('frequency',  'Omega',     freqToOmega,    None),
-        ('phase',      'PhaseRad',  phaseToRad,     None),
-        ('offset',     'Offset')
+        ("start",      "tStart"),
+        ("stop",       "tStop"),
+        ("amplitude",  "Ampl"),
+        ("frequency",  "Omega",     freqToOmega,    None),
+        ("phase",      "PhaseRad",  phaseToRad,     None),
+        ("offset",     "Offset")
     ),
     # extra param values
     {
-        'applyIinj' : 0
+        "applyIinj" : 0
     })
 
 class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSource):
     __doc__ = electrodes.NoisyCurrentSource.__doc__
-    genn_currentsource_name = 'NoisyCurrentSource'
+    genn_currentsource_name = "NoisyCurrentSource"
     currentsource_defs = GeNNDefinitions(
     # definitions
     {
-        'injection_code' : '''
+        "injection_code" : """
             if ($(applyIinj) && $(t) >= $(tStart) && $(t) < $(tStop)) {
                 $(injectCurrent, $(meanDT) + $(gennrand_normal) * $(sdDT));
             }
-        ''',
+        """,
         
-        'var_name_types': [
-            ('applyIinj', "unsigned char")],
-        'param_name_types' : {
-            'tStart': 'scalar', 
-            'tStop': 'scalar', 
-            'meanDT': 'scalar', 
-            'sdDT': 'scalar'}
+        "var_name_types": [
+            ("applyIinj", "unsigned char")],
+        "param_name_types" : {
+            "tStart": "scalar",
+            "tStop": "scalar",
+            "meanDT": "scalar",
+            "sdDT": "scalar"}
     },
     # translations
     (
-        ('start',      'tStart'),
-        ('stop',       'tStop'),
-        ('mean',       'meanDT',    partial(mulDT, "mean"),     None),
-        ('stdev',      'sdDT',      partial(mulDT, "stdev"),    None),
-        ('dt',         '_DT'),
+        ("start",      "tStart"),
+        ("stop",       "tStop"),
+        ("mean",       "meanDT",    partial(mulDT, "mean"),     None),
+        ("stdev",      "sdDT",      partial(mulDT, "stdev"),    None),
+        ("dt",         "_DT"),
     ),
     # extra param values
     {
-        'applyIinj' : 0
+        "applyIinj" : 0
     })
