@@ -4,8 +4,8 @@ from six import iteritems, itervalues
 from pyNN import recording
 from . import simulator
 
-class Monitor(object):
 
+class Monitor(object):
     def __init__(self, parent):
         self.recorder = parent
         self.start_id = parent.population.first_id
@@ -37,7 +37,7 @@ class Monitor(object):
             self.data.extend([] for _ in range(len(self.id_set) - old_id_len))
 
         iimap_len = len(self.id_data_idx_map)
-        self.id_data_idx_map.update({idd - self.start_id : i + iimap_len 
+        self.id_data_idx_map.update({idd - self.start_id: i + iimap_len
                                      for i, idd in enumerate(new_ids)})
 
     def get_data(self, ids):
@@ -48,8 +48,8 @@ class Monitor(object):
 
         data_ids = [self.id_data_idx_map[idd] for idd in ids]
 
-        return (np.array(self.data)[data_ids,:].T 
-                if len(self.data) > 1 
+        return (np.array(self.data)[data_ids, :].T
+                if len(self.data) > 1
                 else np.array(self.data).T)
 
     def get_time(self):
@@ -74,17 +74,17 @@ class Monitor(object):
 
 
 class StateMonitor(Monitor):
-
     def __init__(self, parent, variable):
         super(StateMonitor, self).__init__(parent)
-        self.translated = (parent.population.celltype.translations[variable]["translated_name"])
+        parent_translations = parent.population.celltype.translations
+        self.translated = (parent_translations[variable]["translated_name"])
 
     def init_data_view(self):
-        self.data_view = (self.recorder.population._pop.vars[self.translated].view)
+        vars = self.recorder.population._pop.vars
+        self.data_view = vars[self.translated].view
 
 
 class SpikeMonitor(Monitor):
-
     def __init__(self, parent):
         super(SpikeMonitor, self).__init__(parent)
 
@@ -136,10 +136,13 @@ class Recorder(recording.Recorder):
 
     def _record_vars(self, t):
         if len(self.recorded) > 0:
+            model = self._simulator.state.model
+            label = self.population._genn_label
+
             if "spikes" in self.recorded:
-                self._simulator.state.model.pull_current_spikes_from_device(self.population._genn_label)
+                model.pull_current_spikes_from_device(label)
             if len(self.recorded) - ("spikes" in self.recorded) > 0:
-                self._simulator.state.model.pull_state_from_device(self.population._genn_label)
+                model.pull_state_from_device(label)
 
         for monitor in self.monitors.values():
             monitor(t)
@@ -152,7 +155,8 @@ class Recorder(recording.Recorder):
         return spikes
 
     def _get_all_signals(self, variable, ids, clear=False):
-        # assuming not using cvode, otherwise need to get times as well and use IrregularlySampledAnalogSignal
+        # assuming not using cvode, otherwise need to get times as
+        # well and use IrregularlySampledAnalogSignal
         return self.monitors[variable].get_data(ids)
 
     def _local_count(self, variable, filter_ids=None):
