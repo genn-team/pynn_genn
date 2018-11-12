@@ -180,32 +180,34 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
 
-            // If voltage is above artificial spike height
+            // If voltage is above artificial spike height, reset it
             if($(V) >= $(vSpike)) {
                 $(V) = $(vReset);
             }
 
+            // Calculate RK4 terms
+            const scalar i = $(Isyn) + $(iOffset);
+            const scalar v1 = DV($(V), $(W));
+            const scalar w1 = DW($(V), $(W));
+            const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+            const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+            const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+            const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+            const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
+            const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+
+            // If we're not in refractory period, update V
             if ($(RefracTime) <= 0.0) {
-                const scalar i = $(Isyn) + $(iOffset);
-                // Calculate RK4 terms
-                const scalar v1 = DV($(V), $(W));
-                const scalar w1 = DW($(V), $(W));
-                const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
-                const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
-                // Update V
                 $(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
-                // If we're not above peak, update w
-                // **NOTE** it's not safe to do this at peak as wn may well be huge
-                if($(V) <= -40.0) {
-                    $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
-                }
             }
             else {
                 $(RefracTime) -= DT;
+            }
+
+            // If we're not above peak, update w
+            // **NOTE** it's not safe to do this at peak as wn may well be huge
+            if($(V) <= -40.0) {
+                $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
             }
         """,
 
