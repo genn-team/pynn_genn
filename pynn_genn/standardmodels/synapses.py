@@ -41,10 +41,10 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
         ("delay", "delaySteps", delayMsToSteps, delayStepsToMs))
 
     def _get_minimum_delay(self):
-        d = state.min_delay
-        if d == "auto":
-            d = state.dt
-        return d
+        if state._min_delay == "auto":
+            return state.dt
+        else:
+            return state._min_delay
 
 class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.TsodyksMarkramSynapse.__doc__
@@ -103,10 +103,10 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
         ("z",         "z"))
 
     def _get_minimum_delay(self):
-        d = state.min_delay
-        if d == "auto":
-            d = state.dt
-        return d
+        if state._min_delay == "auto":
+            return state.dt
+        else:
+            return state._min_delay
 
 class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
     __doc__ = synapses.STDPMechanism.__doc__
@@ -138,10 +138,10 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
     }
 
     def _get_minimum_delay(self):
-        d = state.min_delay
-        if d == "auto":
-            d = state.dt
-        return d
+        if state._min_delay == "auto":
+            return state.dt
+        else:
+            return state._min_delay
 
     def __init__(self, timing_dependence=None, weight_dependence=None,
             voltage_dependence=None, dendritic_delay_fraction=1.0,

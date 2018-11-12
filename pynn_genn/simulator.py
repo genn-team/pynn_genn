@@ -36,7 +36,10 @@ class State(common.control.BaseState):
     @property
     def min_delay(self):
         if self._min_delay == "auto":
-            return min(p.min_delay for p in self.projections)
+            if len(self.projections) == 0:
+                return self.dt
+            else:
+                return min(p.min_delay for p in self.projections)
         else:
             return self._min_delay
 
