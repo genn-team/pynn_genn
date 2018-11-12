@@ -34,6 +34,6 @@ setup(
     # Requirements
     # **NOTE** PyNN really should be requiring lazyarray itself but it (0.9.2) doesn't seem to
     install_requires=["pynn>=0.9, <1.0", "pygenn", "lazyarray>=0.3, < 0.4", 
-                      "sentinel", "neo>=0.6, <0.7", "numpy>1.6", "six"],
+                      "sentinel", "neo>=0.6, <0.7", "numpy>1.6, < 1.15", "six"],
     zip_safe=False,  # Partly for performance reasons
 )
