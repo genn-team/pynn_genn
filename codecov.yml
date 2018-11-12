@@ -1,2 +1,2 @@
 fixes:
-    - "/**/site-packages/pynn_genn*.egg/::/"
+  - "/**/pynn_genn*.egg/::" # Repath files from PyNN GeNN egg to root of repository
