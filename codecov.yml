@@ -1,0 +1,2 @@
+fixes:
+    - "/**/site-packages/pynn_genn*.egg/::/"
