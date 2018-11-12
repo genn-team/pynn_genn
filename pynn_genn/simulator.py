@@ -87,7 +87,7 @@ class State(common.control.BaseState):
             self.model.step_time()
 
     def clear(self):
-        self.model = GeNNModel("float', 'GeNNModel")
+        self.model = GeNNModel("float", "GeNNModel")
         self.populations = []
         self.projections = []
         self.recorders = set([])

@@ -122,7 +122,7 @@ class GeNNStandardModelType(StandardModelType):
             elif pref_n in extra_param_values:
                 neuron_params[n] = extra_param_values[pref_n].evaluate(simplify=True)
             else:
-                raise Exception('Property "{}" not correctly initialised'.format(n))
+                raise Exception("Property '{}' not correctly initialised".format(n))
 
         # Loop through GeNN variables
         neuron_ini = {}
@@ -147,7 +147,7 @@ class GeNNStandardModelType(StandardModelType):
                 # Evaluate values into neuron initialiser
                 neuron_ini[n] = extra_param_values[pref_n].evaluate(simplify=False)
             else:
-                raise Exception('Variable "{}" not correctly initialised'.format(n))
+                raise Exception("Variable '{}' not correctly initialised".format(n))
 
         return genn_model, neuron_params, neuron_ini
 
