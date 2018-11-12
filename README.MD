@@ -1,3 +1,4 @@
+[![Build Status](https://gen-ci.inf.sussex.ac.uk/buildStatus/icon?job=GeNN/pynn_genn/master)](https://gen-ci.inf.sussex.ac.uk/job/GeNN/job/pynn_genn/job/master/) [![codecov](https://codecov.io/gh/genn-team/pynn_genn/branch/master/graph/badge.svg)](https://codecov.io/gh/genn-team/pynn_genn)
 # A PyNN interface to GeNN
 This project bridges [GeNN](http://genn-team.github.io/genn/), a GPU enhanced Neuronal Network simulation environment, with [PyNN](https://pypi.org/project/PyNN/), a simulator-independent language for building neuronal network models.
 
