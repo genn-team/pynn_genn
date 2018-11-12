@@ -19,10 +19,10 @@ from pygenn.genn_model import create_custom_neuron_class
 logger = logging.getLogger("PyNN")
 
 # Function to convert time constants to exponential decay
-def tauToDecay(tau_param_name, **kwargs):
+def tau_to_decay(tau_param_name, **kwargs):
     return la.exp(-state.dt / kwargs[tau_param_name])
 
-def tauToInit(tau_param_name, **kwargs):
+def tau_to_init(tau_param_name, **kwargs):
     tau = kwargs[tau_param_name]
     
     init = 1.0 - la.exp(-state.dt / tau)
@@ -30,12 +30,12 @@ def tauToInit(tau_param_name, **kwargs):
 
 # Function to convert mean 'rate' parameter
 # to mean interspike interval (in timesteps)
-def rateToISI(rate, **kwargs):
+def rate_to_isi(rate, **kwargs):
     return 1000.0 / (rate * state.dt)
 
 # Function to convert mean interspike interval 
 # 'isi' (in timesteps) to mean rate in Hz
-def isiToRate(isi, **kwargs):
+def isi_to_rate(isi, **kwargs):
     return 1000.0 / (isi * state.dt)
 
 genn_neuron_defs = {}
@@ -78,7 +78,7 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
         ("v_rest",     "Vrest"),
         ("v_reset",    "Vreset"),
         ("cm",         "Rmembrane",     "tau_m / cm", ""),
-        ("tau_m",      "ExpTC",         partial(tauToDecay, "tau_m"), None),
+        ("tau_m",      "ExpTC",         partial(tau_to_decay, "tau_m"), None),
         ("tau_refrac", "TauRefrac"),
         ("v_thresh",   "Vthresh"),
         ("i_offset",   "Ioffset"),
@@ -140,14 +140,14 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
         ("v_rest",     "Vrest"),
         ("v_reset",    "Vreset"),
         ("cm",         "Rmembrane",     "tau_m / cm",   ""),
-        ("tau_m",      "ExpTC",         partial(tauToDecay, "tau_m"),    None),
+        ("tau_m",      "ExpTC",         partial(tau_to_decay, "tau_m"),    None),
         ("tau_refrac", "TauRefrac"),
         ("v_thresh",   "Vthresh"),
         ("i_offset",   "Ioffset"),
         ("v",          "V"),
-        ("tau_sfa",    "ExpSFA",        partial(tauToDecay, "tau_sfa"),  None),
+        ("tau_sfa",    "ExpSFA",        partial(tau_to_decay, "tau_sfa"),  None),
         ("e_rev_sfa",  "ESfa"),
-        ("tau_rr",     "ExpRr",         partial(tauToDecay, "tau_rr"),   None),
+        ("tau_rr",     "ExpRr",         partial(tau_to_decay, "tau_rr"),   None),
         ("e_rev_rr",   "ERr"),
         ("g_s",        "GSfa", 0.001),
         ("g_r",        "GRr", 0.001),
@@ -283,7 +283,7 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
     },
     # translations
     (
-        ("rate",     "isi",         rateToISI,  isiToRate),
+        ("rate",     "isi",         rate_to_isi,  isi_to_rate),
         ("start",    "spikeStart"),
         ("duration", "duration")
     ),
@@ -321,7 +321,7 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     },
     # translations
     (
-        ("rate",       "isi",           rateToISI,      isiToRate),
+        ("rate",       "isi",           rate_to_isi,      isi_to_rate),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
         ("tau_refrac", "TauRefrac")
@@ -467,13 +467,13 @@ genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
     },
     # translations
     (
-        ("tau_syn_E",  "exc_expDecay",  partial(tauToDecay, "tau_syn_E"),   None),
-        ("tau_syn_I",  "inh_expDecay",  partial(tauToDecay, "tau_syn_I"),   None),
+        ("tau_syn_E",  "exc_expDecay",  partial(tau_to_decay, "tau_syn_E"),   None),
+        ("tau_syn_I",  "inh_expDecay",  partial(tau_to_decay, "tau_syn_I"),   None),
     ),
     # extra param values
     {
-        "exc_init": partial(tauToInit, "tau_syn_E"),
-        "inh_init": partial(tauToInit, "tau_syn_I")
+        "exc_init": partial(tau_to_init, "tau_syn_E"),
+        "inh_init": partial(tau_to_init, "tau_syn_I")
     }
 )
     
@@ -494,13 +494,13 @@ genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
     (
         ("e_rev_E",    "exc_E"),
         ("e_rev_I",    "inh_E"),
-        ("tau_syn_E",  "exc_expDecay",  partial(tauToDecay, "tau_syn_E"),   None),
-        ("tau_syn_I",  "inh_expDecay",  partial(tauToDecay, "tau_syn_I"),   None)
+        ("tau_syn_E",  "exc_expDecay",  partial(tau_to_decay, "tau_syn_E"),   None),
+        ("tau_syn_I",  "inh_expDecay",  partial(tau_to_decay, "tau_syn_I"),   None)
     ),
     # extra param values
     {
-        "exc_init": partial(tauToInit, "tau_syn_E"),
-        "inh_init": partial(tauToInit, "tau_syn_I")
+        "exc_init": partial(tau_to_init, "tau_syn_E"),
+        "inh_init": partial(tau_to_init, "tau_syn_I")
     }
 )
 

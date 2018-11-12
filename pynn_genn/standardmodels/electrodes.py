@@ -18,20 +18,14 @@ logger = logging.getLogger("PyNN")
 
 # Function to convert mean 'rate' parameter 
 # to mean interspike interval (in timesteps)
-def mulDT(param_name, dt, **kwargs):
+def mul_dt(param_name, dt, **kwargs):
     return kwargs[param_name] * dt
 
-def freqToOmega(frequency, **kwargs):
+def freq_to_omega(frequency, **kwargs):
     return frequency * 2.0 * np.pi / 1000.0
 
-def phaseToRad(phase, **kwargs):
+def phase_to_rad(phase, **kwargs):
     return phase / 180.0 * np.pi
-
-def stepStart(times, **kwargs):
-    return larray(times.base_value.value[0])
-
-def stepStop(times, **kwargs):
-    return larray(times.base_value.value[-1])
 
 class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
     __doc__ = electrodes.DCSource.__doc__
@@ -130,9 +124,9 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
         # Concatenate together step amplitudes and times to form extra global parameter
         return {
             "stepAmpls" : np.concatenate([seq.value
-                                           for seq in native_params["stepAmpls"]]),
+                                          for seq in native_params["stepAmpls"]]),
             "stepTimes" : np.concatenate([seq.value
-                                           for seq in native_params["stepTimes"]])}
+                                          for seq in native_params["stepTimes"]])}
 
 
 class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
@@ -161,8 +155,8 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
         ("start",      "tStart"),
         ("stop",       "tStop"),
         ("amplitude",  "Ampl"),
-        ("frequency",  "Omega",     freqToOmega,    None),
-        ("phase",      "PhaseRad",  phaseToRad,     None),
+        ("frequency",  "Omega",     freq_to_omega,    None),
+        ("phase",      "PhaseRad",  phase_to_rad,     None),
         ("offset",     "Offset")
     ),
     # extra param values
@@ -194,8 +188,8 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
     (
         ("start",      "tStart"),
         ("stop",       "tStop"),
-        ("mean",       "meanDT",    partial(mulDT, "mean"),     None),
-        ("stdev",      "sdDT",      partial(mulDT, "stdev"),    None),
+        ("mean",       "meanDT",    partial(mul_dt, "mean"),     None),
+        ("stdev",      "sdDT",      partial(mul_dt, "stdev"),    None),
         ("dt",         "_DT"),
     ),
     # extra param values
