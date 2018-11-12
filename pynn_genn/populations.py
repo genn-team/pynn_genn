@@ -23,6 +23,7 @@ class Assembly(common.Assembly):
         which breaks connection building if there is a callback"""
         return sum(p.local_size for p in self.populations)
 
+
 class PopulationView(common.PopulationView):
     _assembly_class = Assembly
     _simulator = simulator
@@ -35,7 +36,8 @@ class PopulationView(common.PopulationView):
             param_vals = parent_params[n].evaluate(simplify=False)
 
             # If parameter is a sequence and value has a length
-            # **NOTE** following logic comes from pyNN.parameters.ParameterSpace
+            # **NOTE** following logic is copied from
+            # pyNN.parameters.ParameterSpace
             if parent_params[n].dtype is Sequence and isinstance(v, Sized):
                 # If it's empty, replace v with empty sequence
                 if len(v) == 0:
@@ -90,19 +92,21 @@ class Population(common.Population):
         """
         Create a population of neurons all of the same type.
         """
-        super(Population, self).__init__(size, cellclass, cellparams, structure,
-                initial_values, label)
+        super(Population, self).__init__(size, cellclass, cellparams,
+                                         structure, initial_values, label)
 
         # Create empty list to hold injected currents
         self._injected_currents = []
 
         # Give population a unique GeNN label
         # If a label is passed we include a sanitized version of this in it
-        # **NOTE** while superclass will always populate label PROPERTY the result isn't useful
+        # **NOTE** while superclass will always populate label PROPERTY
+        # the result isn't useful as its not unique
         if label is None:
             self._genn_label = "population_%u" % Population._nPop
         else:
-            self._genn_label = "population_%u_%s" % (Population._nPop, sanitize_label(label))
+            self._genn_label = "population_%u_%s" % (Population._nPop,
+                                                     sanitize_label(label))
 
     def _create_cells(self):
         id_range = np.arange(simulator.state.id_counter,
@@ -111,7 +115,9 @@ class Population(common.Population):
                                   dtype=simulator.ID)
 
         def is_local(id):
-            return (id % simulator.state.num_processes) == simulator.state.mpi_rank
+            return ((id % simulator.state.num_processes) ==
+                    simulator.state.mpi_rank)
+
         self._mask_local = is_local(self.all_cells)
 
         # Take a deep copy of cell type parameters
@@ -133,7 +139,8 @@ class Population(common.Population):
         # Build GeNN neuon model
         native_parameters = self._native_parameters
         self._genn_nmodel, neuron_params, neuron_ini =\
-            self.celltype.build_genn_neuron(native_parameters, self.initial_values)
+            self.celltype.build_genn_neuron(native_parameters,
+                                            self.initial_values)
 
         self._pop = simulator.state.model.add_neuron_population(
             self._genn_label, self.size, self._genn_nmodel,
