@@ -20,8 +20,10 @@ from .model import sanitize_label
 from .contexts import ContextMixin
 
 # Tuple type used to store details of GeNN sub-projections
-SubProjection = namedtuple("SubProjection", ["genn_label", "pre_pop", "post_pop",
-                                             "pre_slice", "post_slice", "syn_pop"])
+SubProjection = namedtuple("SubProjection",
+                           ["genn_label", "pre_pop", "post_pop",
+                            "pre_slice", "post_slice", "syn_pop"])
+
 
 '''
 class Connection(common.Connection):
@@ -103,18 +105,21 @@ class Connection(common.Connection):
         return dict([(name, getattr(self, name)) for name in attribute_names])
 '''
 
+
 class Projection(common.Projection, ContextMixin):
     __doc__ = common.Projection.__doc__
     _simulator = simulator
     _static_synapse_class = StaticSynapse
 
     def __init__(self, presynaptic_population, postsynaptic_population,
-                 connector, synapse_type=None, source=None, receptor_type=None,
-                 space=Space(), label=None):
-        # Make a deep copy of synapse type so projection can independently change parameters
+                 connector, synapse_type=None, source=None,
+                 receptor_type=None, space=Space(), label=None):
+        # Make a deep copy of synapse type
+        # so projection can independently change parameters
         synapse_type = deepcopy(synapse_type)
-        common.Projection.__init__(self, presynaptic_population, postsynaptic_population,
-                                   connector, synapse_type, source, receptor_type,
+        common.Projection.__init__(self, presynaptic_population,
+                                   postsynaptic_population, connector,
+                                   synapse_type, source, receptor_type,
                                    space, label)
 
         # Initialise the context stack
@@ -124,9 +129,12 @@ class Projection(common.Projection, ContextMixin):
         self.use_sparse = (False if isinstance(connector, AllToAllConnector)
                            else True)
 
-        # Generate unique stem for sub-projections created from this projection
-        # **NOTE** superclass will always populate label PROPERTY with something moderately useful
-        self._genn_label_stem = "projection_%u_%s" % (Projection._nProj, sanitize_label(self.label))
+        # Generate name stem for sub-projections created from this projection
+        # **NOTE** superclass will always populate label PROPERTY
+        # with something moderately useful i.e. at least unique
+        self._genn_label_stem =\
+            "projection_%u_%s" % (Projection._nProj,
+                                  sanitize_label(self.label))
 
         # Add projection to the simulator
         self._simulator.state.projections.append(self)
@@ -140,7 +148,8 @@ class Projection(common.Projection, ContextMixin):
                             **connection_parameters):
         num_synapses = len(presynaptic_indices)
         conn_pre_indices.extend(presynaptic_indices)
-        conn_post_indices.extend(repeat(postsynaptic_index, times=num_synapses))
+        conn_post_indices.extend(repeat(postsynaptic_index,
+                                        times=num_synapses))
 
         # Loop through connection _parameters
         for p_name, p_val in iteritems(connection_parameters):
@@ -153,7 +162,7 @@ class Projection(common.Projection, ContextMixin):
         pass
 
     def _get_attributes_as_arrays(self, names, multiple_synapses="sum"):
-         # Dig out reference to GeNN model
+        # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
         # Pull projection state from device
@@ -166,7 +175,7 @@ class Projection(common.Projection, ContextMixin):
         if self.use_sparse:
             raise Exception("Reading attributes of sparse projections "
                             "into arrays is currently not supported")
-        # Otherwise 
+        # Otherwise
         else:
             # Loop through variables
             for n in names[0]:
@@ -182,7 +191,8 @@ class Projection(common.Projection, ContextMixin):
                     # Reshape variable values from sub-population
                     # and copy into slice of var
                     var[sub.pre_slice, sub.post_slice] =\
-                        np.reshape(sub_pop.syn_pop.get_var_values(n), sub_shape)
+                        np.reshape(sub_pop.syn_pop.get_var_values(n),
+                                   sub_shape)
 
                 # Add variable to list
                 variables.append(var)
@@ -221,29 +231,33 @@ class Projection(common.Projection, ContextMixin):
                     variables.append(np.tile(np.arange(self.post.size),
                                              self.pre.size))
 
-            # Otherwise, stack together the variables from each sub-projection and add to list
+            # Otherwise, stack together the variables
+            # from each sub-projection and add to list
             else:
-                variables.append(np.hstack(sub_pop.syn_pop.get_var_values(n)
-                                           for sub_pop in self._sub_projections))
+                variables.append(np.hstack(p.syn_pop.get_var_values(n)
+                                           for p in self._sub_projections))
 
         # Unzip into list of tuples and return
         return zip(*variables)
 
     def _get_sub_pops(self, pop, neuron_slice, conn_inds, conn_mask):
-        """ recursive helper function to split up connection indices generated by
-            standard connect function into list containing sub-projections
-            to actual projections i.e. rather than Assemblies or PopulationViews"""
+        """ recursive helper function to split up connection indices generated
+        by standard connect function into list containing sub-projections
+        to actual projections i.e. not Assemblies or PopulationViews"""
         # If population is an assembly
         if isinstance(pop, common.Assembly):
             sub_pops = []
             n_slice_start = neuron_slice.start
             for child_pop in pop.populations:
                 # Build slice
-                n_slice_stop = min(n_slice_start + child_pop.size, neuron_slice.stop)
+                n_slice_stop = min(n_slice_start + child_pop.size,
+                                   neuron_slice.stop)
                 child_slice = slice(n_slice_start, n_slice_stop)
 
                 # Build mask to select connections in this slice
-                child_mask = conn_mask & (conn_inds >= n_slice_start) & (conn_inds < n_slice_stop)
+                child_mask = (conn_mask &
+                              (conn_inds >= n_slice_start) &
+                              (conn_inds < n_slice_stop))
 
                 # Transform our block of indices so they're
                 # in terms of child population's neurons
@@ -261,7 +275,8 @@ class Projection(common.Projection, ContextMixin):
         elif isinstance(pop, common.PopulationView):
             # Transform our block of indices so they are
             # in terms of the grandfather's neurons
-            conn_inds[conn_mask] = pop.index_in_grandparent(conn_inds[conn_mask])
+            conn_inds[conn_mask] =\
+                pop.index_in_grandparent(conn_inds[conn_mask])
 
             # Recurse to get to grandfather population
             return self._get_sub_pops(pop.grandparent, neuron_slice,
@@ -275,9 +290,9 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrixType = "RAGGED_INDIVIDUALG"
+            matrix_type = "RAGGED_INDIVIDUALG"
         else:
-            matrixType = "DENSE_INDIVIDUALG"
+            matrix_type = "DENSE_INDIVIDUALG"
 
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
@@ -292,7 +307,7 @@ class Projection(common.Projection, ContextMixin):
         # Build connectivity
         # **NOTE** this build connector matching shape of PROJECTION
         # this means that it will match pre and post view or assembly
-        with self.get_new_context(conn_pre_indices=pre_indices, 
+        with self.get_new_context(conn_pre_indices=pre_indices,
                                   conn_post_indices=post_indices,
                                   conn_params=params):
             self._connector.connect(self)
@@ -302,7 +317,7 @@ class Projection(common.Projection, ContextMixin):
         post_indices = np.asarray(post_indices, dtype=np.uint32)
 
         # Convert connection parameters to numpy arrays
-        # **THINK** should we do something with types here/use numpy record array?
+        # **THINK** should we do something with use numpy record array?
         for c in params:
             params[c] = np.asarray(params[c])
 
@@ -311,17 +326,18 @@ class Projection(common.Projection, ContextMixin):
             logging.warning("Projection {} has no connections. "
                             "Ignoring.".format(self.label))
             return
-        
+
         # Extract delays
         delay_steps = params["delaySteps"]
-        
+
         # If delays aren't all the same
         # **TODO** add support for heterogeneous dendritic delay
         if not np.allclose(delay_steps, delay_steps[0]):
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))
-            logging.warning("Projection {}: GeNN does not support variable delays for a single projection. "
-                            "Using mean value {} ms for all connections.".format(
+            logging.warning("Projection {}: GeNN does not support variable "
+                            "delays for a single projection. Using mean "
+                            "value {} ms for all connections.".format(
                                 self.label,
                                 delay_steps * self._simulator.state.dt))
         else:
@@ -331,16 +347,22 @@ class Projection(common.Projection, ContextMixin):
         # **TODO** this is a pretty hacky solution
         self.min_delay = (delay_steps + 1) * self._simulator.state.dt
 
-        # Build lists of actual pre and postsynaptic populations we are connecting
-        # (i.e. rather than views, assemblies etc)
-        pre_pops = self._get_sub_pops(self.pre, slice(0, self.pre.size), pre_indices,
-                                      np.ones(pre_indices.shape, dtype=bool))
-        post_pops = self._get_sub_pops(self.post, slice(0, self.post.size), post_indices,
-                                       np.ones(post_indices.shape, dtype=bool))
+        # Build lists of actual pre and postsynaptic populations
+        # we are connecting (i.e. rather than views, assemblies etc)
+        pre_pops = self._get_sub_pops(
+            self.pre, slice(0, self.pre.size), pre_indices,
+            np.ones(pre_indices.shape, dtype=bool))
+        post_pops = self._get_sub_pops(
+            self.post, slice(0, self.post.size), post_indices,
+            np.ones(post_indices.shape, dtype=bool))
 
-        # Loop through presynaptic populations and their corresponding slices of presynaptic neurons
+        # Loop through presynaptic populations and their corresponding
+        # slices of presynaptic neurons
         self._sub_projections = []
-        for (pre_pop, pre_slice, pre_mask), (post_pop, post_slice, post_mask) in product(pre_pops, post_pops):
+        for pre, post in product(pre_pops, post_pops):
+            pre_pop, pre_slice, pre_mask = pre
+            post_pop, post_slice, post_mask = post
+
             # Combine mask to select connections
             conn_mask = pre_mask & post_mask
 
@@ -353,18 +375,21 @@ class Projection(common.Projection, ContextMixin):
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
                 post_pop.celltype.build_genn_psm(post_pop._native_parameters,
-                                                    post_pop.initial_values, prefix)
+                                                 post_pop.initial_values,
+                                                 prefix)
 
             # Build GeNN weight update model
             wum_model, wum_params, wum_init, wum_pre_init, wum_post_init =\
-                self.synapse_type.build_genn_wum(conn_params, self.initial_values)
+                self.synapse_type.build_genn_wum(conn_params,
+                                                 self.initial_values)
 
             # Build a unique label for sub-projection
-            genn_label = "%s_%u" % (self._genn_label_stem, len(self._sub_projections))
+            genn_label = "%s_%u" % (self._genn_label_stem,
+                                    len(self._sub_projections))
 
             # Create GeNN synapse population
             syn_pop = simulator.state.model.add_synapse_population(
-                genn_label, matrixType, delay_steps,
+                genn_label, matrix_type, delay_steps,
                 pre_pop._pop, post_pop._pop,
                 wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
                 psm_model, psm_params, psm_ini)
@@ -373,5 +398,6 @@ class Projection(common.Projection, ContextMixin):
             if self.use_sparse:
                 syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
 
-            self._sub_projections.append(SubProjection(genn_label, pre_pop, post_pop,
-                                                       pre_slice, post_slice, syn_pop))
+            self._sub_projections.append(
+                SubProjection(genn_label, pre_pop, post_pop,
+                              pre_slice, post_slice, syn_pop))
