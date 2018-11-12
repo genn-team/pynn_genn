@@ -7,7 +7,7 @@ setup(
 
     # Metadata for PyPi
     url="https://github.com/genn-team/pynn_genn",
-    author="University of Manchester",
+    author="University of Sussex",
     description="Tools for simulating neural models generated using PyNN 0.9 using "
                 "the GeNN simulator",
     #long_description=replace_local_hyperlinks(read_file("README.rst")),
@@ -20,13 +20,12 @@ setup(
         "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
 
         "Operating System :: POSIX :: Linux",
-        "Operating System :: Microsoft :: Windows",
         "Operating System :: MacOS",
 
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
 
         "Topic :: Scientific/Engineering",
     ],
