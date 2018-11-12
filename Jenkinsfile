@@ -231,7 +231,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Generate unique name for message
                         def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
                         
-                        // Activate virtualenv, remove log, run tests and keeping return status
+                        // Activate virtualenv, remove log and run tests (keeping return status)
                         def script = """
                         . ../../../virtualenv/bin/activate
                         rm -f .coverage
@@ -242,11 +242,19 @@ for(b = 0; b < builderNodes.size; b++) {
                             setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
                         }
                         
-                        // Activate virtualenv, convert coverage to XML and upload
+                        // Activate virtualenv and  convert coverage to XML
                         sh """
                         . ../../../virtualenv/bin/activate
                         coverage xml
-                        codecov --token 1460b8f4-e4af-4acd-877e-353c9449111c --file coverage.xml
+                        """
+                    }
+                    
+                    // Switch to PyNN GeNN repository root so codecov uploader works correctly
+                    dir("pynn_genn") {
+                        // Activate virtualenv and upload coverage
+                        sh """
+                        . ../virtualenv/bin/activate
+                        codecov --token 1460b8f4-e4af-4acd-877e-353c9449111c --file test/system/coverage.xml
                         """
                     }
                 }
