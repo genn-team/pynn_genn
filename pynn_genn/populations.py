@@ -1,5 +1,5 @@
 from copy import deepcopy
-from six import iteritems
+from six import iteritems, string_types
 from collections import Sized
 from lazyarray import larray
 import numpy as np
@@ -63,7 +63,7 @@ class PopulationView(common.PopulationView):
         # if all the cells have the same value for a parameter, should
         # we return just the number, rather than an array?
         parent_params = self.parent._parameters
-        if isinstance(parameter_names, basestring):
+        if isinstance(parameter_names, string_types):
             val = parent_params[parameter_names][self.mask]
             return (simplify_params(val) if simplify else val)
         # Otherwise, if we should simplify
@@ -194,7 +194,7 @@ class Population(common.Population):
     def get(self, parameter_names, gather=False, simplify=True):
         # if all the cells have the same value for a parameter, should
         # we return just the number, rather than an array?
-        if isinstance(parameter_names, basestring):
+        if isinstance(parameter_names, string_types):
             param = self._parameters[parameter_names]
             return param.evaluate(simplify=simplify)
         # Otherwise
