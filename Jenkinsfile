@@ -247,6 +247,8 @@ for(b = 0; b < builderNodes.size; b++) {
                         . ../../../virtualenv/bin/activate
                         coverage xml
                         """
+                        
+                        archive uniqueTestOutputMsg;
                     }
                     
                     // Switch to PyNN GeNN repository root so codecov uploader works correctly
