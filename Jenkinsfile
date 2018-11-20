@@ -197,7 +197,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         archive uniqueLibGeNNBuildMsg
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
-
+                        
+                        // Remove existing logs
+                        sh """
+                        rm -f ${uniquePluginBuildMsg}
+                        """;
 
                         // Activate virtualenv, remove existing logs, clean, build module and archive output
                         echo "Building Python module";
@@ -230,6 +234,11 @@ for(b = 0; b < builderNodes.size; b++) {
                     dir("pynn_genn/test/system") {
                         // Generate unique name for message
                         def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
+                        
+                        // Remove existing logs
+                        sh """
+                        rm -f ${uniqueTestOutputMsg}
+                        """;
                         
                         // Activate virtualenv, remove log and run tests (keeping return status)
                         def testCommand = """
