@@ -315,6 +315,52 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
         "RefracTime" : 0.0
     })
 
+#--- start messing
+genn_neuron_defs["InhGamma"] = GeNNDefinitions(
+    # definitions
+    {
+        "sim_code" : """
+            oldSpike = false;
+            if ($(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration)) {
+                while ($(t) > $(tbins)[$(startIndex)] && $(startIndex) != $(endIndex)) 
+                    $(startIndex)++;
+                if ($(timeStepToSpike) <= 0.0f) {
+                const scalar ta= $(a)[$(startIndex)];
+                const scalar tb= $(b)[$(startIndex)];
+                $(timeStepToSpike) += $(gennrand_gamma,ta,tb);
+            }
+            $(timeStepToSpike) -= 1.0;
+        """,
+
+        "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
+
+        "var_name_types" : [
+            ("timeStepToSpike", "scalar"),
+            ("startIndex", "unsigned int"),
+            ("endIndex", "unsigned int")
+        ],
+
+        "param_name_types": {
+            "spikeStart": "scalar",
+            "duration": "scalar",
+        },
+        "extra_global_params": [("a", "scalar*"),("tbins", "scalar*"),("b", "scalar*")]
+    },
+    # translations
+    (
+        ("a",          "a"),
+        ("tbins",      "tbins"),
+        ("b",          "b"),
+        ("start",      "spikeStart"),
+        ("duration",   "duration"),
+    ),
+    # extra param values
+    {
+        "timeStepToSpike" : 0.0
+    }
+)
+#--- end messing
+
 genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
@@ -638,6 +684,49 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
         # Return with model
         return genn_model, [], neuron_ini
 
+class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
+    __doc__ = cells.SpikeSourceInhGamma.__doc__
+    genn_neuron_name = "InhGamma"
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+
+    def get_extra_global_neuron_params(self, native_params, init_vals):
+        # Get a, tbins and b
+        a_val = native_params["a"]
+        tbin_val = native_params["tbin"]
+        b_val = native_params["b"]
+
+        # Concatenate together spike times to form extra global parameter
+        return {"a" : np.concatenate([seq.value for seq in a_val]),
+                "tbin" : np.concatenate([seq.value for seq in tbin_val]),
+                "b" : np.concatenate([seq.value for seq in b_val])}
+
+    def build_genn_neuron(self, native_params, init_vals):
+        # Create model using unmodified defs
+        genn_model = create_custom_neuron_class(self.genn_neuron_name,
+                                                **self.neuron_defs.definitions)()
+
+        # Get a, tbins and b
+        a_val = native_params["a"]
+        tbin_val = native_params["tbin"]
+        b_val = native_params["b"]
+
+        # Create empty numpy arrays to hold start and end step indices
+        start_index = np.empty(shape=native_params.shape, dtype=np.uint32)
+        end_index = np.empty(shape=native_params.shape, dtype=np.uint32)
+
+        # Calculate indices for each sequence
+        cum_size = 0
+        for i, seq in enumerate(tbin_val):
+            start_index[i] = cum_size
+            cum_size += len(seq.value)
+            end_index[i] = cum_size
+
+        # Build initialisation dictionary
+        neuron_ini = {"startIndex": start_index,
+                      "endIndex": end_index}
+
+        # Return with model
+        return genn_model, [], neuron_ini
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_alpha_isfa_ista.__doc__
