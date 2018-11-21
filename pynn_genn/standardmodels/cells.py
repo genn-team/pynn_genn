@@ -315,7 +315,6 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
         "RefracTime" : 0.0
     })
 
-#--- start messing
 genn_neuron_defs["InhGamma"] = GeNNDefinitions(
     # definitions
     {
@@ -344,7 +343,12 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
             "spikeStart": "scalar",
             "duration": "scalar",
         },
-        "extra_global_params": [("a", "scalar*"),("tbins", "scalar*"),("b", "scalar*")]
+        
+        "extra_global_params": [
+            ("a", "scalar*"),
+            ("tbins", "scalar*"),
+            ("b", "scalar*")
+        ]
     },
     # translations
     (
@@ -359,7 +363,6 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
         "timeStepToSpike" : 0.0
     }
 )
-#--- end messing
 
 genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
     definitions = {
@@ -695,7 +698,7 @@ class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
         tbin_val = native_params["tbin"]
         b_val = native_params["b"]
 
-        # Concatenate together spike times to form extra global parameter
+        # Concatenate together a, tbin ans b to form extra global parameter
         return {"a" : np.concatenate([seq.value for seq in a_val]),
                 "tbin" : np.concatenate([seq.value for seq in tbin_val]),
                 "b" : np.concatenate([seq.value for seq in b_val])}
