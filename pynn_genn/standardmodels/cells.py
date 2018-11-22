@@ -38,11 +38,13 @@ def rate_to_isi(rate, **kwargs):
 def isi_to_rate(isi, **kwargs):
     return 1000.0 / (isi * state.dt)
 
-def timesteps_to_ms(timestep_param_name, **kwargs):
-    return kwargs[timestep_param_name] * state.dt
-
+# Function to convert milliseconds to simulation timesteps
 def ms_to_timesteps(ms_param_name, **kwargs):
     return kwargs[ms_param_name] / state.dt
+
+# Function to convert simulation timesteps to milliseconds
+def timesteps_to_ms(timestep_param_name, **kwargs):
+    return kwargs[timestep_param_name] * state.dt
 
 genn_neuron_defs = {}
 
@@ -308,10 +310,10 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
            },
     },
     translations = (
-        ("rate",       "isi",           rate_to_isi,      isi_to_rate),
+        ("rate",       "isi",           rate_to_isi,                            isi_to_rate),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
-        ("tau_refrac", "TauRefrac",      partial(ms_to_timesteps, "tau_refrac"), partial(timesteps_to_ms, "TauRefrac"))
+        ("tau_refrac", "TauRefrac",     partial(ms_to_timesteps, "tau_refrac"), partial(timesteps_to_ms, "TauRefrac"))
     ),
     extra_param_values = {
         "timeStepToSpike" : 0.0,
