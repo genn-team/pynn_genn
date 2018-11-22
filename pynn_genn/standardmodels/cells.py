@@ -30,13 +30,13 @@ def tau_to_init(tau_param_name, **kwargs):
 
 # Function to convert mean 'rate' parameter
 # to mean interspike interval (in timesteps)
-def rate_to_isi(rate, **kwargs):
-    return 1000.0 / (rate * state.dt)
+def rate_to_isi(rate_param_name, **kwargs):
+    return 1000.0 / (kwargs[rate_param_name] * state.dt)
 
 # Function to convert mean interspike interval 
 # 'isi' (in timesteps) to mean rate in Hz
-def isi_to_rate(isi, **kwargs):
-    return 1000.0 / (isi * state.dt)
+def isi_to_rate(isi_param_name, **kwargs):
+    return 1000.0 / (kwargs[isi_param_name] * state.dt)
 
 genn_neuron_defs = {}
 
@@ -271,7 +271,7 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
             "duration": "scalar"},
     },
     translations = (
-        ("rate",     "isi",         rate_to_isi,  isi_to_rate),
+        ("rate",     "isi",         partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
         ("start",    "spikeStart"),
         ("duration", "duration")
     ),
@@ -305,7 +305,7 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
            },
     },
     translations = (
-        ("rate",       "isi",           rate_to_isi,      isi_to_rate),
+        ("rate",       "isi",           partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
         ("tau_refrac", "TauRefrac")
@@ -313,6 +313,37 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     extra_param_values = {
         "timeStepToSpike" : 0.0,
         "RefracTime" : 0.0
+    })
+
+genn_neuron_defs["Gamma"] = GeNNDefinitions(
+    definitions = {
+        "sim_code" : """
+            oldSpike = false;
+            if($(timeStepToSpike) <= 0.0f) {
+                $(timeStepToSpike) += $(beta) * $(gennrand_gamma, $(alpha));
+            }
+            $(timeStepToSpike) -= 1.0;
+        """,
+
+        "threshold_condition_code" : "$(t) >= $(start) && $(t) < $(start) + $(duration) && $(timeStepToSpike) <= 0.0",
+
+        "var_name_types": [
+            ("timeStepToSpike", "scalar")],
+
+        "param_name_types": {
+            "alpha": "scalar",
+            "beta": "scalar",
+            "start": "scalar",
+            "duration": "scalar"},
+    },
+    translations = (
+        ("alpha",       "alpha"),
+        ("beta",        "beta",     partial(rate_to_isi, "beta"),  partial(isi_to_rate, "beta")),
+        ("start",       "start"),
+        ("duration",    "duration")
+    ),
+    extra_param_values = {
+        "timeStepToSpike" : 0.0,
     })
 
 genn_neuron_defs["InhGamma"] = GeNNDefinitions(
@@ -682,6 +713,12 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
 
         # Return with model
         return genn_model, [], neuron_ini
+
+class SpikeSourceGamma(cells.SpikeSourceGamma, GeNNStandardCellType):
+    __doc__ = cells.SpikeSourceGamma
+
+    genn_neuron_name = "Gamma"
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
 
 class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceInhGamma.__doc__
