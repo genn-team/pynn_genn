@@ -38,6 +38,14 @@ def rate_to_isi(rate, **kwargs):
 def isi_to_rate(isi, **kwargs):
     return 1000.0 / (isi * state.dt)
 
+# Function to convert milliseconds to simulation timesteps
+def ms_to_timesteps(ms_param_name, **kwargs):
+    return kwargs[ms_param_name] / state.dt
+
+# Function to convert simulation timesteps to milliseconds
+def timesteps_to_ms(timestep_param_name, **kwargs):
+    return kwargs[timestep_param_name] * state.dt
+
 genn_neuron_defs = {}
 
 genn_neuron_defs["IF"] = GeNNDefinitions(
@@ -283,20 +291,17 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
             oldSpike = false;
-            if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+            if($(timeStepToSpike) <= 0.0 ) {
+                $(timeStepToSpike) += ($(isi)-$(TauRefrac)) * $(gennrand_exponential) + $(TauRefrac);
             }
             $(timeStepToSpike) -= 1.0;
-            $(RefracTime) -= DT;
         """,
 
-        "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0",
-
-        "reset_code" : "$(RefracTime) = $(TauRefrac);",
+        "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
 
         "var_name_types" : [
             ("timeStepToSpike", "scalar"),
-            ("RefracTime", "scalar")],
+            ],
         "param_name_types": {
             "isi": "scalar",
             "TauRefrac": "scalar",
@@ -305,10 +310,10 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
            },
     },
     translations = (
-        ("rate",       "isi",           rate_to_isi,      isi_to_rate),
+        ("rate",       "isi",           rate_to_isi,                            isi_to_rate),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
-        ("tau_refrac", "TauRefrac")
+        ("tau_refrac", "TauRefrac",     partial(ms_to_timesteps, "tau_refrac"), partial(timesteps_to_ms, "TauRefrac"))
     ),
     extra_param_values = {
         "timeStepToSpike" : 0.0,
