@@ -21,6 +21,10 @@ def test_scenarios():
     for scenario in registry:
         if "genn" not in scenario.exclude:
             scenario.description = "{}(genn)".format(scenario.__name__)
+
+            # **HACK** work around bug in nose where names of tests don't get cached
+            test_scenarios.compat_func_name = scenario.description
+
             if have_genn:
                 yield scenario, pynn_genn
             else:

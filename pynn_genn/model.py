@@ -1,4 +1,5 @@
 import sys
+from collections import namedtuple
 from functools import partial
 from itertools import groupby
 from copy import deepcopy
@@ -25,6 +26,11 @@ genn_to_numpy_types = {
     "int": np.int32,
     "unsigned int": np.uint32}
 
+
+# Tuple type used to store GeNN model defintions
+GeNNDefinitions = namedtuple("GeNNDefinitions",
+                             ["definitions", "translations",
+                              "extra_param_values"])
 
 def sanitize_label(label):
     # Strip out any non-alphanumerical characters
@@ -299,9 +305,3 @@ class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
         return self.build_genn_model(self.currentsource_defs, native_params,
                                      {}, creator)
 
-
-class GeNNDefinitions(object):
-    def __init__(self, definitions, translations, extra_param_values={}):
-        self.definitions = definitions
-        self.translations = translations
-        self.extra_param_values = extra_param_values

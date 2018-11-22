@@ -197,7 +197,11 @@ for(b = 0; b < builderNodes.size; b++) {
                         archive uniqueLibGeNNBuildMsg
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
-
+                        
+                        // Remove existing logs
+                        sh """
+                        rm -f ${uniquePluginBuildMsg}
+                        """;
 
                         // Activate virtualenv, remove existing logs, clean, build module and archive output
                         echo "Building Python module";
@@ -231,22 +235,33 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Generate unique name for message
                         def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
                         
+                        // Remove existing logs
+                        sh """
+                        rm -f ${uniqueTestOutputMsg}
+                        """;
+                        
                         // Activate virtualenv, remove log and run tests (keeping return status)
-                        def script = """
+                        def testCommand = """
                         . ../../../virtualenv/bin/activate
                         rm -f .coverage
                         nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
                         """
-                        def statusCode = sh script:script, returnStatus:true
-                        if(statusCode != 0) {
+                        def testStatusCode = sh script:testCommand, returnStatus:true
+                        if(testStatusCode != 0) {
                             setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
                         }
                         
                         // Activate virtualenv and  convert coverage to XML
-                        sh """
+                        def coverageCommand = """
                         . ../../../virtualenv/bin/activate
                         coverage xml
                         """
+                        def coverageStatusCode = sh script:coverageCommand, returnStatus:true
+                        if(coverageStatusCode != 0) {
+                            setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
+                        }
+                        
+                        archive uniqueTestOutputMsg;
                     }
                     
                     // Switch to PyNN GeNN repository root so codecov uploader works correctly

@@ -47,8 +47,7 @@ def ms_to_timesteps(ms_param_name, **kwargs):
 genn_neuron_defs = {}
 
 genn_neuron_defs["IF"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             if ($(RefracTime) <= 0.0) {
                 scalar alpha = (($(Isyn) + $(Ioffset)) * $(Rmembrane)) + $(Vrest);
@@ -79,8 +78,7 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
             "Ioffset": "scalar",    # Offset current
             "TauRefrac": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("v_rest",     "Vrest"),
         ("v_reset",    "Vreset"),
         ("cm",         "Rmembrane",     "tau_m / cm", ""),
@@ -90,15 +88,12 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
         ("i_offset",   "Ioffset"),
         ("v",          "V"),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "RefracTime" : 0.0,
-    }
-)
+    })
 
 genn_neuron_defs["Adapt"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             if ($(RefracTime) <= 0.0) {
                 scalar alpha = (($(Isyn) + $(Ioffset) - $(GRr) * ($(V) - $(ERr)) - $(GSfa) * ($(V) - $(ESfa))) * $(Rmembrane)) + $(Vrest);
@@ -141,8 +136,7 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
             "QSfa": "scalar",       # Quantal spike frequency adaptation conductance increase [pS]
             "QRr": "scalar"}        # Quantal relative refractoriness conductance increase [pS]
     },
-    # translations
-    (
+    translations = (
         ("v_rest",     "Vrest"),
         ("v_reset",    "Vreset"),
         ("cm",         "Rmembrane",     "tau_m / cm",   ""),
@@ -160,11 +154,9 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
         ("q_sfa",      "QSfa", 0.001),
         ("q_rr",       "QRr", 0.001)
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "RefracTime" : 0.0,
-    }
-)
+    })
 
 #  genn_neuron_defs["GIF"] = GeNNNeuronDefinitions(
 #      # definitions
@@ -180,8 +172,7 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
 #          "paramNames"
 
 genn_neuron_defs["AdExp"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
@@ -245,8 +236,7 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
             "b": "scalar",        # Spike-triggered adaptation [nA]
             "iOffset": "scalar"}, # Offset current [nA]
     },
-    # translations
-    (
+    translations = (
         ("cm",         "C"),
         ("tau_refrac", "TauRefrac"),
         ("v_spike",    "vSpike"),
@@ -262,15 +252,12 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
         ("v",          "V"),
         ("w",          "W"),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "RefracTime" : 0.0,
-    }
-)
+    })
 
 genn_neuron_defs["Poisson"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
@@ -289,21 +276,17 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
             "spikeStart": "scalar",
             "duration": "scalar"},
     },
-    # translations
-    (
+    translations = (
         ("rate",     "isi",         rate_to_isi,  isi_to_rate),
         ("start",    "spikeStart"),
         ("duration", "duration")
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "timeStepToSpike" : 0.0,
-    }
-)
+    })
 
 genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             oldSpike = false;
             if($(timeStepToSpike) <= 0.0 ) {
@@ -324,23 +307,19 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
             "duration": "scalar",
            },
     },
-    # translations
-    (
+    translations = (
         ("rate",       "isi",           rate_to_isi,      isi_to_rate),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
         ("tau_refrac", "TauRefrac",      partial(ms_to_timesteps, "tau_refrac"), partial(timesteps_to_ms, "TauRefrac"))
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "timeStepToSpike" : 0.0,
         "RefracTime" : 0.0
-    }
-)
+    })
 
 genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             if ($(V) >= 30.0){
                $(V)=$(c);
@@ -366,21 +345,19 @@ genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
             "d": "scalar",
             "Ioffset": "scalar"},
     },
-    # translations
-    (
+    translations = (
         ("a",        "a"),
         ("b",        "b"),
         ("c",        "c"),
         ("d",        "d"),
         ("i_offset", "Ioffset", 1000),
-        ("v"         "V"),
-        ("u"         "U")
-    )
-)
+        ("v",        "V"),
+        ("u",        "U")
+    ),
+    extra_param_values = {})
 
 genn_neuron_defs["HH"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             scalar Imem;
             unsigned int mt;
@@ -390,36 +367,36 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
                    $(n)*$(n)*$(n)*$(n)*$(gK)*($(V)-($(EK)))+
                    $(gl)*($(V)-($(El)))-$(Isyn)-$(Ioffset));
                scalar _a;
-               if (lV == -52.0) {
+               if (lV == -50.0) {
                    _a= 1.28;
                }
                else {
-                   _a= 0.32*(-52.0-$(V))/(exp((-52.0-$(V))/4.0)-1.0);
+                   _a= 0.32*(-50.0-$(V))/(exp((-50.0-$(V))/4.0)-1.0);
                }
                scalar _b;
-               if (lV == -25.0) {
+               if (lV == -23.0) {
                    _b= 1.4;
                }
                else {
-                   _b= 0.28*($(V)+25.0)/(exp(($(V)+25.0)/5.0)-1.0);
+                   _b= 0.28*($(V)+23.0)/(exp(($(V)+23.0)/5.0)-1.0);
                }
                $(m)+= (_a*(1.0-$(m))-_b*$(m))*mdt;
-               _a= 0.128*exp((-48.0-$(V))/18.0);
-               _b= 4.0 / (exp((-25.0-$(V))/5.0)+1.0);
+               _a= 0.128*exp((-46.0-$(V))/18.0);
+               _b= 4.0 / (exp((-23.0-$(V))/5.0)+1.0);
                $(h)+= (_a*(1.0-$(h))-_b*$(h))*mdt;
-               if (lV == -50.0) {
+               if (lV == -48.0) {
                    _a= 0.16;
                }
                else {
-                   _a= 0.032*(-50.0-$(V))/(exp((-50.0-$(V))/5.0)-1.0);
+                   _a= 0.032*(-48.0-$(V))/(exp((-48.0-$(V))/5.0)-1.0);
                }
-               _b= 0.5*exp((-55.0-$(V))/40.0);
+               _b= 0.5*exp((-53.0-$(V))/40.0);
                $(n)+= (_a*(1.0-$(n))-_b*$(n))*mdt;
                $(V)+= Imem/$(C)*mdt;
             }
         """,
 
-        "threshold_condition_code" : "$(V) >= 0.0",
+        "threshold_condition_code" : "$(V) >= 33.0",
 
         "var_name_types" : [
             ("V", "scalar"),
@@ -436,8 +413,7 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
             "C": "scalar",
             "Ioffset": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("gbar_Na",    "gNa"),
         ("gbar_K",     "gK"),
         ("g_leak",     "gl"),
@@ -449,18 +425,15 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
         ("v_offset",   "V_OFFSET"),
         ("i_offset",   "Ioffset"),
     ),
-    # extra param values
-    {
-        "m" : 0.0529324,
-        "h" : 0.3176767,
-        "n" : 0.5961207
-    }
-)
+    extra_param_values = {
+        "m" : 0.0,
+        "h" : 1.0,
+        "n" : 0.0
+    })
 
 genn_postsyn_defs = {}
 genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "decay_code" : "$(inSyn)*=$(expDecay);",
 
         "apply_input_code" : "$(Isyn) += $(init) * $(inSyn);",
@@ -470,21 +443,17 @@ genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
             "expDecay": "scalar",
             "init": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("tau_syn_E",  "exc_expDecay",  partial(tau_to_decay, "tau_syn_E"),   None),
         ("tau_syn_I",  "inh_expDecay",  partial(tau_to_decay, "tau_syn_I"),   None),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "exc_init": partial(tau_to_init, "tau_syn_E"),
         "inh_init": partial(tau_to_init, "tau_syn_I")
-    }
-)
-    
+    })
+
 genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "decay_code" : "$(inSyn)*=$(expDecay);",
 
         "apply_input_code" : "$(Isyn) += $(init) * $(inSyn) * ($(E) - $(V));",
@@ -495,23 +464,19 @@ genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
             "init": "scalar",
             "E": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("e_rev_E",    "exc_E"),
         ("e_rev_I",    "inh_E"),
         ("tau_syn_E",  "exc_expDecay",  partial(tau_to_decay, "tau_syn_E"),   None),
         ("tau_syn_I",  "inh_expDecay",  partial(tau_to_decay, "tau_syn_I"),   None)
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "exc_init": partial(tau_to_init, "tau_syn_E"),
         "inh_init": partial(tau_to_init, "tau_syn_I")
-    }
-)
+    })
 
 genn_postsyn_defs["AlphaCurr"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "decay_code" : """
             $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
             $(inSyn)*=exp(-DT/$(tau));
@@ -524,20 +489,17 @@ genn_postsyn_defs["AlphaCurr"] = GeNNDefinitions(
         "param_name_types" : {
             "tau": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("tau_syn_E",  "exc_tau"),
         ("tau_syn_I",  "inh_tau"),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "exc_x" : 0.0,
         "inh_x" : 0.0,
-    }
-)
+    })
+
 genn_postsyn_defs["AlphaCond"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "decay_code" : """
             $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
             $(inSyn)*=exp(-DT/$(tau));
@@ -551,19 +513,16 @@ genn_postsyn_defs["AlphaCond"] = GeNNDefinitions(
             "tau": "scalar",
             "E": "scalar"}
     },
-    # translations
-    (
+    translations = (
         ("e_rev_E",    "exc_E"),
         ("e_rev_I",    "inh_E"),
         ("tau_syn_E",  "exc_tau"),
         ("tau_syn_I",  "inh_tau"),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "exc_x" : 0.0,
         "inh_x" : 0.0,
-    }
-)
+    })
 
 genn_postsyn_defs["DeltaCurr"] = GeNNDefinitions({}, (), True)
 
@@ -635,8 +594,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceArray.__doc__
     genn_neuron_name = "SpikeSourceArray"
     neuron_defs = GeNNDefinitions(
-        # definitions
-        {
+        definitions = {
             "sim_code": "oldSpike = false;\n",
             "threshold_condition_code": "$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
             "reset_code": "$(startSpike)++;\n",
@@ -644,10 +602,10 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
             "var_name_types": [("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
             "extra_global_params": [("spikeTimes", "scalar*")]
         },
-        # translations
-        (
+        translations = (
             ("spike_times", "spikeTimes"),
-        ))
+        ),
+        extra_param_values = {})
 
     def get_extra_global_neuron_params(self, native_params, init_vals):
         # Get spike times
