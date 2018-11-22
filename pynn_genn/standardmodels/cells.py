@@ -316,8 +316,7 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     })
 
 genn_neuron_defs["InhGamma"] = GeNNDefinitions(
-    # definitions
-    {
+    definitions = {
         "sim_code" : """
             oldSpike = false;
             if ($(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration)) {
@@ -350,19 +349,16 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
             ("b", "scalar*")
         ]
     },
-    # translations
-    (
+    translations = (
         ("a",          "a"),
         ("tbins",      "tbins"),
         ("b",          "b"),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
     ),
-    # extra param values
-    {
+    extra_param_values = {
         "timeStepToSpike" : 0.0
-    }
-)
+    })
 
 genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
     definitions = {
