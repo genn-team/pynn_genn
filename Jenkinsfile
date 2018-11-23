@@ -124,13 +124,13 @@ for(b = 0; b < builderNodes.size; b++) {
                             dir("genn") {
                                 sh """
                                 git pull
-                                git checkout master
+                                git checkout pygenn_cpu_only
                                 """;
                             }
                         }
                         else {
                             echo "Cloning GeNN";
-                            sh "git clone -b master https://github.com/genn-team/genn.git";
+                            sh "git clone -b pygenn_cpu_only https://github.com/genn-team/genn.git";
                         }
 
                         // Remove existing virtualenv
