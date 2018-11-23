@@ -4,15 +4,15 @@ This project bridges [GeNN](http://genn-team.github.io/genn/), a GPU enhanced Ne
 
 ## Getting Started:
 ### Installing PyGeNN from source (Windows is currently not supported)
- - clone the ``master`` branch of GeNN (https://github.com/genn-team/genn)
- - set the ``GENN_PATH`` environment variable to point to the GeNN directory.
- - from the GeNN directory, build GeNN as a dynamic library using ``make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/`` (you will need to add ``CPU_ONLY=1`` if you do not have an NVIDIA GPU)
- - on Mac OS X only, set your newly created library's name with ``install_name_tool -id "@loader_path/libgenn_DYNAMIC.dylib" pygenn/genn_wrapper/libgenn_DYNAMIC.dylib`` (you will need to replace ``libgenn_DYNAMIC`` with ``libgenn_CPU_ONLY_DYNAMIC`` if you do not have an NVIDIA GPU)
- - install with setup tools using ``python setup.py install`` command
+ - Clone the ``master`` branch of GeNN (https://github.com/genn-team/genn)
+ - Ensure that the ``GENN_PATH`` environment variable to point to the GeNN directory.
+ - Ffrom the GeNN directory, build GeNN as a dynamic library using ``make -f lib/GNUMakefileLibGeNN DYNAMIC=1 LIBGENN_PATH=pygenn/genn_wrapper/`` (you will need to add ``CPU_ONLY=1`` if you do not have an NVIDIA GPU)
+ - On Mac OS X only, set your newly created library's name with ``install_name_tool -id "@loader_path/libgenn_DYNAMIC.dylib" pygenn/genn_wrapper/libgenn_DYNAMIC.dylib`` (you will need to replace ``libgenn_DYNAMIC`` with ``libgenn_CPU_ONLY_DYNAMIC`` if you do not have an NVIDIA GPU)
+ - Install with setup tools using ``python setup.py develop`` command
  
 ### Installing the PyNN backend for GeNN
- - clone this project
- - install with setuptools using ``python setup.py install`` command
+ - Clone this project
+ - Install with setuptools using ``python setup.py develop`` command
 
 ## Bugs
-- PyNN GeNN is still under development - current results of running PyNN system tests are outlined in #8 with links to outstanding issues causing test failures.
+- PyNN GeNN is still under development - current results of running PyNN system tests are outlined in [#8](https://github.com/genn-team/pynn_genn/issues/8) with links to outstanding issues causing test failures.
