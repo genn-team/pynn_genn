@@ -115,23 +115,12 @@ for(b = 0; b < builderNodes.size; b++) {
                     // **NOTE** only try and set build status AFTER checkout
                     try {
                         setBuildStatus(installationStageName, "PENDING");
-
-                        // If GeNN exists
-                        if(fileExists("genn")) {
-                            echo "Updating GeNN";
-                            
-                            // Pull from repository
-                            dir("genn") {
-                                sh """
-                                git pull
-                                git checkout pygenn_cpu_only
-                                """;
-                            }
-                        }
-                        else {
-                            echo "Cloning GeNN";
-                            sh "git clone -b pygenn_cpu_only https://github.com/genn-team/genn.git";
-                        }
+                        
+                        // Deleting existing checked out version of GeNN
+                        sh "rm -rf genn";
+                        
+                        // Clone GeNN
+                        sh "git clone -b pygenn_cpu_only https://github.com/genn-team/genn.git";
 
                         // Remove existing virtualenv
                         sh "rm -rf virtualenv";
