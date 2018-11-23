@@ -122,7 +122,10 @@ for(b = 0; b < builderNodes.size; b++) {
                             
                             // Pull from repository
                             dir("genn") {
-                                sh "git pull";
+                                sh """
+                                git pull
+                                git checkout python_wrapper_gamma
+                                """;
                             }
                         }
                         else {
