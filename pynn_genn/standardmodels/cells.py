@@ -38,6 +38,14 @@ def rate_to_isi(rate_param_name, **kwargs):
 def isi_to_rate(isi_param_name, **kwargs):
     return 1000.0 / (kwargs[isi_param_name] * state.dt)
 
+# Function to convert milliseconds to simulation timesteps
+def ms_to_timesteps(ms_param_name, **kwargs):
+    return kwargs[ms_param_name] / state.dt
+
+# Function to convert simulation timesteps to milliseconds
+def timesteps_to_ms(timestep_param_name, **kwargs):
+    return kwargs[timestep_param_name] * state.dt
+
 genn_neuron_defs = {}
 
 genn_neuron_defs["IF"] = GeNNDefinitions(
@@ -169,6 +177,7 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
             #define DV(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest)) + ($(deltaT) * exp(((V) - $(vThresh)) / $(deltaT)))) + (i - (W)) / $(C)
+            #define DV_DELTA_T_ZERO(V, W) (1.0 / $(TauM)) * (-((V) - $(Vrest))) + (i - (W)) / $(C)
             #define DW(V, W) (1.0 / $(tauW)) * (($(a) * (V - $(Vrest))) - W)
 
             // If voltage is above artificial spike height, reset it
@@ -178,14 +187,27 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
 
             // Calculate RK4 terms
             const scalar i = $(Isyn) + $(iOffset);
-            const scalar v1 = DV($(V), $(W));
-            const scalar w1 = DW($(V), $(W));
-            const scalar v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-            const scalar w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-            const scalar v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-            const scalar w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-            const scalar v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
-            const scalar w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+            scalar v1, w1, v2, w2, v3, w3, v4, w4;
+            if($(deltaT) == 0.0) {
+                v1 = DV_DELTA_T_ZERO($(V), $(W));
+                w1 = DW($(V), $(W));
+                v2 = DV_DELTA_T_ZERO($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                v3 = DV_DELTA_T_ZERO($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                v4 = DV_DELTA_T_ZERO($(V) + (DT * v3), $(W) + (DT * w3));
+                w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+            }
+            else {
+                v1 = DV($(V), $(W));
+                w1 = DW($(V), $(W));
+                v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
+                v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
+                v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
+                w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+            }
 
             // If we're not in refractory period, update V
             if ($(RefracTime) <= 0.0) {
@@ -202,7 +224,7 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
             }
         """,
 
-        "threshold_condition_code" : "$(V) > -40",
+        "threshold_condition_code" : "($(deltaT) == 0 && $(V) > $(vThresh)) || ($(deltaT) > 0.0 && $(V) > -40)",
 
         "reset_code" : """
             // **NOTE** we reset v to arbitrary plotting peak rather than to actual reset voltage
@@ -283,20 +305,17 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
             oldSpike = false;
-            if($(timeStepToSpike) <= 0.0f) {
-                $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
+            if($(timeStepToSpike) <= 0.0 ) {
+                $(timeStepToSpike) += ($(isi)-$(TauRefrac)) * $(gennrand_exponential) + $(TauRefrac);
             }
             $(timeStepToSpike) -= 1.0;
-            $(RefracTime) -= DT;
         """,
 
-        "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(RefracTime) <= 0.0f && $(timeStepToSpike) <= 0.0",
-
-        "reset_code" : "$(RefracTime) = $(TauRefrac);",
+        "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
 
         "var_name_types" : [
             ("timeStepToSpike", "scalar"),
-            ("RefracTime", "scalar")],
+            ],
         "param_name_types": {
             "isi": "scalar",
             "TauRefrac": "scalar",
@@ -308,7 +327,7 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
         ("rate",       "isi",           partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
-        ("tau_refrac", "TauRefrac")
+        ("tau_refrac", "TauRefrac",     partial(ms_to_timesteps, "tau_refrac"), partial(timesteps_to_ms, "TauRefrac"))
     ),
     extra_param_values = {
         "timeStepToSpike" : 0.0,
