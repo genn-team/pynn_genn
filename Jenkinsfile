@@ -127,7 +127,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         }
                         else {
                             echo "Cloning GeNN";
-                            sh "git clone -b python_wrapper https://github.com/genn-team/genn.git";
+                            sh "git clone -b python_wrapper_gamma https://github.com/genn-team/genn.git";
                         }
 
                         // Remove existing virtualenv
