@@ -122,12 +122,15 @@ for(b = 0; b < builderNodes.size; b++) {
                             
                             // Pull from repository
                             dir("genn") {
-                                sh "git pull";
+                                sh """
+                                git pull
+                                git checkout master
+                                """;
                             }
                         }
                         else {
                             echo "Cloning GeNN";
-                            sh "git clone -b python_wrapper https://github.com/genn-team/genn.git";
+                            sh "git clone -b master https://github.com/genn-team/genn.git";
                         }
 
                         // Remove existing virtualenv
