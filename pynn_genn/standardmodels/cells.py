@@ -13,7 +13,7 @@ import lazyarray as la
 from pyNN.standardmodels import cells, build_translations
 from ..simulator import state
 import logging
-from ..model import GeNNStandardCellType, GeNNDefinitions
+from ..model import GeNNStandardCellType, GeNNDefinitions, DDTemplate
 from pygenn.genn_model import create_custom_neuron_class
 
 logger = logging.getLogger("PyNN")
@@ -160,18 +160,76 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
         "RefracTime" : 0.0,
     })
 
-#  genn_neuron_defs["GIF"] = GeNNNeuronDefinitions(
-#      # definitions
-#      {
-#          "simCode" : """
-#
-#          """,
-#
-#          "thresholdConditionCode" : "",
-#
-#          "resetCode" : "",
-#
-#          "paramNames"
+genn_neuron_defs["GIF"] = GeNNDefinitions(
+    definitions = {
+        "sim_code" : DDTemplate("""
+            if ($(RefracTime) <= 0.0) {
+                scalar i = $(Isyn) + $(Ioffset);
+                
+                $${ADAPT_CURRENT_CODE}
+                const scalar alpha = (i * $(Rmembrane)) + $(Vrest);
+                $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
+            }
+            else {
+                $(RefracTime) -= DT;
+            }
+            
+            $${ADAPT_DECAY_CODE}
+        """),
+
+        "threshold_condition_code" : DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($(Vthresh) $${ADAPT_THRESH_CODE})"),
+
+        "reset_code" : DDTemplate("""
+            $(V) = $(Vreset);
+            $(RefracTime) = $(TauRefrac);
+        
+            $${ADAPT_RESET_CODE}
+        """),
+        
+        "var_name_types" : [
+            ("V", "scalar"),
+            ("RefracTime", "scalar")],
+    
+    "param_name_types": {
+        "Rmembrane": "scalar",  # Membrane resistance
+        "ExpTC": "scalar",       # Membrane time constant [ms]
+        "Vrest": "scalar",      # Resting membrane potential [mV]
+        "Vreset": "scalar",     # Reset voltage [mV]
+        "Vthresh": "scalar",    # Spiking threshold [mV]
+        "Ioffset": "scalar",    # Offset current
+        "TauRefrac": "scalar"}
+    },
+    translations = (
+        ('v_rest',      "Vrest"),
+        ('cm',          "Rmembrane",     "tau_m / cm", ""),
+        ('tau_m',       "ExpTC",         partial(tau_to_decay, "tau_m"), None),
+        ('tau_refrac',  "TauRefrac"),
+        ('v_reset',     "Vreset"),  
+        ('i_offset',    "Ioffset"),
+        ('delta_v',     "DeltaV"),
+        ('v_t_star',    "VthreshStar"),
+        ('lambda0',     "Lambda0"),
+        ('tau_eta1',    "ExpTCEta1",    partial(tau_to_decay, "tau_eta1"), None),
+        ('tau_eta2',    "ExpTCEta2",    partial(tau_to_decay, "tau_eta2"), None),   
+        ('tau_eta3',    "ExpTCEta3",    partial(tau_to_decay, "tau_eta3"), None),   
+        ('tau_gamma1',  "ExpTCGamma1",  partial(tau_to_decay, "tau_gamma1"), None),   
+        ('tau_gamma2',  "ExpTCGamma2",  partial(tau_to_decay, "tau_gamma2"), None),    
+        ('tau_gamma3',  "ExpTCGamma3",  partial(tau_to_decay, "tau_gamma3"), None),    
+        ('a_eta1',      "EtaA1"),
+        ('a_eta2',      "EtaA2"),
+        ('a_eta3',      "EtaA3"),
+        ('a_gamma1',    "GammaA1"),
+        ('a_gamma2',    "GammaA2"),
+        ('a_gamma3',    "GammaA3")),
+    
+    extra_param_values = {
+        "RefracTime" : 0.0,
+        "Ieta1": 0.0,
+        "Ieta2": 0.0,
+        "Ieta3": 0.0,
+        "Vgamma1": 0.0,
+        "Vgamma2": 0.0,
+        "Vgamma3": 0.0})
 
 genn_neuron_defs["AdExp"] = GeNNDefinitions(
     definitions = {
@@ -665,12 +723,14 @@ class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellT
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 
+
 class EIF_cond_exp_isfa_ista(cells.EIF_cond_exp_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_exp_isfa_ista.__doc__
     genn_neuron_name = "AdExp"
     genn_postsyn_name = "ExpCond"
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
+
 
 class Izhikevich(cells.Izhikevich, GeNNStandardCellType):
     __doc__ = cells.Izhikevich.__doc__
@@ -682,3 +742,81 @@ class Izhikevich(cells.Izhikevich, GeNNStandardCellType):
     standard_receptor_type = True
     receptor_scale = 1e-3  # synaptic weight is in mV, so need to undo usual weight scaling
 
+
+class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
+    genn_neuron_name = "GIF"
+    genn_postsyn_name = "ExpCond"
+    neuron_defs = genn_neuron_defs[genn_neuron_name]
+    postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
+    
+    def build_genn_neuron(self, native_params, init_vals):
+        # Take a copy of the native parameters
+        amended_native_params = deepcopy(native_params)
+        
+        # Determine which adaption 'channels' are active
+        eta_indices = _get_active_indices("EtaA")
+        gamma_indices = _get_active_indices("GammaA")
+                            
+        adapt_current_code = ""
+        adapt_decay_code = ""
+        adapt_reset_code = ""
+        adapt_thresh_code = ""
+        
+        # Loop through adaption current channels
+        for e in eta_indices:
+            # Add state variable
+            amended_native_params["var_name_types"].append("Ieta%u" % e)
+            
+            # Add parameters
+            amended_native_params["param_name_types"]["ExpTCEta%u" % e] = "scalar"
+            amended_native_params["param_name_types"]["EtaA%u" % e] = "scalar"
+            
+            adapt_current_code += "i += $(Ieta%u);\n" % e
+            adapt_decay_code += "$(Ieta%u) *= $(ExpTCEta%u);\n" % (e, e)
+            adapt_reset_code += "$(Ieta%u) += $(EtaA%u);\n" % (e, e)
+            
+        # Loop through threshod adaption channels
+        for g in gamma_indices:
+            # Add state variable
+            amended_native_params["var_name_types"].append("Vgamma%u" % g)
+            
+            # Add parameters
+            amended_native_params["param_name_types"]["ExpTCGamma%u" % g] = "scalar"
+            amended_native_params["param_name_types"]["GammaA%u" % g] = "scalar"
+            
+            adapt_decay_code += "$(Vgamma%u) *= $(ExpTCGamma%u);\n" % (g, g)
+            adapt_reset_code += "$(Vgamma%u) += $(GammaA%u);\n" % (g, g)
+            adapt_thresh_code += " + $(Vgamma%u)" % g
+        
+        # Apply substitutions to sim code
+        amended_native_params["sim_code"] =\
+            amended_native_params["sim_code"].substitute(
+                ADAPT_CURRENT_CODE=adapt_current_code,
+                ADAPT_DECAY_CODE=adapt_decay_code)
+        
+        # Apply substitutions to sim code
+        amended_native_params["threshold_condition_code"] =\
+            amended_native_params["threshold_condition_code"].substitute(
+                ADAPT_THRESH_CODE=adapt_thresh_code)
+        
+        # Apply substitutions to sim code
+        amended_native_params["reset_code"] =\
+            amended_native_params["reset_code"].substitute(
+                ADAPT_RESET_CODE=adapt_reset_code)
+        
+        # Call superclass method to build 
+        # neuron model from amended native parameters
+        return super(GIF_cond_exp, self).build_genn_neuron(
+            amended_native_params, init_vals)
+    
+    def _get_active_indices(self, native_params, stem):
+        indices = []
+        for i in range(1, 4):
+            param = native_params["%s%u" % (stem, i)]
+            if param.is_homogeneous:
+                if param.evaluate(simplify=True) != 0.0:
+                    indices.append(i)
+            else:
+                if np.any(param.evaluate(simplify=False) != 0.0):
+                    indices.append(i)
+        return indices
