@@ -203,6 +203,71 @@ def test_SpikeSourceGamma(sim, plot_figure=False):
     return data
 test_SpikeSourceGamma.__test__ = False
 
+@register(exclude=['brian'])
+def test_SpikeSourceGammaInh(sim, plot_figure=False):
+    try:
+        from scipy.stats import kstest
+    except ImportError:
+        raise SkipTest("scipy not available")
+    sim.setup()
+    params = {
+        "beta": [[100.0, 200.0], [200.0, 100.0], [200.0, 400.0]],
+        "tbins": [[ 5000.0, 10000.0 ], [3000.0, 10000.0], [6000.0, 10000.0]],
+        "alpha": [[6, 4], [2, 3], [5, 5]]
+    }
+    t_stop = 10000.0
+    sources = sim.Population(3, sim.SpikeSourceGammaInh(**params))
+    sources.record('spikes')
+    sim.run(t_stop)
+    data = sources.get_data().segments[0]
+    sim.end()
+
+    if plot_figure and have_scipy:
+        import matplotlib.pyplot as plt
+        plt.clf()
+        for i, (st, a, tb, b) in enumerate(zip(data.spiketrains, params["alpha"], params["tbin"], params["beta"])):
+            for j in [ 0, 1 ]:
+                alpha= a[j]
+                if j== 0:
+                    tbin= tb[j]
+                    bin_spikes = st[st < tbin]
+                else:
+                    tbin= tb[j]-tb[j-1]
+                    bin_spikes = st[(st >= tb[j-1]) & (st < tb[j])]
+                beta= b[j]
+                plt.subplot(3, 2, j*3 + i + 1)
+                
+                isi = bin_spikes[1:] - bin_spikes[:-1]
+                n_bins = int(numpy.sqrt(beta * tbin/1000.0))
+                values, bins, patches = plt.hist(isi, bins=n_bins,
+                                             label="alpha={}, beta={} Hz".format(alpha[j], beta[j]),
+                                             histtype='step',
+                                             normed=False)
+            print("isi count: ", isi.size, tbin/1000.0 * beta[j]/alpha[j])
+            bin_width = bins[1] - bins[0]
+            expected = (tbin * beta[j] * tbin ) / (1000.0 * alpha[j]) * scipy.stats.gamma.pdf(bins, a=alpha[j], scale=1000.0/beta[j])
+            plt.plot(bins, expected, 'r-')
+            plt.xlabel("Inter-spike interval (ms)")
+            plt.legend()
+        plt.savefig("test_SpikeSourceGamma_%s.png" % sim.__name__)
+
+    # Kolmogorov-Smirnov test
+    print("alpha beta expected-isi actual-isi, p, D")
+    for st, alpha, beta in zip(data.spiketrains,
+                               params['alpha'],
+                               params['beta']):
+        expected_mean_isi = 1000*alpha/beta  # ms
+        isi = st[1:] - st[:-1]
+        # Kolmogorov-Smirnov test
+        D, p = kstest(isi.magnitude,
+                      "gamma",
+                      args=(alpha, 0, 1000.0/beta),  # args are (a, loc, scale)
+                      alternative='two-sided')
+        print(alpha, beta, expected_mean_isi, isi.mean(), p, D)
+        assert_less(D, 0.1)
+
+    return data
+test_SpikeSourceGamma.__test__ = False
 
 @register(exclude=['brian'])
 def test_SpikeSourcePoissonRefractory(sim, plot_figure=False):

@@ -370,14 +370,19 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
         "sim_code" : """
             oldSpike = false;
             if ($(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration)) {
-                while ($(t) > $(tbins)[$(startIndex)] && $(startIndex) != $(endIndex)) 
+                if ($(t) > $(tbins)[$(startIndex)] && $(startIndex) != $(endIndex)) {
                     $(startIndex)++;
-                if ($(timeStepToSpike) <= 0.0f) {
-                const scalar ta= $(a)[$(startIndex)];
-                const scalar tb= $(b)[$(startIndex)];
-                $(timeStepToSpike) += $(gennrand_gamma,ta,tb);
+                    const scalar a= $(alpha)[$(startIndex)];
+                    const scalar b= $(beta)[$(startIndex)];
+                    $(timeStepToSpike) = $(tbins)[$(startIndex)]+b*$(gennrand_gamma,a);
+                }
+                if ($(timeStepToSpike) <= 0.0f || force_update) {
+                    const scalar a= $(alpha)[$(startIndex)];
+                    const scalar b= $(beta)[$(startIndex)];
+                    $(timeStepToSpike) += b*$(gennrand_gamma,a);
+                }
+                $(timeStepToSpike) -= 1.0;
             }
-            $(timeStepToSpike) -= 1.0;
         """,
 
         "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
@@ -394,15 +399,15 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
         },
         
         "extra_global_params": [
-            ("a", "scalar*"),
+            ("alpha", "scalar*"),
             ("tbins", "scalar*"),
-            ("b", "scalar*")
+            ("beta", "scalar*")
         ]
     },
     translations = (
-        ("a",          "a"),
+        ("a",          "alpha"),
         ("tbins",      "tbins"),
-        ("b",          "b"),
+        ("b",          "beta",      partial(rate_to_isi, "beta"),  partial(isi_to_rate, "beta")),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
     ),
@@ -745,25 +750,25 @@ class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
 
     def get_extra_global_neuron_params(self, native_params, init_vals):
-        # Get a, tbins and b
-        a_val = native_params["a"]
+        # Get alpha, tbins and beta
+        alpha_val = native_params["alpha"]
         tbin_val = native_params["tbin"]
-        b_val = native_params["b"]
+        beta_val = native_params["beta"]
 
         # Concatenate together a, tbin ans b to form extra global parameter
-        return {"a" : np.concatenate([seq.value for seq in a_val]),
+        return {"alpha" : np.concatenate([seq.value for seq in alpha_val]),
                 "tbin" : np.concatenate([seq.value for seq in tbin_val]),
-                "b" : np.concatenate([seq.value for seq in b_val])}
+                "beta" : np.concatenate([seq.value for seq in beta_val])}
 
     def build_genn_neuron(self, native_params, init_vals):
         # Create model using unmodified defs
         genn_model = create_custom_neuron_class(self.genn_neuron_name,
                                                 **self.neuron_defs.definitions)()
 
-        # Get a, tbins and b
-        a_val = native_params["a"]
+        # Get alpha, tbins and beta
+        alpha_val = native_params["alpha"]
         tbin_val = native_params["tbin"]
-        b_val = native_params["b"]
+        beta_val = native_params["beta"]
 
         # Create empty numpy arrays to hold start and end step indices
         start_index = np.empty(shape=native_params.shape, dtype=np.uint32)
