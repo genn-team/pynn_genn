@@ -376,7 +376,7 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
                     const scalar b= $(beta)[$(startIndex)];
                     $(timeStepToSpike) = $(tbins)[$(startIndex)]+b*$(gennrand_gamma,a);
                 }
-                if ($(timeStepToSpike) <= 0.0f || force_update) {
+                if ($(timeStepToSpike) <= 0.0f) {
                     const scalar a= $(alpha)[$(startIndex)];
                     const scalar b= $(beta)[$(startIndex)];
                     $(timeStepToSpike) += b*$(gennrand_gamma,a);
@@ -407,7 +407,7 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
     translations = (
         ("a",          "alpha"),
         ("tbins",      "tbins"),
-        ("b",          "beta",      partial(rate_to_isi, "beta"),  partial(isi_to_rate, "beta")),
+        ("b",          "beta"),
         ("start",      "spikeStart"),
         ("duration",   "duration"),
     ),
@@ -603,7 +603,7 @@ genn_postsyn_defs["AlphaCond"] = GeNNDefinitions(
         """,
 
         "apply_input_code" : "$(Isyn) += ($(E) - $(V)) * $(x);",
-        
+
         "var_name_types" : [
             ("x", "scalar")],
         "param_name_types" : {
@@ -752,41 +752,39 @@ class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
     def get_extra_global_neuron_params(self, native_params, init_vals):
         # Get alpha, tbins and beta
         alpha_val = native_params["alpha"]
-        tbin_val = native_params["tbin"]
+        tbin_val = native_params["tbins"]
         beta_val = native_params["beta"]
 
         # Concatenate together a, tbin ans b to form extra global parameter
         return {"alpha" : np.concatenate([seq.value for seq in alpha_val]),
-                "tbin" : np.concatenate([seq.value for seq in tbin_val]),
-                "beta" : np.concatenate([seq.value for seq in beta_val])}
+                "tbins" : np.concatenate([seq.value for seq in tbin_val]),
+                "beta" : np.concatenate([1000.0 / (seq.value * state.dt) 
+                                         for seq in beta_val])}
 
     def build_genn_neuron(self, native_params, init_vals):
-        # Create model using unmodified defs
-        genn_model = create_custom_neuron_class(self.genn_neuron_name,
-                                                **self.neuron_defs.definitions)()
-
-        # Get alpha, tbins and beta
-        alpha_val = native_params["alpha"]
-        tbin_val = native_params["tbin"]
-        beta_val = native_params["beta"]
+        # Take a copy of the native parameters
+        amended_native_params = deepcopy(native_params)
 
         # Create empty numpy arrays to hold start and end step indices
-        start_index = np.empty(shape=native_params.shape, dtype=np.uint32)
-        end_index = np.empty(shape=native_params.shape, dtype=np.uint32)
+        start_index = np.empty(shape=amended_native_params.shape, dtype=np.uint32)
+        end_index = np.empty(shape=amended_native_params.shape, dtype=np.uint32)
 
         # Calculate indices for each sequence
         cum_size = 0
-        for i, seq in enumerate(tbin_val):
+        for i, seq in enumerate(native_params["tbins"]):
             start_index[i] = cum_size
             cum_size += len(seq.value)
             end_index[i] = cum_size
 
-        # Build initialisation dictionary
-        neuron_ini = {"startIndex": start_index,
-                      "endIndex": end_index}
+        # Wrap indices in lazy arrays and add to amended native parameters
+        amended_native_params["startIndex"] = la.larray(start_index)
+        amended_native_params["endIndex"] = la.larray(end_index)
 
-        # Return with model
-        return genn_model, [], neuron_ini
+        # Call superclass method to build 
+        # neuron model from amended native parameters
+        return super(SpikeSourceInhGamma, self).build_genn_neuron(
+            amended_native_params, init_vals)
+
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):
     __doc__ = cells.EIF_cond_alpha_isfa_ista.__doc__
