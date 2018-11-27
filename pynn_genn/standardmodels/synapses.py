@@ -6,12 +6,11 @@ Standard cells for the GeNN module.
 :license: CeCILL, see LICENSE for details.
 """
 from copy import deepcopy
-from string import Template
 from pyNN.standardmodels import synapses, StandardModelType, build_translations
 from ..simulator import state
 import logging
 from pygenn.genn_wrapper.WeightUpdateModels import StaticPulse
-from ..model import GeNNStandardSynapseType, GeNNDefinitions
+from ..model import GeNNStandardSynapseType, GeNNDefinitions, DDTemplate
 
 logger = logging.getLogger("PyNN")
 
@@ -24,10 +23,6 @@ def delayMsToSteps(delay, **kwargs):
 # **NOTE** in GeNN delay 0 is one timestep
 def delayStepsToMs(delaySteps, **kwargs):
     return (delaySteps + 1.0) * state.dt
-
-class DDTemplate(Template):
-    """Template string class with the delimiter overridden with double $"""
-    delimiter = "$$"
 
 class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
