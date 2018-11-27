@@ -177,27 +177,31 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
             $${ADAPT_DECAY_CODE}
         """),
 
-        "threshold_condition_code" : DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($(Vthresh) $${ADAPT_THRESH_CODE})"),
+        "threshold_condition_code": DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($(VthreshStar) $${ADAPT_THRESH_CODE})"),
 
-        "reset_code" : DDTemplate("""
+        "reset_code": DDTemplate("""
             $(V) = $(Vreset);
             $(RefracTime) = $(TauRefrac);
         
             $${ADAPT_RESET_CODE}
         """),
         
-        "var_name_types" : [
+        # **NOTE** variables associated with adaption 'channels' get added when model is built
+        "var_name_types": [
             ("V", "scalar"),
             ("RefracTime", "scalar")],
     
-    "param_name_types": {
-        "Rmembrane": "scalar",  # Membrane resistance
-        "ExpTC": "scalar",       # Membrane time constant [ms]
-        "Vrest": "scalar",      # Resting membrane potential [mV]
-        "Vreset": "scalar",     # Reset voltage [mV]
-        "Vthresh": "scalar",    # Spiking threshold [mV]
-        "Ioffset": "scalar",    # Offset current
-        "TauRefrac": "scalar"}
+        # **NOTE** parameters associated with adaption 'channels' get added when model is built
+        "param_name_types": {
+            "Rmembrane": "scalar",  # Membrane resistance
+            "ExpTC": "scalar",       # Membrane time constant [ms]
+            "Vrest": "scalar",      # Resting membrane potential [mV]
+            "Vreset": "scalar",     # Reset voltage [mV]
+            "VthreshStar": "scalar",    # Spiking threshold [mV]
+            "Ioffset": "scalar",    # Offset current
+            "TauRefrac": "scalar",
+            "DeltaV": "scalar",
+            "Lambda0": "scalar"}
     },
     translations = (
         ('v_rest',      "Vrest"),
@@ -220,7 +224,8 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
         ('a_eta3',      "EtaA3"),
         ('a_gamma1',    "GammaA1"),
         ('a_gamma2',    "GammaA2"),
-        ('a_gamma3',    "GammaA3")),
+        ('a_gamma3',    "GammaA3"),
+        ("v",           "V")),
     
     extra_param_values = {
         "RefracTime" : 0.0,
@@ -749,66 +754,70 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
     
-    def build_genn_neuron(self, native_params, init_vals):
-        # Take a copy of the native parameters
-        amended_native_params = deepcopy(native_params)
-        
+    def build_genn_neuron(self, native_params, init_vals):  
         # Determine which adaption 'channels' are active
-        eta_indices = _get_active_indices("EtaA")
-        gamma_indices = _get_active_indices("GammaA")
-                            
+        eta_indices = self._get_active_indices(native_params, "EtaA")
+        gamma_indices = self._get_active_indices(native_params, "GammaA")
+
+        # Start with empty code strings
         adapt_current_code = ""
         adapt_decay_code = ""
         adapt_reset_code = ""
         adapt_thresh_code = ""
-        
+
+        # Take a copy of the native parameters
+        amended_neuron_defs = deepcopy(self.neuron_defs)
+        amended_defs = amended_neuron_defs.definitions
+
         # Loop through adaption current channels
         for e in eta_indices:
             # Add state variable
-            amended_native_params["var_name_types"].append("Ieta%u" % e)
-            
+            amended_defs["var_name_types"].append(("Ieta%u" % e, "scalar"))
+
             # Add parameters
-            amended_native_params["param_name_types"]["ExpTCEta%u" % e] = "scalar"
-            amended_native_params["param_name_types"]["EtaA%u" % e] = "scalar"
-            
+            amended_defs["param_name_types"]["ExpTCEta%u" % e] = "scalar"
+            amended_defs["param_name_types"]["EtaA%u" % e] = "scalar"
+
             adapt_current_code += "i += $(Ieta%u);\n" % e
             adapt_decay_code += "$(Ieta%u) *= $(ExpTCEta%u);\n" % (e, e)
             adapt_reset_code += "$(Ieta%u) += $(EtaA%u);\n" % (e, e)
-            
+
         # Loop through threshod adaption channels
         for g in gamma_indices:
             # Add state variable
-            amended_native_params["var_name_types"].append("Vgamma%u" % g)
-            
+            amended_defs["var_name_types"].append(("Vgamma%u" % g, "scalar"))
+
             # Add parameters
-            amended_native_params["param_name_types"]["ExpTCGamma%u" % g] = "scalar"
-            amended_native_params["param_name_types"]["GammaA%u" % g] = "scalar"
-            
+            amended_defs["param_name_types"]["ExpTCGamma%u" % g] = "scalar"
+            amended_defs["param_name_types"]["GammaA%u" % g] = "scalar"
+
             adapt_decay_code += "$(Vgamma%u) *= $(ExpTCGamma%u);\n" % (g, g)
             adapt_reset_code += "$(Vgamma%u) += $(GammaA%u);\n" % (g, g)
             adapt_thresh_code += " + $(Vgamma%u)" % g
-        
+
         # Apply substitutions to sim code
-        amended_native_params["sim_code"] =\
-            amended_native_params["sim_code"].substitute(
+        amended_defs["sim_code"] =\
+            amended_defs["sim_code"].substitute(
                 ADAPT_CURRENT_CODE=adapt_current_code,
                 ADAPT_DECAY_CODE=adapt_decay_code)
-        
+
         # Apply substitutions to sim code
-        amended_native_params["threshold_condition_code"] =\
-            amended_native_params["threshold_condition_code"].substitute(
+        amended_defs["threshold_condition_code"] =\
+            amended_defs["threshold_condition_code"].substitute(
                 ADAPT_THRESH_CODE=adapt_thresh_code)
-        
+
         # Apply substitutions to sim code
-        amended_native_params["reset_code"] =\
-            amended_native_params["reset_code"].substitute(
+        amended_defs["reset_code"] =\
+            amended_defs["reset_code"].substitute(
                 ADAPT_RESET_CODE=adapt_reset_code)
-        
-        # Call superclass method to build 
-        # neuron model from amended native parameters
-        return super(GIF_cond_exp, self).build_genn_neuron(
-            amended_native_params, init_vals)
-    
+
+        # Build callable to create a custom neuron model from defs
+        creator = partial(create_custom_neuron_class, self.genn_neuron_name)
+
+        # Build model
+        return self.build_genn_model(amended_neuron_defs, native_params,
+                                     init_vals, creator)
+
     def _get_active_indices(self, native_params, stem):
         indices = []
         for i in range(1, 4):
