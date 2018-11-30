@@ -119,18 +119,18 @@ for(b = 0; b < builderNodes.size; b++) {
                         // If GeNN exists
                         if(fileExists("genn")) {
                             echo "Updating GeNN";
-                            
+
                             // Pull from repository
                             dir("genn") {
                                 sh """
-                                git pull
-                                git checkout master
+                                git fetch --all
+                                git reset --hard origin/master
                                 """;
                             }
                         }
                         else {
                             echo "Cloning GeNN";
-                            sh "git clone -b master https://github.com/genn-team/genn.git";
+                            sh "git clone https://github.com/genn-team/genn.git";
                         }
 
                         // Remove existing virtualenv
@@ -200,18 +200,15 @@ for(b = 0; b < builderNodes.size; b++) {
                         archive uniqueLibGeNNBuildMsg
                         
                         def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
-                        
-                        // Remove existing logs
-                        sh """
-                        rm -f ${uniquePluginBuildMsg}
-                        """;
 
                         // Activate virtualenv, remove existing logs, clean, build module and archive output
+                        // **HACK** installing twice as a temporary solution to https://stackoverflow.com/questions/12491328/python-distutils-not-include-the-swig-generated-module
                         echo "Building Python module";
                         script = """
                         . ../virtualenv/bin/activate
-                        rm -f ${uniquePluginBuildMsg}
                         python setup.py clean --all
+                        rm -f ${uniquePluginBuildMsg}
+                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
                         python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
                         """
                         def installStatusCode = sh script:script, returnStatus:true
