@@ -44,7 +44,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get("rank", 0)
     simulator.state.num_processes = extra_params.get("num_processes", 1)
-    simulator.state.model.cpu_only = extra_params.get("cpu_only", False)
+    simulator.state.model.use_cpu = extra_params.get("use_cpu", None)
 
     # If a model name is specified, use that
     if "model_name" in extra_params:
