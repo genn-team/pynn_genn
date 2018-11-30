@@ -175,9 +175,10 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
             }
             
             $${ADAPT_DECAY_CODE}
+            oldSpike = false;
         """),
 
-        "threshold_condition_code": DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($(VthreshStar) $${ADAPT_THRESH_CODE})"),
+        "threshold_condition_code": DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($${ADAPT_THRESH_CODE})"),
 
         "reset_code": DDTemplate("""
             $(V) = $(Vreset);
@@ -212,7 +213,7 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
         ('i_offset',    "Ioffset"),
         ('delta_v',     "DeltaV"),
         ('v_t_star',    "VthreshStar"),
-        ('lambda0',     "Lambda0"),
+        ('lambda0',     "Lambda0",      0.001),
         ('tau_eta1',    "ExpTCEta1",    partial(tau_to_decay, "tau_eta1"), None),
         ('tau_eta2',    "ExpTCEta2",    partial(tau_to_decay, "tau_eta2"), None),   
         ('tau_eta3',    "ExpTCEta3",    partial(tau_to_decay, "tau_eta3"), None),   
@@ -891,7 +892,7 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
         adapt_current_code = ""
         adapt_decay_code = ""
         adapt_reset_code = ""
-        adapt_thresh_code = ""
+        threshold_voltage = "$(VthreshStar)"
 
         # Take a copy of the native parameters
         amended_neuron_defs = deepcopy(self.neuron_defs)
@@ -906,7 +907,7 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
             amended_defs["param_name_types"]["ExpTCEta%u" % e] = "scalar"
             amended_defs["param_name_types"]["EtaA%u" % e] = "scalar"
 
-            adapt_current_code += "i += $(Ieta%u);\n" % e
+            adapt_current_code += "i -= $(Ieta%u);\n" % e
             adapt_decay_code += "$(Ieta%u) *= $(ExpTCEta%u);\n" % (e, e)
             adapt_reset_code += "$(Ieta%u) += $(EtaA%u);\n" % (e, e)
 
@@ -921,13 +922,21 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
 
             adapt_decay_code += "$(Vgamma%u) *= $(ExpTCGamma%u);\n" % (g, g)
             adapt_reset_code += "$(Vgamma%u) += $(GammaA%u);\n" % (g, g)
-            adapt_thresh_code += " + $(Vgamma%u)" % g
+            threshold_voltage += " - $(Vgamma%u)" % g
 
         # Apply substitutions to sim code
         amended_defs["sim_code"] =\
             amended_defs["sim_code"].substitute(
                 ADAPT_CURRENT_CODE=adapt_current_code,
                 ADAPT_DECAY_CODE=adapt_decay_code)
+
+        # If threshold is stochastic
+        if self._is_param_non_zero(native_params, "DeltaV"):
+            adapt_thresh_code = "$(gennrand_uniform) < -expm1(-($(Lambda0) * exp(($(V) - %s) / $(DeltaV))) * DT)" % (threshold_voltage)
+            #adapt_thresh_code += "($(VthreshStar))"
+        # Otherwise, threshold is deterministic
+        else:
+            adapt_thresh_code = "$(V) < " + threshold_voltage
 
         # Apply substitutions to sim code
         amended_defs["threshold_condition_code"] =\
@@ -946,14 +955,21 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
         return self.build_genn_model(amended_neuron_defs, native_params,
                                      init_vals, creator)
 
+    def _is_param_non_zero(self, native_params, param_name):
+        param = native_params[param_name]
+        if param.is_homogeneous:
+            if param.evaluate(simplify=True) != 0.0:
+                return True
+        else:
+            if np.any(param.evaluate(simplify=False) != 0.0):
+                return True
+
+        return False
+
     def _get_active_indices(self, native_params, stem):
         indices = []
         for i in range(1, 4):
-            param = native_params["%s%u" % (stem, i)]
-            if param.is_homogeneous:
-                if param.evaluate(simplify=True) != 0.0:
-                    indices.append(i)
-            else:
-                if np.any(param.evaluate(simplify=False) != 0.0):
-                    indices.append(i)
+            if self._is_param_non_zero(native_params, "%s%u" % (stem, i)):
+                indices.append(i)
+
         return indices
