@@ -119,12 +119,12 @@ for(b = 0; b < builderNodes.size; b++) {
                         // If GeNN exists
                         if(fileExists("genn")) {
                             echo "Updating GeNN";
-                            
+
                             // Pull from repository
                             dir("genn") {
                                 sh """
-                                git pull
-                                git checkout master
+                                git fetch --all
+                                git reset --hard origin/master
                                 """;
                             }
                         }
