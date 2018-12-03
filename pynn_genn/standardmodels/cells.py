@@ -178,7 +178,7 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
             oldSpike = false;
         """),
 
-        "threshold_condition_code": DDTemplate("$(RefracTime) <= 0.0 && $(V) >= ($${ADAPT_THRESH_CODE})"),
+        "threshold_condition_code": DDTemplate("$(RefracTime) <= 0.0 && $${ADAPT_THRESH_CODE}"),
 
         "reset_code": DDTemplate("""
             $(V) = $(Vreset);
@@ -933,10 +933,9 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
         # If threshold is stochastic
         if self._is_param_non_zero(native_params, "DeltaV"):
             adapt_thresh_code = "$(gennrand_uniform) < -expm1(-($(Lambda0) * exp(($(V) - %s) / $(DeltaV))) * DT)" % (threshold_voltage)
-            #adapt_thresh_code += "($(VthreshStar))"
         # Otherwise, threshold is deterministic
         else:
-            adapt_thresh_code = "$(V) < " + threshold_voltage
+            adapt_thresh_code = "$(V) < (" + threshold_voltage + ")"
 
         # Apply substitutions to sim code
         amended_defs["threshold_condition_code"] =\
