@@ -20,6 +20,7 @@ from . import simulator
 from .standardmodels.cells import *
 from .standardmodels.synapses import *
 from .standardmodels.electrodes import *
+from .model import sanitize_label
 from .populations import Population, PopulationView, Assembly
 from .projections import Projection
 from neo.io import get_io
@@ -56,6 +57,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
 
         # Extract model name and path
         model_name = os.path.splitext(os.path.basename(calframe[1][1]))[0]
+        model_name = sanitize_label(model_name)
         model_path = os.path.dirname(calframe[1][1])
 
         # Set model name and path (adding ./ if path is relative)
