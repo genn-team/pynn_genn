@@ -17,6 +17,7 @@ from pyNN.connectors import *
 from pyNN.recording import *
 from pyNN.standardmodels import StandardCellType
 from . import simulator
+from .model import sanitize_label
 from .standardmodels.cells import *
 from .standardmodels.synapses import *
 from .standardmodels.electrodes import *
