@@ -86,7 +86,7 @@ for(b in desiredBuilds) {
 //--------------------------------------------------------------------------
 // **YUCK** need to do a C style loop here - probably due to JENKINS-27421 
 def builders = [:]
-for(b = 0; b < builderNodes.size; b++) {
+for(b = 0; b < builderNodes.size(); b++) {
     // **YUCK** meed to bind the label variable before the closure - can't do 'for (label in labels)'
     def nodeName = builderNodes.get(b).get(0)
     def nodeLabel = builderNodes.get(b).get(1)
@@ -136,6 +136,7 @@ for(b = 0; b < builderNodes.size; b++) {
                         // Remove existing virtualenv
                         sh "rm -rf virtualenv";
 
+                        sh "pip install virtualenv";
                         // Create new one
                         echo "Creating virtualenv";
                         sh "virtualenv virtualenv";
