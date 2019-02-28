@@ -57,9 +57,6 @@ class State(common.control.BaseState):
 
         self._built = True
 
-    def run(self, simtime):
-        self.run_until(self.t + simtime)
-
     def run_until(self, tstop):
         if not self._built:
             self.finalize()
@@ -71,23 +68,23 @@ class State(common.control.BaseState):
         self.model.t = self.t
         self.model.timestep = int(round(self.t / self.dt))
 
+        # Calculate corresponding timestep to tstop
+        timestep_stop = int(round(tstop / self.dt))
+
         # Simulate
         self.running = True
-        while self.t < tstop:
-            # Get time at start of step (this is correct timestamp for recorded data)
-            timestep = self.model.timestep
-
+        while self.model.timestep < timestep_stop:
             # Record any variables being recorded
+            # **NOTE** this is essentially recording the state at the end of the LAST timestep
             for rec in self.recorders:
-                rec._record_vars(timestep)
-
-            # Also update our t from the GeNN timestep
-            # **NOTE** GeNN steps time at end of timestep and PyNN expects opposite
-            # **NOTE** GeNN often using 32-bit float timesteps which fail a lot of tests
-            self.t = timestep * float(self.dt)
+                rec._record_vars(self.model.timestep)
 
             # Advance model time
             self.model.step_time()
+
+            # Update PyNN's t from the GeNN timestep (which will have been updated during the call to step_time)
+            # **NOTE** Internally, GeNN often uses 32-bit float timesteps which fail a lot of tests so we totally disregard the,
+            self.t = self.model.timestep * float(self.dt)
 
     def clear(self):
         self.model = GeNNModel("float", "GeNNModel")
