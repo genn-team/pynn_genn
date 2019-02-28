@@ -10,7 +10,6 @@ class Monitor(object):
         self.recorder = parent
         self.start_id = parent.population.first_id
         self.data = None
-        self.time = None
         self.id_data_idx_map = {}
 
     @property
@@ -29,7 +28,6 @@ class Monitor(object):
         if self.data is None:
             self.id_set = new_ids
             self.data = [[] for _ in new_ids]
-            self.time = []
         else:
             old_id_len = len(self.id_set)
             self.id_set = self.id_set.union(new_ids)
@@ -52,13 +50,9 @@ class Monitor(object):
                 if len(self.data) > 1
                 else np.array(self.data).T)
 
-    def get_time(self):
-        return self.time
-
     def __call__(self, timestep):
         """Fetch new data"""
         if timestep % self.sampling_timesteps == 0:
-            self.time.append(timestep * self.recorder._simulator.state.dt)
             for idd, i in iteritems(self.id_data_idx_map):
                 # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
@@ -66,9 +60,6 @@ class Monitor(object):
     def store_to_cache(self):
         # If anything is being recorded
         if self.data is not None:
-            # Empty list of times
-            self.time = []
-
             # Create an empty list to hold recorded data for each ID
             self.data = [[] for _ in range(len(self.id_set))]
 
