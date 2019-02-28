@@ -10,7 +10,8 @@ except ImportError:
 import numpy as np
 
 from pyNN import common
-from pyNN.connectors import AllToAllConnector
+from pyNN.connectors import AllToAllConnector, FromListConnector, \
+                            FromFileConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 
@@ -22,7 +23,8 @@ from .contexts import ContextMixin
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
                            ["genn_label", "pre_pop", "post_pop",
-                            "pre_slice", "post_slice", "syn_pop"])
+                            "pre_slice", "post_slice", "syn_pop",
+                            "pre_ind", "post_ind"])
 
 
 '''
@@ -126,7 +128,14 @@ class Projection(common.Projection, ContextMixin):
         ContextMixin.__init__(self, {})
 
         # **TODO** leave type up to Connector types
-        self.use_sparse = (False if isinstance(connector, AllToAllConnector)
+        conn_ratio = 0.0
+        if isinstance(connector, FromListConnector) or \
+            isinstance(connector, FromFileConnector):
+            max_conns = float(presynaptic_population.size * postsynaptic_population.size)
+            n_conns = len(connector.conn_list)
+            conn_ratio = n_conns/max_conns
+
+        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (conn_ratio > 0.7)
                            else True)
 
         # Generate name stem for sub-projections created from this projection
@@ -190,9 +199,7 @@ class Projection(common.Projection, ContextMixin):
 
                     # Reshape variable values from sub-population
                     # and copy into slice of var
-                    var[sub.pre_slice, sub.post_slice] =\
-                        np.reshape(sub_pop.syn_pop.get_var_values(n),
-                                   sub_shape)
+                    var[sub.pre_ind, sub.post_ind] = sub.syn_pop.get_var_values(n)
 
                 # Add variable to list
                 variables.append(var)
@@ -400,4 +407,5 @@ class Projection(common.Projection, ContextMixin):
 
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
-                              pre_slice, post_slice, syn_pop))
+                              pre_slice, post_slice, syn_pop,
+                              conn_pre_inds, conn_post_inds))
