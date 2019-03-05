@@ -23,8 +23,7 @@ from .contexts import ContextMixin
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
                            ["genn_label", "pre_pop", "post_pop",
-                            "pre_slice", "post_slice", "syn_pop",
-                            "pre_ind", "post_ind"])
+                            "pre_slice", "post_slice", "syn_pop"])
 
 
 '''
@@ -128,14 +127,13 @@ class Projection(common.Projection, ContextMixin):
         ContextMixin.__init__(self, {})
 
         # **TODO** leave type up to Connector types
-        conn_ratio = 0.0
+        n_conns = 0
+        max_conns = float(presynaptic_population.size * postsynaptic_population.size)
         if isinstance(connector, FromListConnector) or \
             isinstance(connector, FromFileConnector):
-            max_conns = float(presynaptic_population.size * postsynaptic_population.size)
             n_conns = len(connector.conn_list)
-            conn_ratio = n_conns/max_conns
 
-        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (conn_ratio > 0.7)
+        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (max_conns == n_conns)
                            else True)
 
         # Generate name stem for sub-projections created from this projection
@@ -199,8 +197,9 @@ class Projection(common.Projection, ContextMixin):
 
                     # Reshape variable values from sub-population
                     # and copy into slice of var
-                    var[sub.pre_ind, sub.post_ind] = sub.syn_pop.get_var_values(n)
-
+                    var[sub.pre_slice, sub.post_slice] =\
+                        np.reshape(sub.syn_pop.get_var_values(n),
+                                   sub_shape)
                 # Add variable to list
                 variables.append(var)
 
@@ -377,7 +376,20 @@ class Projection(common.Projection, ContextMixin):
             # and connection parameters for this sub-projection
             conn_pre_inds = pre_indices[conn_mask]
             conn_post_inds = post_indices[conn_mask]
-            conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+
+            if self.use_sparse:
+                conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+            else:
+                ## GeNN stores synapses in this row-major order for dense matrices
+                ## PyNN in some cases (FromListConnector) uses column-major
+                ## thus we need to re-sort to row-major order
+                to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))
+                conn_mask[:] = conn_mask[to_row_major]
+                conn_pre_inds[:] = conn_pre_inds[to_row_major]
+                conn_post_inds[:] = conn_post_inds[to_row_major]
+
+                conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
+
 
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
@@ -407,5 +419,4 @@ class Projection(common.Projection, ContextMixin):
 
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
-                              pre_slice, post_slice, syn_pop,
-                              conn_pre_inds, conn_post_inds))
+                              pre_slice, post_slice, syn_pop))
