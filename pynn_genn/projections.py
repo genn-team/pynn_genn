@@ -385,8 +385,6 @@ class Projection(common.Projection, ContextMixin):
                 ## thus we need to re-sort to row-major order
                 to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))
                 conn_mask[:] = conn_mask[to_row_major]
-                conn_pre_inds[:] = conn_pre_inds[to_row_major]
-                conn_post_inds[:] = conn_post_inds[to_row_major]
 
                 conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
 
