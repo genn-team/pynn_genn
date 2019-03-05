@@ -48,24 +48,25 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.num_processes = extra_params.get("num_processes", 1)
     simulator.state.model.use_cpu = extra_params.get("use_cpu", None)
 
+    # Get the parent frame from our current frame (whatever called setup)
+    calframe = inspect.getouterframes(inspect.currentframe(), 1)
+
     # If a model name is specified, use that
     if "model_name" in extra_params:
-        simulator.state.model.model_name = extra_params["model_name"]
+        model_name = extra_params["model_name"]
     # Otherwise
     else:
-        # Get the parent frame from our current frame (whatever called setup)
-        calframe = inspect.getouterframes(inspect.currentframe(), 1)
-
         # Extract model name and path
         model_name = os.path.splitext(os.path.basename(calframe[1][1]))[0]
-        model_name = sanitize_label(model_name)
-        model_path = os.path.dirname(calframe[1][1])
 
-        # Set model name and path (adding ./ if path is relative)
-        simulator.state.model.model_name = model_name
-        simulator.state.model_path = (model_path + os.sep
-                                      if os.path.isabs(model_path)
-                                      else "./" + model_path + os.sep)
+    model_name = sanitize_label(model_name)
+    model_path = os.path.dirname(calframe[1][1])
+
+    # Set model name and path (adding ./ if path is relative)
+    simulator.state.model.model_name = model_name
+    simulator.state.model_path = (model_path + os.sep
+                                  if os.path.isabs(model_path)
+                                  else "./" + model_path + os.sep)
     return rank()
 
 

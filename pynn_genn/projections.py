@@ -10,7 +10,8 @@ except ImportError:
 import numpy as np
 
 from pyNN import common
-from pyNN.connectors import AllToAllConnector
+from pyNN.connectors import AllToAllConnector, FromListConnector, \
+                            FromFileConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 
@@ -126,7 +127,13 @@ class Projection(common.Projection, ContextMixin):
         ContextMixin.__init__(self, {})
 
         # **TODO** leave type up to Connector types
-        self.use_sparse = (False if isinstance(connector, AllToAllConnector)
+        n_conns = 0
+        max_conns = float(presynaptic_population.size * postsynaptic_population.size)
+        if isinstance(connector, FromListConnector) or \
+            isinstance(connector, FromFileConnector):
+            n_conns = len(connector.conn_list)
+
+        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (max_conns == n_conns)
                            else True)
 
         # Generate name stem for sub-projections created from this projection
@@ -191,9 +198,8 @@ class Projection(common.Projection, ContextMixin):
                     # Reshape variable values from sub-population
                     # and copy into slice of var
                     var[sub.pre_slice, sub.post_slice] =\
-                        np.reshape(sub_pop.syn_pop.get_var_values(n),
+                        np.reshape(sub.syn_pop.get_var_values(n),
                                    sub_shape)
-
                 # Add variable to list
                 variables.append(var)
 
@@ -370,7 +376,18 @@ class Projection(common.Projection, ContextMixin):
             # and connection parameters for this sub-projection
             conn_pre_inds = pre_indices[conn_mask]
             conn_post_inds = post_indices[conn_mask]
-            conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+
+            if self.use_sparse:
+                conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+            else:
+                ## GeNN stores synapses in this row-major order for dense matrices
+                ## PyNN in some cases (FromListConnector) uses column-major
+                ## thus we need to re-sort to row-major order
+                to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))
+                conn_mask[:] = conn_mask[to_row_major]
+
+                conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
+
 
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
