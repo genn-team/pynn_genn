@@ -130,7 +130,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                         }
                         else {
                             echo "Cloning GeNN";
-                            sh "git clone https://github.com/genn-team/genn.git";
+                            sh "git clone --branch genn_4 https://github.com/genn-team/genn.git";
                         }
 
                         // Remove existing virtualenv
