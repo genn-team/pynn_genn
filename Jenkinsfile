@@ -151,7 +151,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                     // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
                     sh """
                     . virtualenv/bin/activate
-                    pip install nose nose_testconfig coverage codecov "numpy>1.6, < 1.15" scipy
+                    pip install nose nose_testconfig coverage codecov "numpy>1.6, < 1.15" scipy six
                     """;
                 }
 
@@ -174,7 +174,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                         }
                         
                         // Make LibGeNN and all supported backends with relocatable code, suitable for including in Python module
-                        makeCommand += "make RELOCATABLE=1";
+                        makeCommand += "make RELOCATABLE=1 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
                         def makeStatusCode = sh script:makeCommand, returnStatus:true
