@@ -124,7 +124,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                             dir("genn") {
                                 sh """
                                 git fetch --all
-                                git reset --hard origin/master
+                                git reset --hard origin/genn_4
                                 """;
                             }
                         }
@@ -169,32 +169,17 @@ for(b = 0; b < builderNodes.size(); b++) {
                         
                         // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
                         makeCommand = "";
-                        libGeNNName = "libgenn_DYNAMIC"
                         if("dev_toolset" in nodeLabel) {
                             makeCommand += ". /opt/rh/devtoolset-6/enable\n"
                         }
                         
-                        // Add start of make command
-                        makeCommand += "make -f lib/GNUMakefileLibGeNN DYNAMIC=1 ";
-                        
-                        // Add CPU only options
-                        if("cpu_only" in nodeLabel) {
-                            makeCommand += "CPU_ONLY=1 ";
-                            libGeNNName = "libgenn_CPU_ONLY_DYNAMIC"
-                        }
-                        
-                        // Add remainder of make incantation
-                        makeCommand += "LIBGENN_PATH=pygenn/genn_wrapper/ 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
+                        // Make LibGeNN and all supported backends with relocatable code, suitable for including in Python module
+                        makeCommand += "make RELOCATABLE=1";
                         
                         // Make
                         def makeStatusCode = sh script:makeCommand, returnStatus:true
                         if(makeStatusCode != 0) {
                             setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
-                        }
-                        
-                        // If node is a mac, re-label library
-                        if("mac" in nodeLabel) {
-                            sh "install_name_tool -id \"@loader_path/" + libGeNNName + ".dylib\" pygenn/genn_wrapper/" + libGeNNName + ".dylib";
                         }
                         
                         // Archive build message
