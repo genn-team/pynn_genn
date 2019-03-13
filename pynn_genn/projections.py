@@ -296,7 +296,7 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrix_type = "RAGGED_INDIVIDUALG"
+            matrix_type = "SPARSE_INDIVIDUALG"
         else:
             matrix_type = "DENSE_INDIVIDUALG"
 
