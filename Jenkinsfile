@@ -172,14 +172,19 @@ for(b = 0; b < builderNodes.size(); b++) {
                         if("dev_toolset" in nodeLabel) {
                             makeCommand += ". /opt/rh/devtoolset-6/enable\n"
                         }
-                        
-                        // Make LibGeNN and all supported backends with relocatable code, suitable for including in Python module
-                        makeCommand += "make RELOCATABLE=1";
+
+                        // Assemble make incantation
+                        makeCommand = "make DYNAMIC=1 LIBRARY_DIRECTORY=" + pwd() + "/pygenn/genn_wrapper/ 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
                         
                         // Make
                         def makeStatusCode = sh script:makeCommand, returnStatus:true
                         if(makeStatusCode != 0) {
                             setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
+                        }
+                        
+                        // If node is a mac, re-label libraries
+                        if("mac" in nodeLabel) {
+                            sh "find pygenn/genn_wrapper -name \"libgenn*.dylib\" -exec sh -c 'install_name_tool -id \"@loader_path/\$(basename \$1)\" \$1' x {} \\;";
                         }
                         
                         // Archive build message
