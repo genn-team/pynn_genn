@@ -172,10 +172,16 @@ class Projection(common.Projection, ContextMixin):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
-        # Pull projection state from device
-        # **TODO** we could optimise this to only pull what we want
+        # Loop through sub-populations
         for sub_pop in self._sub_projections:
-            genn_model.pull_state_from_device(sub_pop.genn_label)
+            # If we need it, pull connectivity, do so
+            if self.use_sparse and ("presynaptic_index" in names or "postsynaptic_index" in names):
+                genn_model.pull_connectivity_from_device(sub_pop.genn_label)
+
+            # Loop through names and pull variables
+            for n in names:
+                if n != "presynaptic_index" and n != "postsynaptic_index":
+                    genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
         # If projection is sparse
         variables = []
@@ -210,10 +216,16 @@ class Projection(common.Projection, ContextMixin):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
-        # Pull projection state from device
-        # **TODO** we could optimise this to only pull what we want
+        # Loop through sub-populations
         for sub_pop in self._sub_projections:
-            genn_model.pull_state_from_device(sub_pop.genn_label)
+            # If we need it, pull connectivity, do so
+            if self.use_sparse and ("presynaptic_index" in names or "postsynaptic_index" in names):
+                genn_model.pull_connectivity_from_device(sub_pop.genn_label)
+
+            # Loop through names and pull variables
+            for n in names:
+                if n != "presynaptic_index" and n != "postsynaptic_index":
+                    genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
         # Loop through names of variables that are required
         variables = []
