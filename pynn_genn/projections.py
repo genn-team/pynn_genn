@@ -303,7 +303,10 @@ class Projection(common.Projection, ContextMixin):
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
         # neuron parameters into postsynaptic model parameters
-        prefix = "inh_" if self.receptor_type == "inhibitory" else "exc_"
+        prefix = "inh_" if self.receptor_type.startswith("inhibitory") else "exc_"
+        rt_split = self.receptor_type.split("_")
+        if len(rt_split) > 1:
+            prefix = "%s%s_"%(prefix, rt_split[-1])
 
         #  Create connections rows to hold synapses
         pre_indices = []
@@ -380,7 +383,7 @@ class Projection(common.Projection, ContextMixin):
             if self.use_sparse:
                 conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
             else:
-                ## GeNN stores synapses in this row-major order for dense matrices
+                ## GeNN stores synapses in row-major order for dense matrices
                 ## PyNN in some cases (FromListConnector) uses column-major
                 ## thus we need to re-sort to row-major order
                 to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))

@@ -185,6 +185,86 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
         if hasattr(self.timing_dependence, "post_spike_code"):
             self.wum_defs["post_spike_code"] = self.timing_dependence.post_spike_code
 
+
+class DVDTPlasticity(synapses.STDPMechanism, GeNNStandardSynapseType):
+    __doc__ = synapses.STDPMechanism.__doc__
+
+    mutable_vars = set(["g"])
+
+    base_translations = build_translations(
+        ("weight", "g"),
+        ("delay", "delaySteps", delayMsToSteps, delayStepsToMs),
+        ("dendritic_delay_fraction", "_dendritic_delay_fraction"),
+    )
+
+    base_defs = {
+        "vars" : {"g": "scalar",},
+        "pre_var_name_types": [],
+        "post_var_name_types": [],
+
+        "sim_code" : DDTemplate("""
+            $(addToInSyn, $(g));
+            $${TD_CODE}
+        """),
+        "learn_post_code" : DDTemplate("""
+            $${TD_CODE}
+        """),
+
+        "is_pre_spike_time_required" : True,
+        "is_post_spike_time_required" : False,
+    }
+
+    def _get_minimum_delay(self):
+        if state._min_delay == "auto":
+            return state.dt
+        else:
+            return state._min_delay
+
+    def __init__(self, timing_dependence=None, weight_dependence=None,
+            voltage_dependence=None, dendritic_delay_fraction=1.0,
+            weight=0.0, delay=None):
+
+        super(DVDTPlasticity, self).__init__(
+            timing_dependence, weight_dependence, voltage_dependence,
+            dendritic_delay_fraction, weight, delay)
+
+        # Create a copy of the standard STDP defs
+        self.wum_defs = deepcopy(self.base_defs)
+
+        # Adds variables from timing and weight dependence to definitions
+        self.wum_defs["vars"].update(self.timing_dependence.vars)
+        self.wum_defs["vars"].update(self.weight_dependence.vars)
+
+        # Add pre and postsynaptic variables from timing dependence to definition
+        if hasattr(self.timing_dependence, "pre_var_name_types"):
+            self.wum_defs["pre_var_name_types"].extend(
+                self.timing_dependence.pre_var_name_types)
+
+        if hasattr(self.timing_dependence, "post_var_name_types"):
+            self.wum_defs["post_var_name_types"].extend(
+                self.timing_dependence.post_var_name_types)
+
+        # Apply substitutions to sim code
+        td_sim_code = self.timing_dependence.sim_code.substitute(
+            WD_CODE=self.weight_dependence.depression_update_code)
+        self.wum_defs["sim_code"] =\
+            self.wum_defs["sim_code"].substitute(TD_CODE=td_sim_code)
+
+        # Apply substitutions to post learn code
+        td_post_learn_code = self.timing_dependence.learn_post_code.substitute(
+            WD_CODE=self.weight_dependence.potentiation_update_code)
+        self.wum_defs["learn_post_code"] =\
+            self.wum_defs["learn_post_code"].substitute(TD_CODE=td_post_learn_code)
+
+        # Use pre and postsynaptic spike code from timing dependence
+        if hasattr(self.timing_dependence, "pre_spike_code"):
+            self.wum_defs["pre_spike_code"] = self.timing_dependence.pre_spike_code
+
+        if hasattr(self.timing_dependence, "post_spike_code"):
+            self.wum_defs["post_spike_code"] = self.timing_dependence.post_spike_code
+
+
+
 class WeightDependence(object):
 
     vars = {
@@ -284,6 +364,43 @@ class SpikePairRule(synapses.SpikePairRule):
     post_spike_code = """\
         const scalar dt = $(t) - $(sT_post);
         $(postTrace) = $(postTrace) * exp(-dt / $(tauMinus)) + 1.0;
+        """
+
+    translations = build_translations(
+        ("tau_plus",   "tauPlus"),
+        ("tau_minus",  "tauMinus"),
+        ("A_plus",     "Aplus"),
+        ("A_minus",    "Aminus"))
+
+
+class DVDTRule(synapses.SpikePairRule):
+    __doc__ = synapses.SpikePairRule.__doc__
+
+    vars = {"tauPlus": "scalar",  # 0 - Potentiation time constant (ms)
+            "tauMinus": "scalar", # 1 - Depression time constant (ms)
+            "Aplus": "scalar",    # 2 - Rate of potentiation
+            "Aminus": "scalar"}   # 3 - Rate of depression
+
+    pre_var_name_types = [("preTrace", "scalar")]
+    post_var_name_types = [("postTrace", "scalar")]
+
+    # using {.brc} for left{ or right} so that .format() does not freak out
+    # const scalar update = $(Aplus) * $(sT_pre) * $(dvdt);
+    sim_code = DDTemplate("""
+        scalar update = 0.0;
+        if ($(sT_pre) == $(t)){
+            update = $(Aplus) * $(dvdt_post);
+        }
+        $${WD_CODE}
+        """)
+
+    learn_post_code = DDTemplate("""
+        """)
+
+    pre_spike_code = """\
+        """
+
+    post_spike_code = """\
         """
 
     translations = build_translations(
