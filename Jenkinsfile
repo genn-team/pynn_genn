@@ -2,21 +2,19 @@
 
 // All the types of build we'll ideally run if suitable nodes exist
 def desiredBuilds = [
+    ["cuda10", "linux", "x86_64", "python27"] as Set,
     ["cuda9", "linux", "x86_64", "python27"] as Set,
     ["cuda8", "linux", "x86_64", "python27"] as Set,
     ["cpu_only", "linux", "x86_64", "python27"] as Set,
-    ["cuda9", "linux", "x86", "python27"] as Set,
-    ["cuda8", "linux", "x86", "python27"] as Set,
-    ["cpu_only", "linux", "x86", "python27"] as Set,
+    ["cuda10", "mac", "python27"] as Set,
     ["cuda9", "mac", "python27"] as Set,
     ["cuda8", "mac", "python27"] as Set,
     ["cpu_only", "mac", "python27"] as Set,
+    ["cuda10", "linux", "x86_64", "python3"] as Set,
     ["cuda9", "linux", "x86_64", "python3"] as Set,
     ["cuda8", "linux", "x86_64", "python3"] as Set,
     ["cpu_only", "linux", "x86_64", "python3"] as Set,
-    ["cuda9", "linux", "x86", "python3"] as Set,
-    ["cuda8", "linux", "x86", "python3"] as Set,
-    ["cpu_only", "linux", "x86", "python3"] as Set,
+    ["cuda10", "mac", "python3"] as Set,
     ["cuda9", "mac", "python3"] as Set,
     ["cuda8", "mac", "python3"] as Set,
     ["cpu_only", "mac", "python3"] as Set] 
