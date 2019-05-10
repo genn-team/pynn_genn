@@ -96,7 +96,7 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
     extra_param_values = {
         "RefracTime" : 0.0,
     })
-    
+
 genn_neuron_defs["IFSlow"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
@@ -632,6 +632,34 @@ genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
         "inh_init": partial(tau_to_init, "tau_syn_I")
     })
 
+genn_postsyn_defs["ExpCurrSlow"] = GeNNDefinitions(
+    definitions = {
+        "decay_code" : "$(inSyn)*=$(expDecay);",
+
+        "apply_input_code" : "$(Isyn) += $(init) * $(inSyn);",
+
+        "var_name_types" : [],
+        "param_name_types" : {
+            "expDecay": "scalar",
+            "init": "scalar"}
+    },
+    translations = (
+        ("tau_syn_E",  "exc_expDecay",  partial(tau_to_decay, "tau_syn_E"),   None),
+        ("tau_syn_I",  "inh_expDecay",  partial(tau_to_decay, "tau_syn_I"),   None),
+        ("e_rev_E_slow", "exc_slow_E"),
+        ("e_rev_I_slow", "inh_slow_E"),
+        ("tau_syn_E_slow", "exc_slow_expDecay", partial(tau_to_decay, "tau_syn_E_slow"), None),
+        ("tau_syn_I_slow", "inh_slow_expDecay", partial(tau_to_decay, "tau_syn_I_slow"), None),
+        ("v_activate_slow", "VActivateSlow"),
+    ),
+    extra_param_values = {
+        "exc_init": partial(tau_to_init, "tau_syn_E"),
+        "inh_init": partial(tau_to_init, "tau_syn_I"),
+        "exc_slow_init": partial(tau_to_init, "tau_syn_E_slow"),
+        "inh_slow_init": partial(tau_to_init, "tau_syn_I_slow"),
+
+    })
+
 genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
     definitions = {
         "decay_code" : "$(inSyn)*=$(expDecay);",
@@ -773,6 +801,9 @@ class IF_curr_exp_slow(cells.IF_curr_exp, GeNNStandardCellType):
         'thresh_mult_down': 1.0,
         'v_thresh_max': -50.0,
         'v_thresh_min': -50.0,
+        'tau_syn_E_slow': 50.0,
+        'tau_syn_I_slow': 50.0,
+        'v_activate_slow': -60.0,
 
     }
     # Slow down
@@ -814,11 +845,17 @@ class IF_curr_exp_slow(cells.IF_curr_exp, GeNNStandardCellType):
         # "thresh_mult_down": '',
         'v_thresh_max': 'mV',
         'v_thresh_min': 'mV',
+        'tau_syn_E_slow': 'ms',
+        'tau_syn_I_slow': 'ms',
+        'v_activate_slow': 'mV',
 
     }
+    receptor_types = ('excitatory', 'inhibitory',
+                      'excitatory_slow', 'inhibitory_slow',
+                     )
 
     genn_neuron_name = "IFSlow"
-    genn_postsyn_name = "ExpCurr"
+    genn_postsyn_name = "ExpCurrSlow"
     neuron_defs = genn_neuron_defs[genn_neuron_name]
     postsyn_defs = genn_postsyn_defs[genn_postsyn_name]
 

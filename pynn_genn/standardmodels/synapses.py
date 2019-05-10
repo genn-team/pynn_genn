@@ -386,11 +386,18 @@ class DVDTRule(synapses.SpikePairRule):
 
     # using {.brc} for left{ or right} so that .format() does not freak out
     # const scalar update = $(Aplus) * $(sT_pre) * $(dvdt);
+    # this goes to depression update!
+    # const scalar update = -($(Aplus) * $(dvdt_post) );
+    # cout << "t = " << t << " , sT_pre = " << $(sT_pre) << endl;
+    # cout <<  $(Aplus) << " * " << $(dvdt_post) << " = " << update << endl;
+    #
+    # const scalar old_g = $(g);
+    # $${WD_CODE}
+    # cout << "dg = " << $(g) << " - " << old_g << " = " << $(g) - old_g << endl;
+    # cout << endl;
+
     sim_code = DDTemplate("""
-        scalar update = 0.0;
-        if ($(sT_pre) == $(t)){
-            update = $(Aplus) * $(dvdt_post);
-        }
+        const scalar update = -( $(Aplus) * $(dvdt_post) );
         $${WD_CODE}
         """)
 
