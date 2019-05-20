@@ -113,7 +113,7 @@ class GeNNStandardModelType(StandardModelType):
         genn_defs["param_names"] = list(param_name_types.keys())
 
         # Create custom model
-        genn_model = create_custom_model(**genn_defs)()
+        genn_model = create_custom_model(**genn_defs)
 
         # Get set of native parameter names
         native_param_keys = set(native_params.keys())
@@ -247,7 +247,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
 
         # Create custom model
         genn_model = create_custom_weight_update_class(self.__class__.__name__,
-                                                       **genn_defs)()
+                                                       **genn_defs)
 
         # Use first entry in conn param for parameters
         wum_params = {n: conn_params[n][0]
