@@ -3,7 +3,7 @@
 This project bridges [GeNN](http://genn-team.github.io/genn/), a GPU enhanced Neuronal Network simulation environment, with [PyNN](https://pypi.org/project/PyNN/), a simulator-independent language for building neuronal network models.
 
 ## Installation
- 1. Follow the instructions in https://github.com/genn-team/genn/blob/genn_4/pygenn/README.md to install PyGeNN.
+ 1. Follow the instructions in https://github.com/genn-team/genn/blob/master/pygenn/README.md to install PyGeNN.
  2. Clone this project
  3. Install with setuptools using ``python setup.py develop`` command
 
