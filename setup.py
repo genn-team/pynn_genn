@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pynn_genn",
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(),
 
     # Metadata for PyPi
@@ -21,6 +21,7 @@ setup(
 
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS",
+        "Operating System :: Windows",
 
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
