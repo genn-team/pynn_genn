@@ -99,175 +99,169 @@ for(b = 0; b < builderNodes.size(); b++) {
     builders[nodeName] = {
         node(nodeName) {
             def installationStageName =  "Installation (" + env.NODE_NAME + ")";
- 
-            // Customise this nodes environment so GeNN environment variable is set and genn binaries are in path
-            // **NOTE** these are NOT set directly using env.PATH as this makes the change across ALL nodes which means you get a randomly mangled path depending on node startup order
-            withEnv(["GENN_PATH=" + pwd() + "/genn",
-                     "PATH+GENN=" + pwd() + "/genn/lib/bin"]) {
-                stage(installationStageName) {
-                    echo "Checking out GeNN";
+            stage(installationStageName) {
+                echo "Checking out GeNN";
 
-                    // Deleting existing checked out version of pynn_genn
-                    sh "rm -rf pynn_genn";
+                // Deleting existing checked out version of pynn_genn
+                sh "rm -rf pynn_genn";
 
-                    dir("pynn_genn") {
-                        // Checkout pynn_genn here
-                        // **NOTE** because we're using multi-branch project URL is substituted here
-                        checkout scm
-                    }
-
-                    // **NOTE** only try and set build status AFTER checkout
-                    try {
-                        setBuildStatus(installationStageName, "PENDING");
-
-                        // If GeNN exists
-                        if(fileExists("genn")) {
-                            echo "Updating GeNN";
-
-                            // Pull from repository
-                            dir("genn") {
-                                sh """
-                                git fetch --all
-                                git reset --hard origin/genn_4
-                                """;
-                            }
-                        }
-                        else {
-                            echo "Cloning GeNN";
-                            sh "git clone --branch genn_4 https://github.com/genn-team/genn.git";
-                        }
-
-                        // Remove existing virtualenv
-                        sh "rm -rf virtualenv";
-
-                        sh "pip install virtualenv";
-                        // Create new one
-                        echo "Creating virtualenv";
-                        sh "virtualenv virtualenv";
-
-                    } catch (Exception e) {
-                        setBuildStatus(installationStageName, "FAILURE");
-                    }
+                dir("pynn_genn") {
+                    // Checkout pynn_genn here
+                    // **NOTE** because we're using multi-branch project URL is substituted here
+                    checkout scm
                 }
-        
-                buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
-                    // Activate virtualenv and intall packages
-                    // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
+
+                // **NOTE** only try and set build status AFTER checkout
+                try {
+                    setBuildStatus(installationStageName, "PENDING");
+
+                    // If GeNN exists
+                    if(fileExists("genn")) {
+                        echo "Updating GeNN";
+
+                        // Pull from repository
+                        dir("genn") {
+                            sh """
+                            git fetch --all
+                            git reset --hard origin/master
+                            """;
+                        }
+                    }
+                    else {
+                        echo "Cloning GeNN";
+                        sh "git clone --branch master https://github.com/genn-team/genn.git";
+                    }
+
+                    // Remove existing virtualenv
+                    sh "rm -rf virtualenv";
+
+                    sh "pip install virtualenv";
+                    // Create new one
+                    echo "Creating virtualenv";
+                    sh "virtualenv virtualenv";
+
+                } catch (Exception e) {
+                    setBuildStatus(installationStageName, "FAILURE");
+                }
+            }
+
+            buildStep("Installing Python modules(" + env.NODE_NAME + ")") {
+                // Activate virtualenv and intall packages
+                // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
+                sh """
+                . virtualenv/bin/activate
+                pip install nose nose_testconfig coverage codecov "numpy>1.6, < 1.15" scipy
+                """;
+            }
+
+            buildStep("Building PyGeNN (" + env.NODE_NAME + ")") {
+                dir("genn") {
+                    // Build dynamic LibGeNN
+                    // **TODO** only do this stage if anything's changed in GeNN
+                    echo "Building LibGeNN";
+                    def uniqueLibGeNNBuildMsg = "libgenn_build_" + env.NODE_NAME;
+
+                    // Remove existing logs
                     sh """
-                    . virtualenv/bin/activate
-                    pip install nose nose_testconfig coverage codecov "numpy>1.6, < 1.15" scipy
+                    rm -f ${uniqueLibGeNNBuildMsg}
+                    """;
+
+                    // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
+                    makeCommand = "";
+                    if("dev_toolset" in nodeLabel) {
+                        makeCommand += ". /opt/rh/devtoolset-6/enable\n"
+                    }
+
+                    // Assemble make incantation
+                    makeCommand = "make DYNAMIC=1 LIBRARY_DIRECTORY=" + pwd() + "/pygenn/genn_wrapper/ 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
+
+                    // Make
+                    def makeStatusCode = sh script:makeCommand, returnStatus:true
+                    if(makeStatusCode != 0) {
+                        setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
+                    }
+
+                    // Archive build message
+                    archive uniqueLibGeNNBuildMsg
+
+                    def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
+
+                    // Activate virtualenv, remove existing logs, clean, build module and archive output
+                    // **HACK** installing twice as a temporary solution to https://stackoverflow.com/questions/12491328/python-distutils-not-include-the-swig-generated-module
+                    echo "Building Python module";
+                    script = """
+                    . ../virtualenv/bin/activate
+                    python setup.py clean --all
+                    rm -f ${uniquePluginBuildMsg}
+                    python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
+                    python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
+                    """
+                    def installStatusCode = sh script:script, returnStatus:true
+                    if(installStatusCode != 0) {
+                        setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
+                    }
+
+                    archive uniquePluginBuildMsg;
+                }
+            }
+
+            buildStep("Installing PyNN GeNN (" + env.NODE_NAME + ")") {
+                dir("pynn_genn") {
+                    // Activate virtualenv and install PyNN GeNN
+                    sh """
+                    . ../virtualenv/bin/activate
+                    python setup.py install
                     """;
                 }
+            }
 
-                buildStep("Building PyGeNN (" + env.NODE_NAME + ")") {
-                    dir("genn") {
-                        // Build dynamic LibGeNN
-                        // **TODO** only do this stage if anything's changed in GeNN
-                        echo "Building LibGeNN";
-                        def uniqueLibGeNNBuildMsg = "libgenn_build_" + env.NODE_NAME;
+            buildStep("Running tests (" + env.NODE_NAME + ")") {
+                dir("pynn_genn/test/system") {
+                    // Generate unique name for message
+                    def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
 
-                        // Remove existing logs
-                        sh """
-                        rm -f ${uniqueLibGeNNBuildMsg}
-                        """;
-                        
-                        // **YUCK** if dev_toolset is in node label - source in newer dev_toolset (CentOS)
-                        makeCommand = "";
-                        if("dev_toolset" in nodeLabel) {
-                            makeCommand += ". /opt/rh/devtoolset-6/enable\n"
-                        }
+                    // Remove existing logs
+                    sh """
+                    rm -f ${uniqueTestOutputMsg}
+                    """;
 
-                        // Assemble make incantation
-                        makeCommand = "make DYNAMIC=1 LIBRARY_DIRECTORY=" + pwd() + "/pygenn/genn_wrapper/ 1>> \"" + uniqueLibGeNNBuildMsg + "\" 2>> \"" + uniqueLibGeNNBuildMsg + "\""
-                        
-                        // Make
-                        def makeStatusCode = sh script:makeCommand, returnStatus:true
-                        if(makeStatusCode != 0) {
-                            setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
-                        }
-
-                        // Archive build message
-                        archive uniqueLibGeNNBuildMsg
-                        
-                        def uniquePluginBuildMsg = "pygenn_plugin_build_" + env.NODE_NAME;
-
-                        // Activate virtualenv, remove existing logs, clean, build module and archive output
-                        // **HACK** installing twice as a temporary solution to https://stackoverflow.com/questions/12491328/python-distutils-not-include-the-swig-generated-module
-                        echo "Building Python module";
-                        script = """
-                        . ../virtualenv/bin/activate
-                        python setup.py clean --all
-                        rm -f ${uniquePluginBuildMsg}
-                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
-                        python setup.py install 1>> "${uniquePluginBuildMsg}" 2>> "${uniquePluginBuildMsg}"
-                        """
-                        def installStatusCode = sh script:script, returnStatus:true
-                        if(installStatusCode != 0) {
-                            setBuildStatus("Building PyGeNN (" + env.NODE_NAME + ")", "FAILURE");
-                        }
-                        
-                        archive uniquePluginBuildMsg;
+                    // Activate virtualenv, remove log and run tests (keeping return status)
+                    def testCommand = """
+                    . ../../../virtualenv/bin/activate
+                    rm -f .coverage
+                    nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
+                    """
+                    def testStatusCode = sh script:testCommand, returnStatus:true
+                    if(testStatusCode != 0) {
+                        setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
                     }
-                }
-                
-                buildStep("Installing PyNN GeNN (" + env.NODE_NAME + ")") {
-                    dir("pynn_genn") {
-                        // Activate virtualenv and install PyNN GeNN
-                        sh """
-                        . ../virtualenv/bin/activate
-                        python setup.py install
-                        """;
+
+                    // Activate virtualenv and  convert coverage to XML
+                    def coverageCommand = """
+                    . ../../../virtualenv/bin/activate
+                    coverage xml
+                    """
+                    def coverageStatusCode = sh script:coverageCommand, returnStatus:true
+                    if(coverageStatusCode != 0) {
+                        setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
                     }
-                }
-                
-                buildStep("Running tests (" + env.NODE_NAME + ")") {
-                    dir("pynn_genn/test/system") {
-                        // Generate unique name for message
-                        def uniqueTestOutputMsg = "test_output_" + env.NODE_NAME;
-                        
-                        // Remove existing logs
-                        sh """
-                        rm -f ${uniqueTestOutputMsg}
-                        """;
-                        
-                        // Activate virtualenv, remove log and run tests (keeping return status)
-                        def testCommand = """
-                        . ../../../virtualenv/bin/activate
-                        rm -f .coverage
-                        nosetests -s --with-xunit --with-coverage --cover-package=pygenn --cover-package=pynn_genn test_genn.py 1>> "${uniqueTestOutputMsg}" 2>> "${uniqueTestOutputMsg}"
-                        """
-                        def testStatusCode = sh script:testCommand, returnStatus:true
-                        if(testStatusCode != 0) {
-                            setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
-                        }
-                        
-                        // Activate virtualenv and  convert coverage to XML
-                        def coverageCommand = """
-                        . ../../../virtualenv/bin/activate
-                        coverage xml
-                        """
-                        def coverageStatusCode = sh script:coverageCommand, returnStatus:true
-                        if(coverageStatusCode != 0) {
-                            setBuildStatus("Running tests (" + env.NODE_NAME + ")", "UNSTABLE");
-                        }
-                        
-                        archive uniqueTestOutputMsg;
-                    }
-                    
-                    // Switch to PyNN GeNN repository root so codecov uploader works correctly
-                    dir("pynn_genn") {
-                        // Activate virtualenv and upload coverage
-                        sh """
-                        . ../virtualenv/bin/activate
-                        codecov --token 1460b8f4-e4af-4acd-877e-353c9449111c --file test/system/coverage.xml
-                        """
-                    }
+
+                    archive uniqueTestOutputMsg;
                 }
 
-                buildStep("Gathering test results (" + env.NODE_NAME + ")") {
-                    // Process JUnit test output
-                    junit "pynn_genn/test/**/nosetests.xml";
+                // Switch to PyNN GeNN repository root so codecov uploader works correctly
+                dir("pynn_genn") {
+                    // Activate virtualenv and upload coverage
+                    sh """
+                    . ../virtualenv/bin/activate
+                    codecov --token 1460b8f4-e4af-4acd-877e-353c9449111c --file test/system/coverage.xml
+                    """
                 }
+            }
+
+            buildStep("Gathering test results (" + env.NODE_NAME + ")") {
+                // Process JUnit test output
+                junit "pynn_genn/test/**/nosetests.xml";
             }
         }
     }
