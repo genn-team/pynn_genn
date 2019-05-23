@@ -719,7 +719,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     def build_genn_neuron(self, native_params, init_vals):
         # Create model using unmodified defs
         genn_model = create_custom_neuron_class(self.genn_neuron_name,
-                                                **self.neuron_defs.definitions)()
+                                                **self.neuron_defs.definitions)
 
         # Get spike times
         spk_times = native_params["spikeTimes"]
