@@ -205,9 +205,9 @@ class WeightDependence(object):
 class AdditiveWeightDependence(synapses.AdditiveWeightDependence, WeightDependence):
     __doc__ = synapses.AdditiveWeightDependence.__doc__
 
-    depression_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) - (($(Wmax) - $(Wmin)) * update)));\n"
+    depression_update_code = "$(g) = fmin($(Wmax), fmax($(Wmin), $(g) - (($(Wmax) - $(Wmin)) * update)));\n"
 
-    potentiation_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
+    potentiation_update_code = "$(g) = fmin($(Wmax), fmax($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
 
     translations = build_translations(*WeightDependence.wd_translations)
 
@@ -227,7 +227,7 @@ class AdditivePotentiationMultiplicativeDepression(synapses.AdditivePotentiation
 
     depression_update_code = "$(g) -= ($(g) - $(Wmin)) * update;\n"
 
-    potentiation_update_code = "$(g) = min($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
+    potentiation_update_code = "$(g) = fmin($(Wmax), max($(Wmin), $(g) + (($(Wmax) - $(Wmin)) * update)));\n"
 
     translations = build_translations(*WeightDependence.wd_translations)
 
