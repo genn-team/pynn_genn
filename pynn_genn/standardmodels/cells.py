@@ -275,7 +275,6 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
 genn_neuron_defs["Poisson"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
-            oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
                 $(timeStepToSpike) += $(isi) * $(gennrand_exponential);
             }
@@ -291,6 +290,8 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
             "isi": "scalar",
             "spikeStart": "scalar",
             "duration": "scalar"},
+
+        "is_auto_refractory_required": False
     },
     translations = (
         ("rate",     "isi",         partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
@@ -304,7 +305,6 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
 genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
-            oldSpike = false;
             if($(timeStepToSpike) <= 0.0 ) {
                 $(timeStepToSpike) += ($(isi)-$(TauRefrac)) * $(gennrand_exponential) + $(TauRefrac);
             }
@@ -322,6 +322,8 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
             "spikeStart": "scalar",
             "duration": "scalar",
            },
+
+        "is_auto_refractory_required": False
     },
     translations = (
         ("rate",       "isi",           partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
@@ -337,7 +339,6 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
 genn_neuron_defs["Gamma"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
-            oldSpike = false;
             if($(timeStepToSpike) <= 0.0f) {
                 $(timeStepToSpike) += $(beta) * $(gennrand_gamma, $(alpha));
             }
@@ -354,6 +355,8 @@ genn_neuron_defs["Gamma"] = GeNNDefinitions(
             "beta": "scalar",
             "start": "scalar",
             "duration": "scalar"},
+
+        "is_auto_refractory_required": False
     },
     translations = (
         ("alpha",       "alpha"),
@@ -368,7 +371,6 @@ genn_neuron_defs["Gamma"] = GeNNDefinitions(
 genn_neuron_defs["InhGamma"] = GeNNDefinitions(
     definitions = {
         "sim_code" : """
-            oldSpike = false;
             if ($(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration)) {
                 if ($(t) > $(tbins)[$(startIndex)] && $(startIndex) != $(endIndex)) {
                     $(startIndex)++;
@@ -402,7 +404,9 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
             ("alpha", "scalar*"),
             ("tbins", "scalar*"),
             ("beta", "scalar*")
-        ]
+        ],
+
+        "is_auto_refractory_required": False
     },
     translations = (
         ("a",          "alpha"),
@@ -692,12 +696,12 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     genn_neuron_name = "SpikeSourceArray"
     neuron_defs = GeNNDefinitions(
         definitions = {
-            "sim_code": "oldSpike = false;\n",
             "threshold_condition_code": "$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
             "reset_code": "$(startSpike)++;\n",
 
             "var_name_types": [("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
-            "extra_global_params": [("spikeTimes", "scalar*")]
+            "extra_global_params": [("spikeTimes", "scalar*")],
+            "is_auto_refractory_required": False
         },
         translations = (
             ("spike_times", "spikeTimes"),
@@ -715,7 +719,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     def build_genn_neuron(self, native_params, init_vals):
         # Create model using unmodified defs
         genn_model = create_custom_neuron_class(self.genn_neuron_name,
-                                                **self.neuron_defs.definitions)()
+                                                **self.neuron_defs.definitions)
 
         # Get spike times
         spk_times = native_params["spikeTimes"]

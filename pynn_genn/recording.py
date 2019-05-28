@@ -131,20 +131,23 @@ class Recorder(recording.Recorder):
         self.monitors[variable].record(new_ids, sampling_timesteps)
 
     def init_data_views(self):
-        for monitor in self.monitors.values():
+        for monitor in itervalues(self.monitors):
             monitor.init_data_view()
 
     def _record_vars(self, t):
-        if len(self.recorded) > 0:
-            model = self._simulator.state.model
-            label = self.population._genn_label
+        model = self._simulator.state.model
+        label = self.population._genn_label
 
-            if "spikes" in self.recorded:
+        # Loop through monitors
+        for var, monitor in iteritems(self.monitors):
+            # If this variable is spikes, pull current spikes
+            if var == "spikes":
                 model.pull_current_spikes_from_device(label)
-            if len(self.recorded) - ("spikes" in self.recorded) > 0:
-                model.pull_state_from_device(label)
+            # Otherwise pull variable (using translated name cached in monitor)
+            else:
+                model.pull_var_from_device(label, monitor.translated)
 
-        for monitor in self.monitors.values():
+            # Update monitor
             monitor(t)
 
     def _get_spiketimes(self, id):

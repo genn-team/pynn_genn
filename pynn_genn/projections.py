@@ -172,16 +172,36 @@ class Projection(common.Projection, ContextMixin):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
-        # Pull projection state from device
-        # **TODO** we could optimise this to only pull what we want
+        # Loop through sub-populations
         for sub_pop in self._sub_projections:
-            genn_model.pull_state_from_device(sub_pop.genn_label)
+            # Loop through names and pull variables
+            for n in names:
+                if n != "presynaptic_index" and n != "postsynaptic_index":
+                    genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
         # If projection is sparse
         variables = []
         if self.use_sparse:
-            raise Exception("Reading attributes of sparse projections "
-                            "into arrays is currently not supported")
+            # Loop through variables
+            for n in names[0]:
+                # Create empty array to hold variable and initialise to NaN
+                var = np.empty((self.pre.size, self.post.size))
+                var[:] = np.nan
+
+                # Loop through sub-populations
+                for sub in self._sub_projections:
+                    # Get connection indices in
+                    sub_pre_inds = sub.syn_pop.get_sparse_pre_inds()
+                    sub_post_inds = sub.syn_pop.get_sparse_post_inds()
+
+                    # Get slice of variable matrix
+                    sub_var = var[sub.pre_slice, sub.post_slice]
+
+                    sub_var[sub_pre_inds,sub_post_inds] = sub.syn_pop.get_var_values(n)
+
+                # Add variable to list
+                variables.append(var)
+
         # Otherwise
         else:
             # Loop through variables
@@ -210,10 +230,12 @@ class Projection(common.Projection, ContextMixin):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
 
-        # Pull projection state from device
-        # **TODO** we could optimise this to only pull what we want
+        # Loop through sub-populations
         for sub_pop in self._sub_projections:
-            genn_model.pull_state_from_device(sub_pop.genn_label)
+            # Loop through names and pull variables
+            for n in names:
+                if n != "presynaptic_index" and n != "postsynaptic_index":
+                    genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
         # Loop through names of variables that are required
         variables = []
@@ -221,17 +243,29 @@ class Projection(common.Projection, ContextMixin):
             if n == "presynaptic_index":
                 # If projection is sparse
                 if self.use_sparse:
-                    raise Exception("Reading presynaptic indices of sparse "
-                                    "projections is currently not supported")
-                # Otherwise generate presynaptic indices for dense structure
+                    # Stack together presynaptic indices from each
+                    # sub-projection after adding slice offsets
+                    pre_inds = np.hstack(
+                        p.pre_slice.start + p.syn_pop.get_sparse_pre_inds()
+                        for p in self._sub_projections)
+
+                    # Add indices to list
+                    variables.append(pre_inds)
                 else:
                     variables.append(np.repeat(np.arange(self.pre.size),
                                                self.post.size))
             elif n == "postsynaptic_index":
                 # If projection is sparse
                 if self.use_sparse:
-                    raise Exception("Reading postsynaptic indices of sparse "
-                                    "projections is currently not supported")
+                    # Stack together postsynaptic indices from each
+                    # sub-projection after adding slice offsets
+                    post_inds = np.hstack(
+                        p.post_slice.start + p.syn_pop.get_sparse_post_inds()
+                        for p in self._sub_projections)
+
+                    # Add indices to list
+                    variables.append(post_inds)
+
                 # Otherwise generate postsynaptic indices for dense structure
                 else:
                     variables.append(np.tile(np.arange(self.post.size),
@@ -244,7 +278,7 @@ class Projection(common.Projection, ContextMixin):
                                            for p in self._sub_projections))
 
         # Unzip into list of tuples and return
-        return zip(*variables)
+        return list(zip(*variables))
 
     def _get_sub_pops(self, pop, neuron_slice, conn_inds, conn_mask):
         """ recursive helper function to split up connection indices generated
@@ -296,7 +330,7 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrix_type = "RAGGED_INDIVIDUALG"
+            matrix_type = "SPARSE_INDIVIDUALG"
         else:
             matrix_type = "DENSE_INDIVIDUALG"
 

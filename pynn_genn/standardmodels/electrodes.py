@@ -92,7 +92,7 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
     def build_genn_current_source(self, native_params):
         # Create model using unmodified defs
         genn_model = create_custom_current_source_class(
-            self.genn_currentsource_name, **self.currentsource_defs.definitions)()
+            self.genn_currentsource_name, **self.currentsource_defs.definitions)
 
         # Get spike times
         step_times = native_params["stepTimes"]
