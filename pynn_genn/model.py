@@ -3,6 +3,7 @@ from collections import namedtuple
 from functools import partial
 from itertools import groupby
 from copy import deepcopy
+from string import Template
 from lazyarray import larray
 import numpy as np
 from pygenn.genn_model import (create_custom_neuron_class,
@@ -25,6 +26,11 @@ genn_to_numpy_types = {
     "unsigned char": np.uint8,
     "int": np.int32,
     "unsigned int": np.uint32}
+
+
+class DDTemplate(Template):
+    """Template string class with the delimiter overridden with double $"""
+    delimiter = "$$"
 
 
 # Tuple type used to store GeNN model defintions
