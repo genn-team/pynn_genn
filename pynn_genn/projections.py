@@ -126,6 +126,9 @@ class Projection(common.Projection, ContextMixin):
         # Initialise the context stack
         ContextMixin.__init__(self, {})
 
+        # Native projections list. Remains empty if no projections are generated.
+        self._sub_projections = []
+
         # **TODO** leave type up to Connector types
         n_conns = 0
         max_conns = float(presynaptic_population.size * postsynaptic_population.size)
@@ -398,7 +401,6 @@ class Projection(common.Projection, ContextMixin):
 
         # Loop through presynaptic populations and their corresponding
         # slices of presynaptic neurons
-        self._sub_projections = []
         for pre, post in product(pre_pops, post_pops):
             pre_pop, pre_slice, pre_mask = pre
             post_pop, post_slice, post_mask = post
