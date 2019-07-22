@@ -114,7 +114,7 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
                   "applyIinj": np.zeros(shape=native_params.shape, dtype=np.uint8)}
 
         # Return with model
-        return genn_model, [], cs_ini
+        return genn_model, {}, cs_ini
 
     def get_extra_global_params(self, native_params):
         # Concatenate together step amplitudes and times to form extra global parameter
