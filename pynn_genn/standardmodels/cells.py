@@ -804,7 +804,7 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
                       "endSpike": end_spike}
 
         # Return with model
-        return genn_model, [], neuron_ini
+        return genn_model, {}, neuron_ini
 
 class SpikeSourceGamma(cells.SpikeSourceGamma, GeNNStandardCellType):
     __doc__ = cells.SpikeSourceGamma
