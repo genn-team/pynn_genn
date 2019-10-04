@@ -55,22 +55,22 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
         "z" : 0.0
     })
 
+    mutable_vars = set(["x", "y", "z", "u"])
+
     wum_defs = {
         "sim_code" : """
-            scalar deltaST = $(t) - $(sT_pre);
-            $(z) *= exp( -deltaST / $(tauRec) );
-            $(z) += $(y) * ( exp( -deltaST / $(tauPsc) ) -
-            exp( -deltaST / $(tauRec) ) ) / ( ( $(tauPsc) / $(tauRec) ) - 1 );
-            $(y) *= exp( -deltaST / $(tauPsc) );
-            $(x) = 1 - $(y) - $(z);
-            $(u) *= exp( -deltaST / $(tauFacil) );
-            $(u) += $(U) * ( 1 - $(u) );
-            if ( $(u) > $(U) ) {
-            $(u) = $(U);
+            const scalar deltaST = $(t) - $(sT_pre);
+            $(z) *= exp(-deltaST / $(tauRec));
+            $(z) += $(y) * (exp(-deltaST / $(tauPsc)) - exp(-deltaST / $(tauRec))) / (($(tauPsc) / $(tauRec)) - 1.0);
+            $(y) *= exp(-deltaST / $(tauPsc));
+            $(x) = 1.0 - $(y) - $(z);
+            $(u) *= exp(-deltaST / $(tauFacil));
+            $(u) += $(U) * (1.0 - $(u));
+            if ($(u) > $(U)) {
+                $(u) = $(U);
             }
             $(y) += $(x) * $(u);
             $(addToInSyn, $(g) * $(x) * $(u));
-            $(updatelinsyn);
         """,
         "vars" : {
             "U": "scalar",        # asymptotic value of probability of release

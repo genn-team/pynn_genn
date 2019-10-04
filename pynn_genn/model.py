@@ -79,7 +79,7 @@ class GeNNStandardModelType(StandardModelType):
             # and, without the prefix, it is in parameters
             if not param.is_homogeneous and field_name.startswith(prefix) and field_name_no_prefix in param_name_types:
                 # Add it to variables
-                var_name_types.append((field_name,
+                var_name_types.append((field_name_no_prefix,
                                        param_name_types[field_name_no_prefix]))
 
                 # Remove from parameters
@@ -110,10 +110,10 @@ class GeNNStandardModelType(StandardModelType):
                 if not ini.is_homogeneous:
                     # Add it to variables
                     var_name_types.append(
-                        (param_name, param_name_types[param_name_no_prefix]))
+                        (param_name_no_prefix, param_name_types[param_name_no_prefix]))
 
                     # Remove from parameters
-                    del param_name_types[field_name_no_prefix]
+                    del param_name_types[param_name_no_prefix]
 
         # Set parameter names in defs
         genn_defs["param_names"] = list(param_name_types.keys())
@@ -259,13 +259,22 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         wum_params = {n: conn_params[n][0]
                       for n in genn_defs["param_names"]}
 
-        # Convert variables to arrays with correct data type
-        wum_init = {n: conn_params[n].astype(genn_to_numpy_types[t]
-                                             if t in genn_to_numpy_types
-                                             else np.float32,
-                                             copy=False)
-                    for n, t in iteritems(vars)}
+        # Loop through GeNN variables
+        wum_init = {}
+        for n, t in iteritems(vars):
+            # Get type to use for variable
+            var_type = (genn_to_numpy_types[t] if t in genn_to_numpy_types
+                        else np.float32)
 
+            # If this variable is set by connection parameters, use these as initial values
+            if n in conn_params:
+                wum_init[n] = conn_params[n].astype(var_type, copy=False)
+            # Otherwise, if there is a default in the model, use that
+            elif n in self.default_initial_values:
+                wum_init[n] = self.default_initial_values[n]
+            else:
+                raise Exception("Variable '{}' not "
+                                "correctly initialised".format(n))
         # Zero all presynaptic variables
         # **TODO** other means of initialisation
         wum_pre_init = (None
