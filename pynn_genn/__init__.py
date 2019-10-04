@@ -51,6 +51,9 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     if "backend" in extra_params:
         simulator.state.model.use_backend = extra_params["backend"]
 
+    if "selected_gpu_id" in extra_params:
+        simulator.state.model.selected_gpu = extra_params["selected_gpu_id"]
+
     # Get the parent frame from our current frame (whatever called setup)
     calframe = inspect.getouterframes(inspect.currentframe(), 1)
 
