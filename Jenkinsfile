@@ -144,7 +144,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                 // **TODO** we shouldn't manually install most of these - they SHOULD get installed when we install pynn_genn
                 sh """
                 . virtualenv/bin/activate
-                pip install nose nose_testconfig coverage codecov "numpy>1.6, < 1.15" scipy
+                pip install nose nose_testconfig coverage codecov "numpy>=1.10.0,!=1.16.*" scipy
                 """;
             }
 
