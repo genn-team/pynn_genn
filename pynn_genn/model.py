@@ -9,7 +9,9 @@ import numpy as np
 from pygenn.genn_model import (create_custom_neuron_class,
                                create_custom_postsynaptic_class,
                                create_custom_current_source_class,
-                               create_custom_weight_update_class)
+                               create_custom_weight_update_class,
+                               create_custom_init_var_snippet_class, # initialize values (voltages, resistances, ...)
+                               create_custom_sparse_connect_init_snippet_class) # init conn vals, procedural too?
 
 from pygenn import genn_wrapper
 from pyNN.standardmodels import (StandardModelType,
