@@ -10,14 +10,15 @@ from pygenn.genn_model import (create_custom_neuron_class,
                                create_custom_postsynaptic_class,
                                create_custom_current_source_class,
                                create_custom_weight_update_class,
-                               create_custom_init_var_snippet_class, # initialize values (voltages, resistances, ...)
-                               create_custom_sparse_connect_init_snippet_class) # init conn vals, procedural too?
+                               init_var)
 
 from pygenn import genn_wrapper
 from pyNN.standardmodels import (StandardModelType,
                                  StandardCellType,
                                  StandardCurrentSource,
                                  build_translations)
+from pyNN.random import NativeRNG, RandomDistribution
+
 from six import iteritems, iterkeys
 
 # Mapping from GeNN to numpy types
@@ -156,27 +157,42 @@ class GeNNStandardModelType(StandardModelType):
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
             if pref_n in native_param_keys:
-                neuron_ini[n] = native_params[pref_n].evaluate(simplify=False)
+                neuron_ini[n] = self._init_variable(native_params[pref_n])
             # Otherwise if there is an initial value associated with it
             elif pref_n in init_val_lookup:
                 # Get its PyNN name from the lookup
                 pynn_n = init_val_lookup[pref_n]
-                neuron_ini[n] = init_vals[pynn_n].evaluate(simplify=False)
+                neuron_ini[n] = self._init_variable(init_vals[pynn_n])
             # Otherwise if this variable is manually initialised
             elif pref_n in extra_param_values:
                 # Set data type
                 extra_param_values[pref_n].dtype = (genn_to_numpy_types[t]
                                                     if t in genn_to_numpy_types
                                                     else np.float32)
-
                 # Evaluate values into neuron initialiser
                 neuron_ini[n] =\
-                    extra_param_values[pref_n].evaluate(simplify=False)
+                    self._init_variable(extra_param_values[pref_n])
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
-
+            # print(f"neuron_ini[n] {n} -> {neuron_ini[n]}")
         return genn_model, neuron_params, neuron_ini
+
+    def _init_variable(self, param):
+        if isinstance(param.base_value, RandomDistribution) and \
+                isinstance(param.base_value.rng, NativeRNG):
+            # if we need (random) on-device initialization we should use
+            # PyNN GeNN NativeRNG
+            rng = param.base_value.rng
+            dist_name = param.base_value.name
+            params = param.base_value.parameters
+            param_init = rng.init_var_snippet(dist_name, params)
+            return init_var(param_init, params)
+        elif param.is_homogeneous:
+            # if param is a constant send a scalar to device
+            return param.evaluate(simplify=True)
+        else:
+            return param.evaluate(simplify=False)
 
 
 class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
