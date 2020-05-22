@@ -20,6 +20,7 @@ from pyNN.standardmodels import (StandardModelType,
 from pyNN.random import NativeRNG, RandomDistribution
 
 from six import iteritems, iterkeys
+import copy
 
 # Mapping from GeNN to numpy types
 genn_to_numpy_types = {
@@ -59,6 +60,7 @@ class GeNNStandardModelType(StandardModelType):
 
     def build_genn_model(self, defs, native_params, init_vals,
                          create_custom_model, prefix=""):
+
         # Take a deep copy of the definitions
         genn_defs = deepcopy(defs.definitions)
 
@@ -154,6 +156,8 @@ class GeNNStandardModelType(StandardModelType):
         neuron_ini = {}
         for n, t in var_name_types:
             pref_n = prefix + n
+            # print(pref_n)
+
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
             if pref_n in native_param_keys:
@@ -178,14 +182,44 @@ class GeNNStandardModelType(StandardModelType):
             # print(f"neuron_ini[n] {n} -> {neuron_ini[n]}")
         return genn_model, neuron_params, neuron_ini
 
+    def _apply_op(self, op, args0, args1=None):
+        if args1 is None:
+            for k in args0:
+                args0[k] = op(args0[k])
+        elif np.isscalar(args1):
+            for k in args0:
+                args0[k] = op(args0[k], args1)
+        else:
+            for k in args0:
+                args0[k] = op(args0[k], args1[k])
+        return args0
+
+    def _adjust_parameters(self, operations, parameters):
+        for op, var in operations:
+            if isinstance(var, larray) and len(var.operations):
+                # print(parameters)
+                parameters = self._adjust_parameters(var.operations, parameters)
+
+            var = var.base_value if isinstance(var, larray) else var
+            if isinstance(var, RandomDistribution):
+                var = var.parameters
+            parameters = self._apply_op(op, parameters, var)
+        return parameters
+
     def _init_variable(self, param):
         if isinstance(param.base_value, RandomDistribution) and \
                 isinstance(param.base_value.rng, NativeRNG):
             # if we need (random) on-device initialization we should use
             # PyNN GeNN NativeRNG
+            params = copy.copy(param.base_value.parameters)
+
+            # if the parameter needs to be transformed (apply a partial) before
+            # sending it to GeNN, we need to do the appropriate operations
+            if len(param.operations):
+                params = self._adjust_parameters(param.operations, params)
+
             rng = param.base_value.rng
             dist_name = param.base_value.name
-            params = param.base_value.parameters
             param_init = rng.init_var_snippet(dist_name, params)
             return init_var(param_init, params)
         elif param.is_homogeneous:
