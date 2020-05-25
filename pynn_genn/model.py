@@ -183,15 +183,11 @@ class GeNNStandardModelType(StandardModelType):
         return genn_model, neuron_params, neuron_ini
 
     def _apply_op(self, op, args0, args1=None):
-        if args1 is None:
-            for k in args0:
-                args0[k] = op(args0[k])
-        elif np.isscalar(args1):
-            for k in args0:
-                args0[k] = op(args0[k], args1)
-        else:
-            for k in args0:
+        for k in args0:
+            if isinstance(args1, dict):
                 args0[k] = op(args0[k], args1[k])
+            else:
+                args0[k] = op(args0[k], args1)
         return args0
 
     def _adjust_parameters(self, operations, parameters):
