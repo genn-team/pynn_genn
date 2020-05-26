@@ -129,16 +129,7 @@ class Projection(common.Projection, ContextMixin):
         # Native projections list. Remains empty if no projections are generated.
         self._sub_projections = []
 
-        # **TODO** leave type up to Connector types
-        n_conns = 0
-        max_conns = float(presynaptic_population.size * postsynaptic_population.size)
-        if isinstance(connector, FromListConnector) or \
-            isinstance(connector, FromFileConnector):
-            n_conns = len(connector.conn_list)
-
-        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (max_conns == n_conns)
-                           else True)
-
+        self.use_sparse = connector.use_sparse
         # Generate name stem for sub-projections created from this projection
         # **NOTE** superclass will always populate label PROPERTY
         # with something moderately useful i.e. at least unique
@@ -201,7 +192,8 @@ class Projection(common.Projection, ContextMixin):
                     sub_var = var[sub.pre_slice, sub.post_slice]
 
                     if n in sub_pop.syn_pop.vars:
-                        sub_var[sub_pre_inds,sub_post_inds] = sub.syn_pop.get_var_values(n)
+                        sub_var[sub_pre_inds,sub_post_inds] =\
+                                                sub.syn_pop.get_var_values(n)
                     else:
                         sub_var[sub_pre_inds,sub_post_inds] = sub.wum_params[n]
 

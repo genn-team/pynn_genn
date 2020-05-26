@@ -116,10 +116,14 @@ class NativeRNG(pynn_rng):
     @staticmethod
     def _check_params(distribution, parameters):
         _params = NativeRNG._distributions[distribution]['vars']
+        check = True
+        if 'low' in parameters and 'high' in parameters:
+            check &= parameters['low'] < parameters['high']
+
         for p in _params:
             if p not in parameters:
                 return False
-        return True
+        return check
 
     def _supports_dist(self, distribution):
         return distribution in self._distributions
@@ -129,11 +133,12 @@ class NativeRNG(pynn_rng):
         if not self._supports_dist(distribution):
             raise NotImplementedError(
                     "PyNN GeNN RNG does not support distribution"
-                    f"'{distribution}'")
+                    f"'{distribution}'.")
 
         if not self._check_params(distribution, parameters):
             p = self._distributions[distribution]['vars']
-            raise ValueError(f"PyNN GeNN RNG expects parameters {p}")
+            raise ValueError(f"PyNN GeNN RNG unexpected parameters {p} or "
+                             "wrong range specified.")
 
         d = self._distributions[distribution]
         return create_custom_init_var_snippet_class(

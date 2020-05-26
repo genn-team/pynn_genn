@@ -44,7 +44,7 @@ GeNNDefinitions = namedtuple("GeNNDefinitions",
 
 def sanitize_label(label):
     # Strip out any non-alphanumerical characters
-    clean_label = "".join(c for c in label if c.isalnum())
+    clean_label = "".join(c for c in label if c.isalnum() or c == '_')
 
     # If this is Python 2, convert unicode-encoded label to ASCII
     if sys.version_info < (3, 0):
@@ -161,12 +161,12 @@ class GeNNStandardModelType(StandardModelType):
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
             if pref_n in native_param_keys:
-                neuron_ini[n] = self._init_variable(native_params[pref_n])
+                neuron_ini[n] = self._init_variable(pref_n, native_params[pref_n])
             # Otherwise if there is an initial value associated with it
             elif pref_n in init_val_lookup:
                 # Get its PyNN name from the lookup
                 pynn_n = init_val_lookup[pref_n]
-                neuron_ini[n] = self._init_variable(init_vals[pynn_n])
+                neuron_ini[n] = self._init_variable(pynn_n, init_vals[pynn_n])
             # Otherwise if this variable is manually initialised
             elif pref_n in extra_param_values:
                 # Set data type
@@ -175,7 +175,7 @@ class GeNNStandardModelType(StandardModelType):
                                                     else np.float32)
                 # Evaluate values into neuron initialiser
                 neuron_ini[n] =\
-                    self._init_variable(extra_param_values[pref_n])
+                    self._init_variable(pref_n, extra_param_values[pref_n])
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
@@ -202,7 +202,7 @@ class GeNNStandardModelType(StandardModelType):
             parameters = self._apply_op(op, parameters, var)
         return parameters
 
-    def _init_variable(self, param):
+    def _init_variable(self, name, param):
         if isinstance(param.base_value, RandomDistribution) and \
                 isinstance(param.base_value.rng, NativeRNG):
             # if we need (random) on-device initialization we should use
@@ -212,6 +212,9 @@ class GeNNStandardModelType(StandardModelType):
             # if the parameter needs to be transformed (apply a partial) before
             # sending it to GeNN, we need to do the appropriate operations
             if len(param.operations):
+                from warnings import warn
+                warn(f"Conversion of parameter {name} may throw "
+                     "unexpected results.")
                 params = self._adjust_parameters(param.operations, params)
 
             rng = param.base_value.rng
