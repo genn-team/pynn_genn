@@ -145,3 +145,18 @@ class NativeRNG(pynn_rng):
                 f"pynn_genn_rand_{distribution}",
                 param_names=d['vars'], var_init_code=d['code'])
 
+    @staticmethod
+    def get_mean(distribution, parameters):
+        if 'uniform' in distribution:
+            return (parameters['high'] - parameters['low']) * 0.5
+
+        if 'normal' in distribution:
+            return parameters['mu']
+
+        if 'exponential' in distribution:
+            return ( (1./(1.e-12))
+                    if parameters['beta'] == 0. else
+                     (1./parameters['beta']) )
+
+        if 'gamma' in distribution:
+            return parameters['k'] * parameters['theta']

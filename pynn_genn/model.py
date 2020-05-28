@@ -10,7 +10,7 @@ from pygenn.genn_model import (create_custom_neuron_class,
                                create_custom_postsynaptic_class,
                                create_custom_current_source_class,
                                create_custom_weight_update_class,
-                               init_var)
+                               init_var, init_connectivity)
 
 from pygenn import genn_wrapper
 from pyNN.standardmodels import (StandardModelType,
@@ -18,6 +18,7 @@ from pyNN.standardmodels import (StandardModelType,
                                  StandardCurrentSource,
                                  build_translations)
 from pyNN.random import NativeRNG, RandomDistribution
+from pyNN.parameters import LazyArray
 
 from six import iteritems, iterkeys
 import copy
@@ -82,7 +83,8 @@ class GeNNStandardModelType(StandardModelType):
 
             # If parameter is NOT homogeneous, has correct prefix
             # and, without the prefix, it is in parameters
-            if not param.is_homogeneous and field_name.startswith(prefix) and field_name_no_prefix in param_name_types:
+            if not param.is_homogeneous and field_name.startswith(prefix) and \
+                field_name_no_prefix in param_name_types:
                 # Add it to variables
                 var_name_types.append((field_name_no_prefix,
                                        param_name_types[field_name_no_prefix]))
@@ -115,7 +117,8 @@ class GeNNStandardModelType(StandardModelType):
                 if not ini.is_homogeneous:
                     # Add it to variables
                     var_name_types.append(
-                        (param_name_no_prefix, param_name_types[param_name_no_prefix]))
+                        (param_name_no_prefix,
+                         param_name_types[param_name_no_prefix]))
 
                     # Remove from parameters
                     del param_name_types[param_name_no_prefix]
@@ -161,7 +164,8 @@ class GeNNStandardModelType(StandardModelType):
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
             if pref_n in native_param_keys:
-                neuron_ini[n] = self._init_variable(pref_n, native_params[pref_n])
+                neuron_ini[n] = self._init_variable(
+                                    pref_n, native_params[pref_n])
             # Otherwise if there is an initial value associated with it
             elif pref_n in init_val_lookup:
                 # Get its PyNN name from the lookup
@@ -182,26 +186,6 @@ class GeNNStandardModelType(StandardModelType):
             # print(f"neuron_ini[n] {n} -> {neuron_ini[n]}")
         return genn_model, neuron_params, neuron_ini
 
-    def _apply_op(self, op, args0, args1=None):
-        for k in args0:
-            if isinstance(args1, dict):
-                args0[k] = op(args0[k], args1[k])
-            else:
-                args0[k] = op(args0[k], args1)
-        return args0
-
-    def _adjust_parameters(self, operations, parameters):
-        for op, var in operations:
-            if isinstance(var, larray) and len(var.operations):
-                # print(parameters)
-                parameters = self._adjust_parameters(var.operations, parameters)
-
-            var = var.base_value if isinstance(var, larray) else var
-            if isinstance(var, RandomDistribution):
-                var = var.parameters
-            parameters = self._apply_op(op, parameters, var)
-        return parameters
-
     def _init_variable(self, name, param):
         if isinstance(param.base_value, RandomDistribution) and \
                 isinstance(param.base_value.rng, NativeRNG):
@@ -215,7 +199,6 @@ class GeNNStandardModelType(StandardModelType):
                 from warnings import warn
                 warn(f"Conversion of parameter {name} may throw "
                      "unexpected results.")
-                params = self._adjust_parameters(param.operations, params)
 
             rng = param.base_value.rng
             dist_name = param.base_value.name
@@ -270,7 +253,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         genn_defs = deepcopy(self.wum_defs)
 
         # Check that it doesn't already have its
-        # variables and parameters seperated out
+        # variables and parameters separated out
         assert "param_names" not in genn_defs
         assert "var_name_types" not in genn_defs
 
@@ -279,7 +262,10 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         vars = genn_defs["vars"]
         del genn_defs["vars"]
 
-        # Start with an empty list of parameterss
+        # extract the connector from the connectivity parameters
+        conn = conn_params.pop('connector')
+
+        # Start with an empty list of parameters
         param_names = []
 
         # Get set of forcibly mutable vars if synapse type has one
@@ -291,7 +277,8 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         for n, p in iteritems(conn_params):
             # If this parameter is in the variable dictionary,
             # but it is homogenous
-            if n in vars and np.allclose(p, p[0]) and n not in mutable_vars:
+            if  not isinstance(p, LazyArray) and n in vars and \
+                n not in mutable_vars and np.allclose(p, p[0]):
                 # Remove from vars
                 del vars[n]
 
@@ -317,12 +304,16 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             var_type = (genn_to_numpy_types[t] if t in genn_to_numpy_types
                         else np.float32)
 
-            # If this variable is set by connection parameters, use these as initial values
+            # If this variable is set by connection parameters,
+            # use these as initial values
             if n in conn_params:
                 wum_init[n] = conn_params[n].astype(var_type, copy=False)
             # Otherwise, if there is a default in the model, use that
             elif n in self.default_initial_values:
                 wum_init[n] = self.default_initial_values[n]
+            elif n in conn.on_device_init_params and conn.on_device_init:
+                # if the parameter is to be initialized on device
+                wum_init[n] = self._init_variable(n, conn.on_device_init_params[n])
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
@@ -339,9 +330,45 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                          if "post_var_name_types" not in genn_defs
                          else {n[0]: 0.0
                                for n in genn_defs["post_var_name_types"]})
+        # snip_class = conn.init_sparse_conn_snippet()
+        # init_model = init_connectivity(snip_class, conn.get_params())
+        # init_model = init_connectivity(conn.__class__.__name__,
+        #                                conn.get_params())
+        # create_custom_sparse_connect_init_snippet_class(class_name,
+        #                                                 param_names=None,
+        #                                                 derived_params=None,
+        #                                                 row_build_code=None,
+        #                                                 row_build_state_vars=None,
+        #                                                 calc_max_row_len_func=None,
+        #                                                 calc_max_col_len_func=None,
+        #                                                 extra_global_params=None,
+        #                                                 custom_body=None)
 
         return genn_model, wum_params, wum_init, wum_pre_init, wum_post_init
 
+    def _init_variable(self, name, param):
+        if isinstance(param.base_value, RandomDistribution) and \
+                isinstance(param.base_value.rng, NativeRNG):
+            # if we need (random) on-device initialization we should use
+            # PyNN GeNN NativeRNG
+            params = copy.copy(param.base_value.parameters)
+
+            # if the parameter needs to be transformed (apply a partial) before
+            # sending it to GeNN, we need to do the appropriate operations
+            if len(param.operations):
+                from warnings import warn
+                warn(f"Conversion of parameter {name} may throw "
+                     "unexpected results.")
+
+            rng = param.base_value.rng
+            dist_name = param.base_value.name
+            param_init = rng.init_var_snippet(dist_name, params)
+            return init_var(param_init, params)
+        elif param.is_homogeneous:
+            # if param is a constant send a scalar to device
+            return param.evaluate(simplify=True)
+        else:
+            return param.evaluate(simplify=False)
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
     def __init__(self, **parameters):

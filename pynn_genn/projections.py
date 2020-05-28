@@ -14,12 +14,13 @@ from pyNN.connectors import AllToAllConnector, FromListConnector, \
                             FromFileConnector
 from pyNN.core import ezip
 from pyNN.space import Space
+from pyNN.parameters import LazyArray
 
 from . import simulator
 from .standardmodels.synapses import StaticSynapse
 from .model import sanitize_label
 from .contexts import ContextMixin
-
+from .random import NativeRNG
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
                            ["genn_label", "pre_pop", "post_pop",
@@ -366,11 +367,30 @@ class Projection(common.Projection, ContextMixin):
             return
 
         # Extract delays
-        delay_steps = params["delaySteps"]
+        if "delaySteps" in params:
+            delay_steps = params["delaySteps"]
+        else:
+            delay_steps = self._connector._on_device_params["delaySteps"]
 
-        # If delays aren't all the same
         # **TODO** add support for heterogeneous dendritic delay
-        if not np.allclose(delay_steps, delay_steps[0]):
+        if isinstance(delay_steps, LazyArray):
+            if delay_steps.is_homogeneous:
+                delay_steps.shape = (1,)
+                delay_steps = delay_steps.evaluate(simplify=True)
+            else:
+                delay_steps = NativeRNG.get_mean(
+                    delay_steps.base_value.name,
+                    delay_steps.base_value.parameters
+                )
+                logging.warning("Projection {}: GeNN does not support variable "
+                                "delays for a single projection. Using mean "
+                                "value {} ms for all connections.".format(
+                                    self.label,
+                                    delay_steps * self._simulator.state.dt))
+
+            delay_steps = int(round(delay_steps))
+        elif not np.allclose(delay_steps, delay_steps[0]):
+            # If delays aren't all the same
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))
             logging.warning("Projection {}: GeNN does not support variable "
@@ -419,6 +439,7 @@ class Projection(common.Projection, ContextMixin):
 
                 conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
 
+            conn_params['connector']= self._connector
 
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
@@ -449,3 +470,4 @@ class Projection(common.Projection, ContextMixin):
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
                               pre_slice, post_slice, syn_pop, wum_params))
+

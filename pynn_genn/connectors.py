@@ -1,7 +1,7 @@
 from copy import copy
 from pyNN.core import IndexBasedExpression
 from pyNN.parameters import LazyArray
-
+from pygenn.genn_model import create_custom_sparse_connect_init_snippet_class
 from pyNN.connectors import (
     AllToAllConnector as AllToAllPyNN,
     OneToOneConnector as OneToOnePyNN,
@@ -19,7 +19,7 @@ from pyNN.connectors import (
     # ArrayConnector as ArrayPyNN
 )
 
-from pynn_genn.random import RandomDistribution
+from pynn_genn.random import RandomDistribution, NativeRNG
 
 __all__ = [
     "AllToAllConnector", "OneToOneConnector",
@@ -36,6 +36,8 @@ class AbstractGeNNConnector(object):
 
     # __slots__ = ['_on_device', '_procedural', '_row_length', '_col_length',
     #              '_sparse']
+    _row_code = None
+    _row_state_vars = None
 
     def __init__(self, on_device_init=False, procedural=False):
         self._on_device_init = on_device_init
@@ -43,10 +45,8 @@ class AbstractGeNNConnector(object):
         self._row_length = 0
         self._col_length = 0
         self._sparse = True
-        if on_device_init or procedural:
-            self._on_device_params = {}
-        else:
-            self._on_device_params = None
+        self._on_device_params = {}
+        self._conn_params = {}
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         # print("in genn _parameters_from_synapse_type")
@@ -65,9 +65,10 @@ class AbstractGeNNConnector(object):
         if self.on_device_init or self.procedural:
             pops = []
             for name, map in parameter_space.items():
-                if isinstance(map.base_value, RandomDistribution):
-                    self._on_device_params[name] = map
-                    pops.append(name)
+                if isinstance(map.base_value, RandomDistribution) and \
+                    isinstance(map.base_value.rng, NativeRNG):
+                        self._on_device_params[name] = map
+                        pops.append(name)
 
             for name in pops:
                 parameter_space.pop(name)
@@ -110,6 +111,9 @@ class AbstractGeNNConnector(object):
     @property
     def on_device_init(self):
         return self._on_device_init
+    @property
+    def on_device_init_params(self):
+        return self._on_device_params
 
     @property
     def procedural(self):
@@ -123,8 +127,20 @@ class AbstractGeNNConnector(object):
         """
         pass
 
-    def compute_lengths(self, projection):
-        pass
+    def compute_row_length(self, projection):
+        raise NotImplementedError()
+
+    def compute_col_length(self, projection):
+        raise NotImplementedError()
+
+    def get_params(self):
+        return self._conn_params
+
+    def init_sparse_conn_snippet(self, **kwargs):
+        kwargs['row_build_code'] = self._row_code
+        kwargs['row_build_state_vars'] = self._row_state_vars
+        return create_custom_sparse_connect_init_snippet_class(
+                                            self.__class__.__name__, **kwargs)
 
 class OneToOneConnector(AbstractGeNNConnector, OneToOnePyNN):
     _row_code = """
@@ -142,9 +158,13 @@ class OneToOneConnector(AbstractGeNNConnector, OneToOnePyNN):
         self._col_length = 1
         self._sparse = True
 
-    def connect(self, projection):
-        # if not (self.on_device_init or self.procedural):
-        OneToOnePyNN.connect(self, projection)
+    # def connect(self, projection):
+    #     # if not (self.on_device_init or self.procedural):
+    #     OneToOnePyNN.connect(self, projection)
+
+    def init_sparse_conn_snippet(self):
+        args = {}
+        return AbstractGeNNConnector.init_sparse_conn_snippet(self, **args)
 
 class AllToAllConnector(AbstractGeNNConnector, AllToAllPyNN):
     _row_code = """

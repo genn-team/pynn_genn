@@ -14,7 +14,7 @@ import os
 from pyNN import common
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, DEFAULT_MIN_DELAY
 from pyNN.connectors import *
-from pynn_genn.connectors import OneToOneConnector
+from pynn_genn.connectors import OneToOneConnector, AllToAllConnector
 from pyNN.recording import *
 from pyNN.standardmodels import StandardCellType
 from . import simulator
