@@ -159,7 +159,6 @@ class GeNNStandardModelType(StandardModelType):
         neuron_ini = {}
         for n, t in var_name_types:
             pref_n = prefix + n
-            # print(pref_n)
 
             # If this variable is a native parameter,
             # evaluate it into neuron_ini
@@ -183,7 +182,7 @@ class GeNNStandardModelType(StandardModelType):
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
-            # print(f"neuron_ini[n] {n} -> {neuron_ini[n]}")
+
         return genn_model, neuron_params, neuron_ini
 
     def _init_variable(self, name, param):
@@ -364,11 +363,6 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             dist_name = param.base_value.name
             param_init = rng.init_var_snippet(dist_name, params)
             return init_var(param_init, params)
-        elif param.is_homogeneous:
-            # if param is a constant send a scalar to device
-            return param.evaluate(simplify=True)
-        else:
-            return param.evaluate(simplify=False)
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
     def __init__(self, **parameters):

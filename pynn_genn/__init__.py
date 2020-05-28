@@ -13,8 +13,6 @@ import logging
 import os
 from pyNN import common
 from pyNN.common.control import DEFAULT_MAX_DELAY, DEFAULT_TIMESTEP, DEFAULT_MIN_DELAY
-from pyNN.connectors import *
-from pynn_genn.connectors import OneToOneConnector, AllToAllConnector
 from pyNN.recording import *
 from pyNN.standardmodels import StandardCellType
 from . import simulator
@@ -25,6 +23,7 @@ from .standardmodels.electrodes import *
 from .model import sanitize_label
 from .populations import Population, PopulationView, Assembly
 from .projections import Projection
+from pynn_genn.connectors import *
 from neo.io import get_io
 
 

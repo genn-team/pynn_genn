@@ -5,31 +5,32 @@ from pygenn.genn_model import create_custom_sparse_connect_init_snippet_class
 from pyNN.connectors import (
     AllToAllConnector as AllToAllPyNN,
     OneToOneConnector as OneToOnePyNN,
-    # FixedProbabilityConnector as FixProbPyNN,
-    # FixedTotalNumberConnector as FixTotalPyNN,
-    # FixedNumberPreConnector as FixNumPrePyNN,
-    # FixedNumberPostConnector as FixNumPostPyNN,
-    # DistanceDependentProbabilityConnector as DistProbPyNN,
-    # DisplacementDependentProbabilityConnector as DisplaceProbPyNN,
-    # IndexBasedProbabilityConnector as IndexProbPyNN,
-    # SmallWorldConnector as SmallWorldPyNN,
-    # FromListConnector as FromListPyNN,
-    # FromFileConnector as FromFilePyNN,
-    # CloneConnector as ClonePyNN,
-    # ArrayConnector as ArrayPyNN
+    FixedProbabilityConnector as FixProbPyNN,
+    FixedTotalNumberConnector as FixTotalPyNN,
+    FixedNumberPreConnector as FixNumPrePyNN,
+    FixedNumberPostConnector as FixNumPostPyNN,
+    DistanceDependentProbabilityConnector as DistProbPyNN,
+    DisplacementDependentProbabilityConnector as DisplaceProbPyNN,
+    IndexBasedProbabilityConnector as IndexProbPyNN,
+    SmallWorldConnector as SmallWorldPyNN,
+    FromListConnector as FromListPyNN,
+    FromFileConnector as FromFilePyNN,
+    CloneConnector as ClonePyNN,
+    ArrayConnector as ArrayPyNN,
+    Connector
 )
 
 from pynn_genn.random import RandomDistribution, NativeRNG
 
 __all__ = [
     "AllToAllConnector", "OneToOneConnector",
-    # "FixedProbabilityConnector", "FixedTotalNumberConnector",
-    # "FixedNumberPreConnector", "FixedNumberPostConnector",
-    # "DistanceDependentProbabilityConnector",
-    # "DisplacementDependentProbabilityConnector",
-    # "IndexBasedProbabilityConnector", "SmallWorldConnector",
-    # "FromListConnector", "FromFileConnector",
-    # "CloneConnector", "ArrayConnector"
+    "FixedProbabilityConnector", "FixedTotalNumberConnector",
+    "FixedNumberPreConnector", "FixedNumberPostConnector",
+    "DistanceDependentProbabilityConnector",
+    "DisplacementDependentProbabilityConnector",
+    "IndexBasedProbabilityConnector", "SmallWorldConnector",
+    "FromListConnector", "FromFileConnector",
+    "CloneConnector", "ArrayConnector"
 ]
 
 class AbstractGeNNConnector(object):
@@ -49,13 +50,12 @@ class AbstractGeNNConnector(object):
         self._conn_params = {}
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
-        # print("in genn _parameters_from_synapse_type")
         """
         Obtain the parameters to be used for the connections from the projection's `synapse_type`
         attribute. Each parameter value is a `LazyArray`.
         """
         if distance_map is None:
-            distance_map = self._generate_distance_map(projection)
+            distance_map = Connector._generate_distance_map(self, projection)
 
         parameter_space = projection.synapse_type.native_parameters
 
@@ -65,8 +65,9 @@ class AbstractGeNNConnector(object):
         if self.on_device_init or self.procedural:
             pops = []
             for name, map in parameter_space.items():
-                if isinstance(map.base_value, RandomDistribution) and \
-                    isinstance(map.base_value.rng, NativeRNG):
+                if ((isinstance(map.base_value, RandomDistribution) and
+                     isinstance(map.base_value.rng, NativeRNG)) or
+                    map.is_homogeneous):
                         self._on_device_params[name] = map
                         pops.append(name)
 
@@ -158,13 +159,10 @@ class OneToOneConnector(AbstractGeNNConnector, OneToOnePyNN):
         self._col_length = 1
         self._sparse = True
 
-    # def connect(self, projection):
-    #     # if not (self.on_device_init or self.procedural):
-    #     OneToOnePyNN.connect(self, projection)
-
     def init_sparse_conn_snippet(self):
-        args = {}
+        args = {}# todo: what args?
         return AbstractGeNNConnector.init_sparse_conn_snippet(self, **args)
+
 
 class AllToAllConnector(AbstractGeNNConnector, AllToAllPyNN):
     _row_code = """
@@ -184,3 +182,152 @@ class AllToAllConnector(AbstractGeNNConnector, AllToAllPyNN):
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)
         self._sparse = False
+
+
+class FixedProbabilityConnector(AbstractGeNNConnector, FixProbPyNN):
+    _row_code = """
+    """
+
+    __doc__ = FixProbPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FixProbPyNN.__init__(self, safe=safe, callback=callback)
+        # self._row_length = 1
+        # self._col_length = 1
+        # self._sparse = True
+
+
+class FixedTotalNumberConnector(AbstractGeNNConnector, FixTotalPyNN):
+    _row_code = """
+    """
+
+    __doc__ = FixTotalPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FixTotalPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class FixedNumberPreConnector(AbstractGeNNConnector, FixNumPrePyNN):
+    _row_code = """
+    """
+
+    __doc__ = FixNumPrePyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FixNumPrePyNN.__init__(self, safe=safe, callback=callback)
+
+
+class FixedNumberPostConnector(AbstractGeNNConnector, FixNumPostPyNN):
+    _row_code = """
+    """
+
+    __doc__ = FixNumPostPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FixNumPostPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class DistanceDependentProbabilityConnector(AbstractGeNNConnector, DistProbPyNN):
+    _row_code = """
+    """
+
+    __doc__ = DistProbPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        DistProbPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class DisplacementDependentProbabilityConnector(AbstractGeNNConnector,
+                                                DisplaceProbPyNN):
+    _row_code = """
+    """
+
+    __doc__ = DisplaceProbPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        DisplaceProbPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class IndexBasedProbabilityConnector(AbstractGeNNConnector, IndexProbPyNN):
+    _row_code = """
+    """
+
+    __doc__ = IndexProbPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        IndexProbPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class SmallWorldConnector(AbstractGeNNConnector, SmallWorldPyNN):
+    _row_code = """
+    """
+
+    __doc__ = SmallWorldPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        SmallWorldPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class FromListConnector(AbstractGeNNConnector, FromListPyNN):
+    _row_code = """
+    """
+
+    __doc__ = FromListPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FromListPyNN.__init__(self, safe=safe, callback=callback)
+
+
+class FromFileConnector(AbstractGeNNConnector, FromFilePyNN):
+    _row_code = """
+    """
+
+    __doc__ = FromFilePyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        FromFilePyNN.__init__(self, safe=safe, callback=callback)
+
+
+class CloneConnector(AbstractGeNNConnector, ClonePyNN):
+    _row_code = """
+    """
+
+    __doc__ = ClonePyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        ClonePyNN.__init__(self, safe=safe, callback=callback)
+
+
+class ArrayConnector(AbstractGeNNConnector, ArrayPyNN):
+    _row_code = """
+    """
+
+    __doc__ = ArrayPyNN.__doc__
+
+    def __init__(self, safe=True, callback=None,
+                 on_device_init=False, procedural=False):
+        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        ArrayPyNN.__init__(self, safe=safe, callback=callback)
+
