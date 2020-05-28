@@ -196,8 +196,8 @@ class GeNNStandardModelType(StandardModelType):
             # sending it to GeNN, we need to do the appropriate operations
             if len(param.operations):
                 from warnings import warn
-                warn(f"Conversion of parameter {name} may throw "
-                     "unexpected results.")
+                warn("Conversion of parameter {} may throw "
+                     "unexpected results.".format(name))
 
             rng = param.base_value.rng
             dist_name = param.base_value.name
@@ -356,8 +356,8 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             # sending it to GeNN, we need to do the appropriate operations
             if len(param.operations):
                 from warnings import warn
-                warn(f"Conversion of parameter {name} may throw "
-                     "unexpected results.")
+                warn("Conversion of parameter {name} may throw "
+                     "unexpected results.".format(name))
 
             rng = param.base_value.rng
             dist_name = param.base_value.name

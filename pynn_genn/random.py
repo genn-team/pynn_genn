@@ -133,16 +133,16 @@ class NativeRNG(pynn_rng):
         if not self._supports_dist(distribution):
             raise NotImplementedError(
                     "PyNN GeNN RNG does not support distribution"
-                    f"'{distribution}'.")
+                    "'{}'.".format(distribution))
 
         if not self._check_params(distribution, parameters):
             p = self._distributions[distribution]['vars']
-            raise ValueError(f"PyNN GeNN RNG unexpected parameters {p} or "
-                             "wrong range specified.")
+            raise ValueError("PyNN GeNN RNG unexpected parameters {} or "
+                             "wrong range specified.".format(p))
 
         d = self._distributions[distribution]
         return create_custom_init_var_snippet_class(
-                f"pynn_genn_rand_{distribution}",
+                "pynn_genn_rand_{}".format(distribution),
                 param_names=d['vars'], var_init_code=d['code'])
 
     @staticmethod
