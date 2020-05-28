@@ -21,6 +21,7 @@ from .standardmodels.synapses import StaticSynapse
 from .model import sanitize_label
 from .contexts import ContextMixin
 from .random import NativeRNG
+
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
                            ["genn_label", "pre_pop", "post_pop",
@@ -192,11 +193,10 @@ class Projection(common.Projection, ContextMixin):
                     # Get slice of variable matrix
                     sub_var = var[sub.pre_slice, sub.post_slice]
 
-                    if n in sub_pop.syn_pop.vars:
-                        sub_var[sub_pre_inds,sub_post_inds] =\
-                                                sub.syn_pop.get_var_values(n)
-                    else:
+                    if n in sub.wum_params:
                         sub_var[sub_pre_inds,sub_post_inds] = sub.wum_params[n]
+                    else:
+                        sub_var[sub_pre_inds,sub_post_inds] = sub.syn_pop.get_var_values(n)
 
                 # Add variable to list
                 variables.append(var)
@@ -216,9 +216,12 @@ class Projection(common.Projection, ContextMixin):
 
                     # Reshape variable values from sub-population
                     # and copy into slice of var
-                    var[sub.pre_slice, sub.post_slice] =\
-                        np.reshape(sub.syn_pop.get_var_values(n),
-                                   sub_shape)
+                    if n in sub.wum_params:
+                        var[sub.pre_slice, sub.post_slice] = sub.wum_params[n]
+                    else:
+                        var[sub.pre_slice, sub.post_slice] =\
+                            np.reshape(sub.syn_pop.get_var_values(n),sub_shape)
+
                 # Add variable to list
                 variables.append(var)
 
@@ -470,4 +473,3 @@ class Projection(common.Projection, ContextMixin):
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
                               pre_slice, post_slice, syn_pop, wum_params))
-
