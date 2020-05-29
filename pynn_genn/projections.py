@@ -373,7 +373,7 @@ class Projection(common.Projection, ContextMixin):
         if "delaySteps" in params:
             delay_steps = params["delaySteps"]
         else:
-            delay_steps = self._connector._on_device_params["delaySteps"]
+            delay_steps = self._connector.on_device_init_params["delaySteps"]
 
         # **TODO** add support for heterogeneous dendritic delay
         if isinstance(delay_steps, LazyArray):

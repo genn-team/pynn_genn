@@ -33,21 +33,19 @@ __all__ = [
     "CloneConnector", "ArrayConnector"
 ]
 
-class AbstractGeNNConnector(object):
 
-    # __slots__ = ['_on_device', '_procedural', '_row_length', '_col_length',
-    #              '_sparse']
-    _row_code = None
-    _row_state_vars = None
+class GeNNConnectorMixin(object):
+    row_code = ""
 
     def __init__(self, on_device_init=False, procedural=False):
-        self._on_device_init = on_device_init
-        self._procedural = procedural
-        self._row_length = 0
-        self._col_length = 0
-        self._sparse = True
-        self._on_device_params = {}
-        self._conn_params = {}
+        self.on_device_init = on_device_init
+        self.procedural = procedural
+        self.row_length = 0
+        self.col_length = 0
+        self.use_sparse = True
+        self.on_device_init_params = {}
+        self.connector_params = {}
+        self.row_state_vars = None
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -67,8 +65,8 @@ class AbstractGeNNConnector(object):
             for name, map in parameter_space.items():
                 if ((isinstance(map.base_value, RandomDistribution) and
                      isinstance(map.base_value.rng, NativeRNG)) or
-                    map.is_homogeneous):
-                        self._on_device_params[name] = map
+                     map.is_homogeneous):
+                        self.on_device_init_params[name] = map
                         pops.append(name)
 
             for name in pops:
@@ -97,29 +95,6 @@ class AbstractGeNNConnector(object):
                     parameter_space[name] = map(distance_map)
         return parameter_space
 
-    @property
-    def use_sparse(self):
-        return self._sparse
-
-    @property
-    def row_length(self):
-        return self._row_length
-
-    @property
-    def col_length(self):
-        return self._col_length
-
-    @property
-    def on_device_init(self):
-        return self._on_device_init
-    @property
-    def on_device_init_params(self):
-        return self._on_device_params
-
-    @property
-    def procedural(self):
-        return self._procedural
-
     def compute_use_sparse(self, projection):
         """
         compute if the projection requires a sparse or full matrix
@@ -129,22 +104,20 @@ class AbstractGeNNConnector(object):
         pass
 
     def compute_row_length(self, projection):
-        raise NotImplementedError()
+        pass
 
     def compute_col_length(self, projection):
-        raise NotImplementedError()
-
-    def get_params(self):
-        return self._conn_params
+        pass
 
     def init_sparse_conn_snippet(self, **kwargs):
-        kwargs['row_build_code'] = self._row_code
-        kwargs['row_build_state_vars'] = self._row_state_vars
+        kwargs['row_build_code'] = self.row_code
+        kwargs['row_build_state_vars'] = self.row_state_vars
         return create_custom_sparse_connect_init_snippet_class(
                                             self.__class__.__name__, **kwargs)
 
-class OneToOneConnector(AbstractGeNNConnector, OneToOnePyNN):
-    _row_code = """
+
+class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
+    row_code = """
         $(addSynapse, $(id_pre));
         $(endRow);
     """
@@ -153,19 +126,21 @@ class OneToOneConnector(AbstractGeNNConnector, OneToOnePyNN):
 
     def __init__(self, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        OneToOnePyNN.__init__(self, safe=safe, callback=callback)
-        self._row_length = 1
-        self._col_length = 1
-        self._sparse = True
+        GeNNConnectorMixin.__init__(
+            self, on_device_init=on_device_init, procedural=procedural)
+        OneToOnePyNN.__init__(
+            self, safe=safe, callback=callback)
+        self.row_length = 1
+        self.col_length = 1
+        self.use_sparse = True
 
     def init_sparse_conn_snippet(self):
         args = {}# todo: what args?
-        return AbstractGeNNConnector.init_sparse_conn_snippet(self, **args)
+        return GeNNConnectorMixin.init_sparse_conn_snippet(self, **args)
 
 
-class AllToAllConnector(AbstractGeNNConnector, AllToAllPyNN):
-    _row_code = """
+class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
+    row_code = """
         if($(id_pre) < $(num_pre)){
             $(addSynapse, $(id_pre));
         } else {
@@ -177,157 +152,143 @@ class AllToAllConnector(AbstractGeNNConnector, AllToAllPyNN):
 
     def __init__(self, allow_self_connections=True, safe=True, callback=None,
                  on_device_init=True, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)
-        self._sparse = False
+        self.use_sparse = False
 
 
-class FixedProbabilityConnector(AbstractGeNNConnector, FixProbPyNN):
-    _row_code = """
-    """
-
+class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
     __doc__ = FixProbPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, p_connect, allow_self_connections=True,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FixProbPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FixProbPyNN.__init__(self, p_connect, allow_self_connections,
+                 rng, safe=safe, callback=callback)
         # self._row_length = 1
         # self._col_length = 1
         # self._sparse = True
 
 
-class FixedTotalNumberConnector(AbstractGeNNConnector, FixTotalPyNN):
-    _row_code = """
-    """
-
+class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
     __doc__ = FixTotalPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, n, allow_self_connections=True, with_replacement=False,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FixTotalPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
+                              rng, safe=safe, callback=callback)
 
 
-class FixedNumberPreConnector(AbstractGeNNConnector, FixNumPrePyNN):
+class FixedNumberPreConnector(GeNNConnectorMixin, FixNumPrePyNN):
     _row_code = """
     """
 
     __doc__ = FixNumPrePyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, n, allow_self_connections=True, with_replacement=False,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FixNumPrePyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FixNumPrePyNN.__init__(self, n, allow_self_connections, with_replacement,
+                               rng, safe=safe, callback=callback)
 
 
-class FixedNumberPostConnector(AbstractGeNNConnector, FixNumPostPyNN):
-    _row_code = """
-    """
-
+class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
     __doc__ = FixNumPostPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, n, allow_self_connections=True, with_replacement=False,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FixNumPostPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FixNumPostPyNN.__init__(self, n, allow_self_connections,
+                            with_replacement, rng, safe=safe, callback=callback)
 
 
-class DistanceDependentProbabilityConnector(AbstractGeNNConnector, DistProbPyNN):
-    _row_code = """
-    """
-
+class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
     __doc__ = DistProbPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, d_expression, allow_self_connections=True,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        DistProbPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        DistProbPyNN.__init__(self, d_expression, allow_self_connections,
+                 rng, safe=safe, callback=callback)
 
 
-class DisplacementDependentProbabilityConnector(AbstractGeNNConnector,
+class DisplacementDependentProbabilityConnector(GeNNConnectorMixin,
                                                 DisplaceProbPyNN):
-    _row_code = """
-    """
-
     __doc__ = DisplaceProbPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, disp_function, allow_self_connections=True,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        DisplaceProbPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        DisplaceProbPyNN.__init__(self, disp_function, allow_self_connections,
+                 rng, safe=safe, callback=callback)
 
 
-class IndexBasedProbabilityConnector(AbstractGeNNConnector, IndexProbPyNN):
-    _row_code = """
-    """
-
+class IndexBasedProbabilityConnector(GeNNConnectorMixin, IndexProbPyNN):
     __doc__ = IndexProbPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, index_expression, allow_self_connections=True,
+                 rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        IndexProbPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        IndexProbPyNN.__init__(self, index_expression, allow_self_connections,
+                 rng, safe=safe, callback=callback)
 
 
-class SmallWorldConnector(AbstractGeNNConnector, SmallWorldPyNN):
-    _row_code = """
-    """
-
+class SmallWorldConnector(GeNNConnectorMixin, SmallWorldPyNN):
     __doc__ = SmallWorldPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, degree, rewiring, allow_self_connections=True,
+                 n_connections=None, rng=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        SmallWorldPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        SmallWorldPyNN.__init__(self, degree, rewiring, allow_self_connections,
+                 n_connections, rng,  safe=safe, callback=callback)
 
 
-class FromListConnector(AbstractGeNNConnector, FromListPyNN):
-    _row_code = """
-    """
-
+class FromListConnector(GeNNConnectorMixin, FromListPyNN):
     __doc__ = FromListPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, conn_list, column_names=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FromListPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FromListPyNN.__init__(self, conn_list, column_names,
+                              safe=safe, callback=callback)
 
 
-class FromFileConnector(AbstractGeNNConnector, FromFilePyNN):
-    _row_code = """
-    """
-
+class FromFileConnector(GeNNConnectorMixin, FromFilePyNN):
     __doc__ = FromFilePyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self,  file, distributed=False, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        FromFilePyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        FromFilePyNN.__init__(self, file, distributed,
+                              safe=safe, callback=callback)
 
 
-class CloneConnector(AbstractGeNNConnector, ClonePyNN):
-    _row_code = """
-    """
-
+class CloneConnector(GeNNConnectorMixin, ClonePyNN):
     __doc__ = ClonePyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, reference_projection, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        ClonePyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        ClonePyNN.__init__(self, reference_projection, safe=safe,
+                           callback=callback)
 
 
-class ArrayConnector(AbstractGeNNConnector, ArrayPyNN):
-    _row_code = """
-    """
-
+class ArrayConnector(GeNNConnectorMixin, ArrayPyNN):
     __doc__ = ArrayPyNN.__doc__
 
-    def __init__(self, safe=True, callback=None,
+    def __init__(self, array, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        AbstractGeNNConnector.__init__(self, on_device_init, procedural)
-        ArrayPyNN.__init__(self, safe=safe, callback=callback)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        ArrayPyNN.__init__(self, array, safe=safe, callback=callback)
 

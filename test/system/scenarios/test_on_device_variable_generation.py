@@ -1,10 +1,11 @@
 import numpy as np
+from scipy import stats
 import copy
-from nose.tools import assert_equal, assert_less_equal
+from nose.tools import assert_equal, assert_greater
 from .registry import register
 
 
-@register(exclude=["neuron", "nest"])  # for NEURON, this only works when run with MPI and more than one process
+@register(exclude=["neuron", "nest"])  # NativeRNG is GeNN exclusive
 def rng_checks(sim):
     np_rng = sim.random.NumpyRNG()
     rng = sim.random.NativeRNG(np_rng)
@@ -24,7 +25,8 @@ def rng_checks(sim):
     params = {'low': 2, 'high': 1}
     assert_equal(rng._check_params(dist, params), False)
 
-@register(exclude=["neuron", "nest"])  # for NEURON, this only works when run with MPI and more than one process
+
+@register(exclude=["neuron","nest"])  # NativeRNG is GeNN exclusive
 def v_rest(sim):
     np_rng = sim.random.NumpyRNG()
     rng = sim.random.NativeRNG(np_rng, seed=1)
@@ -50,19 +52,13 @@ def v_rest(sim):
 
     sim.end()
 
-    v_min = gen_var.min()
-    v_max = gen_var.max()
-    v_avg = gen_var.mean()
+    scale = dist_params['high'] - dist_params['low']
+    s, p = stats.kstest((gen_var - dist_params['low']) / scale, 'uniform')
+    min_p = 0.05
+    assert_greater(p, min_p)
 
-    half_range = dist_params['low'] + \
-                 (dist_params['high'] - dist_params['low']) / 2.
 
-    epsilon = 0.1
-    assert_less_equal(np.abs(v_min - dist_params['low']), epsilon)
-    assert_less_equal(np.abs(v_max - dist_params['high']), epsilon)
-    assert_less_equal(np.abs(v_avg - half_range), epsilon)
-
-@register(exclude=["neuron", "nest"])  # for NEURON, this only works when run with MPI and more than one process
+@register(exclude=["neuron", "nest"])  # NativeRNG is GeNN exclusive
 def v_init(sim):
     np_rng = sim.random.NumpyRNG()
     rng = sim.random.NativeRNG(np_rng, seed=1)
@@ -89,14 +85,13 @@ def v_init(sim):
     comp_var = np.asarray([float(x) for x in comp_var[0, :]])
     sim.end()
 
-    v_std = comp_var.std()
-    v_mean = comp_var.mean()
+    s, p = stats.kstest((comp_var - dist_params['mu']) / dist_params['sigma'],
+                        'norm')
+    min_p = 0.05
+    assert_greater(p, min_p)
 
-    epsilon = 0.1
-    assert_less_equal(np.abs(v_mean - dist_params['mu']), epsilon)
-    assert_less_equal(np.abs(v_std - dist_params['sigma']), epsilon)
 
-@register(exclude=["neuron", "nest"])  # for NEURON, this only works when run with MPI and more than one process
+@register(exclude=["neuron", "nest"])  # NativeRNG is GeNN exclusive
 def w_init_o2o(sim):
     np_rng = sim.random.NumpyRNG(seed=1)
     rng = sim.random.NativeRNG(np_rng, seed=1)
@@ -129,24 +124,18 @@ def w_init_o2o(sim):
     sim.end()
 
     assert_equal(num_active, n_neurons)
-    assert_equal( np.all(connected[0] == connected[1]), True )
+    assert_equal(np.all(connected[0] == connected[1]), True)
 
-    v_min = comp_var.min()
-    v_max = comp_var.max()
-    v_avg = comp_var.mean()
+    scale = dist_params['high'] - dist_params['low']
+    s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
+    min_p = 0.05
+    assert_greater(p, min_p)
 
-    half_range = dist_params['low'] + \
-                 (dist_params['high'] - dist_params['low']) / 2.
-
-    epsilon = 0.1
-    assert_less_equal(np.abs(v_min - dist_params['low']), epsilon)
-    assert_less_equal(np.abs(v_max - dist_params['high']), epsilon)
-    assert_less_equal(np.abs(v_avg - half_range), epsilon)
 
 if __name__ == '__main__':
     from pyNN.utility import get_simulator
+
     sim, args = get_simulator()
     rng_checks(sim)
     v_rest(sim)
     w_init_o2o(sim)
-

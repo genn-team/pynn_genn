@@ -1,5 +1,5 @@
 import numpy as np
-from pyNN.random import (NativeRNG as pynn_rng,
+from pyNN.random import (NativeRNG,
                          AbstractRNG, NumpyRNG, RandomDistribution)
 from pygenn.genn_model import create_custom_init_var_snippet_class
 
@@ -10,7 +10,7 @@ from pygenn.genn_model import create_custom_init_var_snippet_class
 # NativeRNG
 # ----------------------------------------------------------------------------
 # Signals that the random numbers will be supplied by RNG running on GeNN
-class NativeRNG(pynn_rng):
+class NativeRNG(NativeRNG):
     """
     Signals that the simulator's own native RNG should be used.
     Each simulator module should implement a class of the same name which
@@ -19,27 +19,35 @@ class NativeRNG(pynn_rng):
     # this is from the NumpyRNG in PyNN
     _distributions = {
         'uniform': {
-            'vars': ('low', 'high'),
+            'params': ('low', 'high'),
+            'mean': lambda p: (p['high'] - p['low']) * 0.5,
+            'check': lambda p: p['high'] > p['low'],
             'code': """
                 const scalar scale = $(high) - $(low);
                 $(value) = $(low) + ($(gennrand_uniform) * scale);
-            """
+            """,
         },
         'uniform_int': {
-            'vars': ('low', 'high'),
+            'params': ('low', 'high'),
+            'mean': lambda p: (p['high'] - p['low']) * 0.5,
+            'check': lambda p: p['high'] > p['low'],
             'code': """
                 const scalar scale = $(high) - $(low);
                 $(value) = rint( $(low) + ($(gennrand_uniform) * scale) );
             """
         },
         'normal': {
-            'vars': ('mu', 'sigma'),
+            'params': ('mu', 'sigma'),
+            'mean': lambda p: p['mu'],
+            'check': lambda p: p['sigma'] > 0,
             'code': """
                 $(value) = $(mu) + ($(gennrand_normal) * $(sigma));
             """
         },
         'normal_clipped': {
-            'vars': ('mu', 'sigma', 'low', 'high'),
+            'params': ('mu', 'sigma', 'low', 'high'),
+            'mean': lambda p: p['mu'],
+            'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
                 scalar normal;
                 do{
@@ -49,7 +57,9 @@ class NativeRNG(pynn_rng):
             """
         },
         'normal_clipped_int': {
-            'vars': ('mu', 'sigma', 'low', 'high'),
+            'params': ('mu', 'sigma', 'low', 'high'),
+            'mean': lambda p: p['mu'],
+            'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
                 scalar normal;
                 do{
@@ -59,20 +69,26 @@ class NativeRNG(pynn_rng):
             """
         },
         'normal_clipped_to_boundary': {
-            'vars': ('mu', 'sigma', 'low', 'high'),
+            'mean': lambda p: p['mu'],
+            'params': ('mu', 'sigma', 'low', 'high'),
+            'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
                 scalar normal = $(mu) + ($(gennrand_normal) * $(sigma));
-                $(value) = max( min(normal, $(high)), $(low) );
+                $(value) = fmax( fmin(normal, $(high)), $(low) );
             """
         },
         'exponential': {
-            'vars': ('beta'),
+            'params': ('beta'),
+            'mean': lambda p: 1./p['beta'],
+            'check': lambda p: p['beta'] > 0,
             'code': """
                 $(value) = $(beta) * $(gennrand_exponential);
             """
         },
         'gamma': {
-            'vars': ('k', 'theta'),
+            'params': ('k', 'theta'),
+            'mean': lambda p: p['k'] * p['theta'],
+            'check': lambda p: p['theta'] > 0 and p['k'] > 0,
             'code': """
                 $(value) = $(k) * $(gennrand_gamma, $(theta));
             """
@@ -113,17 +129,13 @@ class NativeRNG(pynn_rng):
     # ------------------------------------------------------------------------
     # On-Device generation methods
     # ------------------------------------------------------------------------
-    @staticmethod
-    def _check_params(distribution, parameters):
-        _params = NativeRNG._distributions[distribution]['vars']
-        check = True
-        if 'low' in parameters and 'high' in parameters:
-            check &= parameters['low'] < parameters['high']
-
+    def _check_params(self, distribution, parameters):
+        _params = NativeRNG._distributions[distribution]['params']
         for p in _params:
             if p not in parameters:
                 return False
-        return check
+
+        return self._distributions[distribution]['check'](parameters)
 
     def _supports_dist(self, distribution):
         return distribution in self._distributions
@@ -136,27 +148,14 @@ class NativeRNG(pynn_rng):
                     "'{}'.".format(distribution))
 
         if not self._check_params(distribution, parameters):
-            p = self._distributions[distribution]['vars']
+            p = self._distributions[distribution]['params']
             raise ValueError("PyNN GeNN RNG unexpected parameters {} or "
                              "wrong range specified.".format(p))
 
         d = self._distributions[distribution]
         return create_custom_init_var_snippet_class(
                 "pynn_genn_rand_{}".format(distribution),
-                param_names=d['vars'], var_init_code=d['code'])
+                param_names=d['params'], var_init_code=d['code'])
 
-    @staticmethod
-    def get_mean(distribution, parameters):
-        if 'uniform' in distribution:
-            return (parameters['high'] - parameters['low']) * 0.5
-
-        if 'normal' in distribution:
-            return parameters['mu']
-
-        if 'exponential' in distribution:
-            return ( (1./(1.e-12))
-                    if parameters['beta'] == 0. else
-                     (1./parameters['beta']) )
-
-        if 'gamma' in distribution:
-            return parameters['k'] * parameters['theta']
+    def get_mean(self, distribution, parameters):
+        return self._distributions[distribution]['mean'](parameters)

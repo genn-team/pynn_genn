@@ -1,4 +1,5 @@
 import sys
+import string
 from collections import namedtuple
 from functools import partial
 from itertools import groupby
@@ -17,7 +18,7 @@ from pyNN.standardmodels import (StandardModelType,
                                  StandardCellType,
                                  StandardCurrentSource,
                                  build_translations)
-from pyNN.random import NativeRNG, RandomDistribution
+from pynn_genn.random import NativeRNG, RandomDistribution
 from pyNN.parameters import LazyArray
 
 from six import iteritems, iterkeys
@@ -46,6 +47,7 @@ GeNNDefinitions = namedtuple("GeNNDefinitions",
 def sanitize_label(label):
     # Strip out any non-alphanumerical characters
     clean_label = "".join(c for c in label if c.isalnum() or c == '_')
+    clean_label = clean_label.lstrip(string.digits)
 
     # If this is Python 2, convert unicode-encoded label to ASCII
     if sys.version_info < (3, 0):
@@ -83,8 +85,8 @@ class GeNNStandardModelType(StandardModelType):
 
             # If parameter is NOT homogeneous, has correct prefix
             # and, without the prefix, it is in parameters
-            if not param.is_homogeneous and field_name.startswith(prefix) and \
-                field_name_no_prefix in param_name_types:
+            if (not param.is_homogeneous and field_name.startswith(prefix) and
+                field_name_no_prefix in param_name_types):
                 # Add it to variables
                 var_name_types.append((field_name_no_prefix,
                                        param_name_types[field_name_no_prefix]))
@@ -186,18 +188,14 @@ class GeNNStandardModelType(StandardModelType):
         return genn_model, neuron_params, neuron_ini
 
     def _init_variable(self, name, param):
-        if isinstance(param.base_value, RandomDistribution) and \
-                isinstance(param.base_value.rng, NativeRNG):
+        if (isinstance(param.base_value, RandomDistribution) and
+           isinstance(param.base_value.rng, NativeRNG) and
+           not len(param.operations)):
             # if we need (random) on-device initialization we should use
             # PyNN GeNN NativeRNG
+            # NOTE: if this parameter needs to be transformed,
+            #       initialize on host
             params = copy.copy(param.base_value.parameters)
-
-            # if the parameter needs to be transformed (apply a partial) before
-            # sending it to GeNN, we need to do the appropriate operations
-            if len(param.operations):
-                from warnings import warn
-                warn("Conversion of parameter {} may throw "
-                     "unexpected results.".format(name))
 
             rng = param.base_value.rng
             dist_name = param.base_value.name
@@ -276,8 +274,8 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         for n, p in iteritems(conn_params):
             # If this parameter is in the variable dictionary,
             # but it is homogenous
-            if  not isinstance(p, LazyArray) and n in vars and \
-                n not in mutable_vars and np.allclose(p, p[0]):
+            if (not isinstance(p, LazyArray) and n in vars and
+               n not in mutable_vars and np.allclose(p, p[0])):
                 # Remove from vars
                 del vars[n]
 
@@ -329,40 +327,9 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                          if "post_var_name_types" not in genn_defs
                          else {n[0]: 0.0
                                for n in genn_defs["post_var_name_types"]})
-        # snip_class = conn.init_sparse_conn_snippet()
-        # init_model = init_connectivity(snip_class, conn.get_params())
-        # init_model = init_connectivity(conn.__class__.__name__,
-        #                                conn.get_params())
-        # create_custom_sparse_connect_init_snippet_class(class_name,
-        #                                                 param_names=None,
-        #                                                 derived_params=None,
-        #                                                 row_build_code=None,
-        #                                                 row_build_state_vars=None,
-        #                                                 calc_max_row_len_func=None,
-        #                                                 calc_max_col_len_func=None,
-        #                                                 extra_global_params=None,
-        #                                                 custom_body=None)
 
         return genn_model, wum_params, wum_init, wum_pre_init, wum_post_init
 
-    def _init_variable(self, name, param):
-        if isinstance(param.base_value, RandomDistribution) and \
-                isinstance(param.base_value.rng, NativeRNG):
-            # if we need (random) on-device initialization we should use
-            # PyNN GeNN NativeRNG
-            params = copy.copy(param.base_value.parameters)
-
-            # if the parameter needs to be transformed (apply a partial) before
-            # sending it to GeNN, we need to do the appropriate operations
-            if len(param.operations):
-                from warnings import warn
-                warn("Conversion of parameter {name} may throw "
-                     "unexpected results.".format(name))
-
-            rng = param.base_value.rng
-            dist_name = param.base_value.name
-            param_init = rng.init_var_snippet(dist_name, params)
-            return init_var(param_init, params)
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
     def __init__(self, **parameters):
