@@ -2,6 +2,11 @@ from copy import copy
 from pyNN.core import IndexBasedExpression
 from pyNN.parameters import LazyArray
 from pygenn.genn_model import create_custom_sparse_connect_init_snippet_class
+# NOTE: Had to change the import names due to naming
+# resolution not working properly and losing the original
+# class when initializing. This is mainly due to using multiple
+# inheritance and trying to override an ancestor method with
+# a mixin class.
 from pyNN.connectors import (
     AllToAllConnector as AllToAllPyNN,
     OneToOneConnector as OneToOnePyNN,
@@ -22,6 +27,7 @@ from pyNN.connectors import (
 
 from pynn_genn.random import RandomDistribution, NativeRNG
 
+# expose only the Connectors defined in PyNN
 __all__ = [
     "AllToAllConnector", "OneToOneConnector",
     "FixedProbabilityConnector", "FixedTotalNumberConnector",

@@ -23,7 +23,7 @@ from .standardmodels.electrodes import *
 from .model import sanitize_label
 from .populations import Population, PopulationView, Assembly
 from .projections import Projection
-from pynn_genn.connectors import *
+from .connectors import *
 from neo.io import get_io
 
 
