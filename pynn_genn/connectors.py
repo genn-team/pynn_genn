@@ -41,17 +41,11 @@ __all__ = [
 
 
 class GeNNConnectorMixin(object):
-    row_code = ""
-
-    def __init__(self, on_device_init=False, procedural=False):
+    def __init__(self, on_device_init=False, procedural=False, use_sparse=False):
         self.on_device_init = on_device_init
         self.procedural = procedural
-        self.row_length = 0
-        self.col_length = 0
-        self.use_sparse = True
+        self.use_sparse = use_sparse
         self.on_device_init_params = {}
-        self.connector_params = {}
-        self.row_state_vars = None
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -101,68 +95,28 @@ class GeNNConnectorMixin(object):
                     parameter_space[name] = map(distance_map)
         return parameter_space
 
-    def compute_use_sparse(self, projection):
-        """
-        compute if the projection requires a sparse or full matrix
-        :param projection:
-        :return:
-        """
-        pass
-
-    def compute_row_length(self, projection):
-        pass
-
-    def compute_col_length(self, projection):
-        pass
-
-    def init_sparse_conn_snippet(self, **kwargs):
-        kwargs['row_build_code'] = self.row_code
-        kwargs['row_build_state_vars'] = self.row_state_vars
-        return create_custom_sparse_connect_init_snippet_class(
-                                            self.__class__.__name__, **kwargs)
 
 
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
-    row_code = """
-        $(addSynapse, $(id_pre));
-        $(endRow);
-    """
-
     __doc__ = OneToOnePyNN.__doc__
 
     def __init__(self, safe=True, callback=None,
                  on_device_init=False, procedural=False):
         GeNNConnectorMixin.__init__(
-            self, on_device_init=on_device_init, procedural=procedural)
+            self, on_device_init=on_device_init, procedural=procedural, use_sparse=True)
         OneToOnePyNN.__init__(
             self, safe=safe, callback=callback)
-        self.row_length = 1
-        self.col_length = 1
-        self.use_sparse = True
-
-    def init_sparse_conn_snippet(self):
-        args = {}# todo: what args?
-        return GeNNConnectorMixin.init_sparse_conn_snippet(self, **args)
 
 
 class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
-    row_code = """
-        if($(id_pre) < $(num_pre)){
-            $(addSynapse, $(id_pre));
-        } else {
-            $(endRow);
-        }
-    """
-
     __doc__ = AllToAllPyNN.__doc__
 
     def __init__(self, allow_self_connections=True, safe=True, callback=None,
                  on_device_init=True, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)
-        self.use_sparse = False
 
 
 class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
@@ -174,9 +128,6 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
         GeNNConnectorMixin.__init__(self, on_device_init, procedural)
         FixProbPyNN.__init__(self, p_connect, allow_self_connections,
                  rng, safe=safe, callback=callback)
-        # self._row_length = 1
-        # self._col_length = 1
-        # self._sparse = True
 
 
 class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
@@ -191,9 +142,6 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
 
 
 class FixedNumberPreConnector(GeNNConnectorMixin, FixNumPrePyNN):
-    _row_code = """
-    """
-
     __doc__ = FixNumPrePyNN.__doc__
 
     def __init__(self, n, allow_self_connections=True, with_replacement=False,
@@ -226,8 +174,8 @@ class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
                  rng, safe=safe, callback=callback)
 
 
-class DisplacementDependentProbabilityConnector(GeNNConnectorMixin,
-                                                DisplaceProbPyNN):
+class DisplacementDependentProbabilityConnector(
+                                        GeNNConnectorMixin, DisplaceProbPyNN):
     __doc__ = DisplaceProbPyNN.__doc__
 
     def __init__(self, disp_function, allow_self_connections=True,
