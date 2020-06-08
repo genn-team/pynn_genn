@@ -110,7 +110,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                     setBuildStatus(installationStageName, "PENDING");
 
                     // If GeNN exists
-                    if(fileExists("genn")) {
+                    if(fileExists("genn/.git")) {
                         echo "Updating GeNN";
 
                         // Pull from repository
