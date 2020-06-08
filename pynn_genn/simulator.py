@@ -49,7 +49,8 @@ class State(common.control.BaseState):
         self._min_delay = d
 
     def finalize(self):
-        self.model._model.set_seed(self.native_rng.seed)
+        if not (self.native_rng is None):
+            self.model._model.set_seed(self.native_rng.seed)
 
         for pop in self.populations:
             pop._create_native_population()
