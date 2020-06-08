@@ -56,6 +56,17 @@ def rng_checks():
     params = {'low': 2, 'high': 1}
     assert_equal(rng._check_params(dist, params), False)
 
+    rng1 = sim.random.NativeRNG(np_rng)
+
+    assert_equal(rng1.seed, rng.seed)
+
+    seed = 9
+    rng2 = sim.random.NativeRNG(np_rng, seed=seed)
+    assert_equal(seed, rng.seed)
+    assert_equal(seed, rng1.seed)
+    assert_equal(seed, rng2.seed)
+
+
 
 def v_rest():
     if not have_genn:

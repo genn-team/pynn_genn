@@ -2,6 +2,7 @@ import numpy as np
 from pyNN.random import (NativeRNG,
                          AbstractRNG, NumpyRNG, RandomDistribution)
 from pygenn.genn_model import create_custom_init_var_snippet_class
+import logging
 
 
 ### adapted from pynn_spinnaker/random
@@ -16,6 +17,8 @@ class NativeRNG(NativeRNG):
     Each simulator module should implement a class of the same name which
     inherits from this and which sets the seed appropriately.
     """
+    # share the seed among instances of this class
+    _seed = None
     # this is from the NumpyRNG in PyNN
     _distributions = {
         'uniform': {
@@ -100,11 +103,27 @@ class NativeRNG(NativeRNG):
         # 'vonmises':       ('vonmises',     {'mu': 'mu', 'kappa': 'kappa'}),
     }
 
+    @property
+    def seed(self):
+        if isinstance(NativeRNG._seed, str) and NativeRNG._seed.lower() == 'none':
+            return None
+        else:
+            return NativeRNG._seed
+
+    @seed.setter
+    def seed(self, val):
+        # TODO: raise a warning here appropriate? for already set seed
+        # if not (NativeRNG._seed is None):
+        #     logging.warning("Changed seed from {} to {}".format(NativeRNG._seed, val))
+
+        NativeRNG._seed = ('none' if val is None else val)
+
     def __init__(self, host_rng, seed=None):
         # Superclass
-        super(NativeRNG, self).__init__(seed)
+        self.seed = seed
+        super(NativeRNG, self).__init__(self.seed)
 
-        self._seed_generator = np.random.RandomState(seed=seed)
+        self._seed_generator = np.random.RandomState(seed=self.seed)
 
         # Cache RNG to use on the host
         assert host_rng is not None

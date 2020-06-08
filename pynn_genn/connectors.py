@@ -66,8 +66,9 @@ class GeNNConnectorMixin(object):
                 if ((isinstance(map.base_value, RandomDistribution) and
                      isinstance(map.base_value.rng, NativeRNG)) or
                      map.is_homogeneous):
-                        self.on_device_init_params[name] = map
-                        pops.append(name)
+
+                    self.on_device_init_params[name] = map
+                    pops.append(name)
 
             for name in pops:
                 parameter_space.pop(name)

@@ -374,25 +374,15 @@ class Projection(common.Projection, ContextMixin):
             delay_steps = params["delaySteps"]
         else:
             delay_steps = self._connector.on_device_init_params["delaySteps"]
-
-        # **TODO** add support for heterogeneous dendritic delay
-        if isinstance(delay_steps, LazyArray):
             if delay_steps.is_homogeneous:
                 delay_steps.shape = (1,)
-                delay_steps = delay_steps.evaluate(simplify=True)
             else:
-                delay_steps = NativeRNG.get_mean(
-                    delay_steps.base_value.name,
-                    delay_steps.base_value.parameters
-                )
-                logging.warning("Projection {}: GeNN does not support variable "
-                                "delays for a single projection. Using mean "
-                                "value {} ms for all connections.".format(
-                                    self.label,
-                                    delay_steps * self._simulator.state.dt))
+                delay_steps.shape = (num_synapses,)
+            delay_steps = delay_steps.evaluate(simplify=True)
 
-            delay_steps = int(round(delay_steps))
-        elif not np.allclose(delay_steps, delay_steps[0]):
+
+        # **TODO** add support for heterogeneous dendritic delay
+        if not np.allclose(delay_steps, delay_steps[0]):
             # If delays aren't all the same
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))

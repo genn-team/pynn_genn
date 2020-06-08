@@ -193,7 +193,7 @@ class GeNNStandardModelType(StandardModelType):
            not len(param.operations)):
             # if we need (random) on-device initialization we should use
             # PyNN GeNN NativeRNG
-            # NOTE: if this parameter needs to be transformed,
+            # NOTE: if this parameter needs to be transformed (operations > 0),
             #       initialize on host
             params = copy.copy(param.base_value.parameters)
 
