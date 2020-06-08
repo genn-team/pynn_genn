@@ -53,7 +53,7 @@ class State(common.control.BaseState):
         for proj in self.projections:
             proj._create_native_projection()
         self.model.build(self.model_path)
-        self.model.load()
+        self.model.load(self.model_path)
 
         self._built = True
 
