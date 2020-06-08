@@ -378,7 +378,7 @@ class Projection(common.Projection, ContextMixin):
                 delay_steps.shape = (1,)
             else:
                 delay_steps.shape = (num_synapses,)
-            delay_steps = delay_steps.evaluate(simplify=True)
+            delay_steps = delay_steps.evaluate(simplify=False)
 
 
         # **TODO** add support for heterogeneous dendritic delay

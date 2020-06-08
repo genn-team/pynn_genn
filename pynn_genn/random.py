@@ -2,6 +2,8 @@ import numpy as np
 from pyNN.random import (NativeRNG,
                          AbstractRNG, NumpyRNG, RandomDistribution)
 from pygenn.genn_model import create_custom_init_var_snippet_class
+from . import simulator
+
 import logging
 
 
@@ -128,6 +130,15 @@ class NativeRNG(NativeRNG):
         # Cache RNG to use on the host
         assert host_rng is not None
         self._host_rng = host_rng
+
+    def __new__(cls, host_rng, seed=None):
+        # constructor - make sure we have a single NativeRNG object in all
+        # the simulation
+        if simulator.state.native_rng is None:
+            obj = super().__new__(cls)
+            simulator.state.native_rng = obj
+
+        return simulator.state.native_rng
 
     def __str__(self):
         return 'NativeRNG GeNN(seed=%s)' % self.seed
