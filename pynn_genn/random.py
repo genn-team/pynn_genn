@@ -19,13 +19,10 @@ class NativeRNG(NativeRNG):
     Each simulator module should implement a class of the same name which
     inherits from this and which sets the seed appropriately.
     """
-    # share the seed among instances of this class
-    _seed = None
     # this is from the NumpyRNG in PyNN
     _distributions = {
         'uniform': {
             'params': ('low', 'high'),
-            'mean': lambda p: (p['high'] - p['low']) * 0.5,
             'check': lambda p: p['high'] > p['low'],
             'code': """
                 const scalar scale = $(high) - $(low);
@@ -34,7 +31,6 @@ class NativeRNG(NativeRNG):
         },
         'uniform_int': {
             'params': ('low', 'high'),
-            'mean': lambda p: (p['high'] - p['low']) * 0.5,
             'check': lambda p: p['high'] > p['low'],
             'code': """
                 const scalar scale = $(high) - $(low);
@@ -43,7 +39,6 @@ class NativeRNG(NativeRNG):
         },
         'normal': {
             'params': ('mu', 'sigma'),
-            'mean': lambda p: p['mu'],
             'check': lambda p: p['sigma'] > 0,
             'code': """
                 $(value) = $(mu) + ($(gennrand_normal) * $(sigma));
@@ -51,7 +46,6 @@ class NativeRNG(NativeRNG):
         },
         'normal_clipped': {
             'params': ('mu', 'sigma', 'low', 'high'),
-            'mean': lambda p: p['mu'],
             'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
                 scalar normal;
@@ -63,7 +57,6 @@ class NativeRNG(NativeRNG):
         },
         'normal_clipped_int': {
             'params': ('mu', 'sigma', 'low', 'high'),
-            'mean': lambda p: p['mu'],
             'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
                 scalar normal;
@@ -74,7 +67,6 @@ class NativeRNG(NativeRNG):
             """
         },
         'normal_clipped_to_boundary': {
-            'mean': lambda p: p['mu'],
             'params': ('mu', 'sigma', 'low', 'high'),
             'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
             'code': """
@@ -84,7 +76,6 @@ class NativeRNG(NativeRNG):
         },
         'exponential': {
             'params': ('beta'),
-            'mean': lambda p: 1./p['beta'],
             'check': lambda p: p['beta'] > 0,
             'code': """
                 $(value) = $(beta) * $(gennrand_exponential);
@@ -92,7 +83,6 @@ class NativeRNG(NativeRNG):
         },
         'gamma': {
             'params': ('k', 'theta'),
-            'mean': lambda p: p['k'] * p['theta'],
             'check': lambda p: p['theta'] > 0 and p['k'] > 0,
             'code': """
                 $(value) = $(k) * $(gennrand_gamma, $(theta));
@@ -104,21 +94,6 @@ class NativeRNG(NativeRNG):
         # 'poisson':        ('poisson',      {'lambda_': 'lam'}),
         # 'vonmises':       ('vonmises',     {'mu': 'mu', 'kappa': 'kappa'}),
     }
-
-    @property
-    def seed(self):
-        if isinstance(NativeRNG._seed, str) and NativeRNG._seed.lower() == 'none':
-            return None
-        else:
-            return NativeRNG._seed
-
-    @seed.setter
-    def seed(self, val):
-        # TODO: raise a warning here appropriate? for already set seed
-        # if not (NativeRNG._seed is None):
-        #     logging.warning("Changed seed from {} to {}".format(NativeRNG._seed, val))
-
-        NativeRNG._seed = ('none' if val is None else val)
 
     def __init__(self, host_rng, seed=None):
         # Superclass
@@ -137,7 +112,10 @@ class NativeRNG(NativeRNG):
         if simulator.state.native_rng is None:
             obj = super().__new__(cls)
             simulator.state.native_rng = obj
-
+        elif simulator.state.native_rng.seed != seed:
+            logging.warning("NativeRNG seed has changed (from {} to {})".format(
+                simulator.state.native_rng.seed, seed
+            ))
         return simulator.state.native_rng
 
     def __str__(self):

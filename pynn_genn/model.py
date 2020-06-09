@@ -275,7 +275,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             # If this parameter is in the variable dictionary,
             # but it is homogenous
             if (not isinstance(p, LazyArray) and n in vars and
-               n not in mutable_vars and np.allclose(p, p[0])):
+                    n not in mutable_vars and np.allclose(p, p[0])):
                 # Remove from vars
                 del vars[n]
 
