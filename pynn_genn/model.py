@@ -203,6 +203,9 @@ class GeNNStandardModelType(StandardModelType):
             return init_var(param_init, params)
         elif param.is_homogeneous:
             # if param is a constant send a scalar to device
+            if param.shape is None:
+                param.shape = (1,)
+
             return param.evaluate(simplify=True)
         else:
             return param.evaluate(simplify=False)
