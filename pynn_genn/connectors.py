@@ -41,7 +41,7 @@ __all__ = [
 
 
 class GeNNConnectorMixin(object):
-    def __init__(self, on_device_init=False, procedural=False, use_sparse=False):
+    def __init__(self, on_device_init=False, procedural=False, use_sparse=True):
         self.on_device_init = on_device_init
         self.procedural = procedural
         self.use_sparse = use_sparse
@@ -104,7 +104,7 @@ class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     def __init__(self, safe=True, callback=None,
                  on_device_init=False, procedural=False):
         GeNNConnectorMixin.__init__(
-            self, on_device_init=on_device_init, procedural=procedural, use_sparse=True)
+            self, on_device_init=on_device_init, procedural=procedural)
         OneToOnePyNN.__init__(
             self, safe=safe, callback=callback)
 
@@ -214,7 +214,7 @@ class FromListConnector(GeNNConnectorMixin, FromListPyNN):
 
     def __init__(self, conn_list, column_names=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
         FromListPyNN.__init__(self, conn_list, column_names,
                               safe=safe, callback=callback)
 
@@ -224,7 +224,7 @@ class FromFileConnector(GeNNConnectorMixin, FromFilePyNN):
 
     def __init__(self,  file, distributed=False, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
         FromFilePyNN.__init__(self, file, distributed,
                               safe=safe, callback=callback)
 
@@ -234,7 +234,9 @@ class CloneConnector(GeNNConnectorMixin, ClonePyNN):
 
     def __init__(self, reference_projection, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
+        use_sparse = reference_projection._connector.use_sparse
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural,
+                                    use_sparse=use_sparse)
         ClonePyNN.__init__(self, reference_projection, safe=safe,
                            callback=callback)
 
