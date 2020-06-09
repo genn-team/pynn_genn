@@ -214,7 +214,7 @@ class FromListConnector(GeNNConnectorMixin, FromListPyNN):
 
     def __init__(self, conn_list, column_names=None, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
         FromListPyNN.__init__(self, conn_list, column_names,
                               safe=safe, callback=callback)
 
@@ -224,7 +224,7 @@ class FromFileConnector(GeNNConnectorMixin, FromFilePyNN):
 
     def __init__(self,  file, distributed=False, safe=True, callback=None,
                  on_device_init=False, procedural=False):
-        GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
+        GeNNConnectorMixin.__init__(self, on_device_init, procedural)
         FromFilePyNN.__init__(self, file, distributed,
                               safe=safe, callback=callback)
 
