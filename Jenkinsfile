@@ -110,7 +110,7 @@ for(b = 0; b < builderNodes.size(); b++) {
                     setBuildStatus(installationStageName, "PENDING");
 
                     // If GeNN exists
-                    if(fileExists("genn")) {
+                    if(fileExists("genn/.git")) {
                         echo "Updating GeNN";
 
                         // Pull from repository
@@ -123,7 +123,10 @@ for(b = 0; b < builderNodes.size(); b++) {
                     }
                     else {
                         echo "Cloning GeNN";
-                        sh "git clone --branch master https://github.com/genn-team/genn.git";
+                        sh """
+                        rm -rf genn
+                        git clone --branch master https://github.com/genn-team/genn.git
+                        """;
                     }
 
                     // Remove existing virtualenv
