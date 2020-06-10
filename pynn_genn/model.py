@@ -210,6 +210,9 @@ class GeNNStandardModelType(StandardModelType):
 
             return param.evaluate(simplify=True)
         else:
+            if param.shape is None:
+                param.shape = (1,)
+
             return param.evaluate(simplify=False)
 
 
