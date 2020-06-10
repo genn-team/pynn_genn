@@ -144,20 +144,22 @@ class GeNNStandardModelType(StandardModelType):
         neuron_params = {}
         for n in genn_defs["param_names"]:
             pref_n = prefix + n
+            is_var_name = n in [v[0] for v in var_name_types]
 
             # If this variable is a native parameter,
             # evaluate it into neuron_params and simplify
             if pref_n in native_param_keys:
-                neuron_params[n] =\
-                    native_params[pref_n].evaluate(simplify=True)
+                neuron_params[n] = self._init_variable(
+                                    is_var_name, native_params[pref_n])
             elif pref_n in extra_param_values:
-                neuron_params[n] =\
-                    extra_param_values[pref_n].evaluate(simplify=True)
+                neuron_params[n] = self._init_variable(
+                                    is_var_name, extra_param_values[pref_n])
             else:
                 raise Exception("Property '{}' not "
                                 "correctly initialised".format(n))
 
         # Loop through GeNN variables
+        is_var_name = True
         neuron_ini = {}
         for n, t in var_name_types:
             pref_n = prefix + n
@@ -166,28 +168,28 @@ class GeNNStandardModelType(StandardModelType):
             # evaluate it into neuron_ini
             if pref_n in native_param_keys:
                 neuron_ini[n] = self._init_variable(
-                                    pref_n, native_params[pref_n])
+                                            is_var_name, native_params[pref_n])
             # Otherwise if there is an initial value associated with it
             elif pref_n in init_val_lookup:
                 # Get its PyNN name from the lookup
                 pynn_n = init_val_lookup[pref_n]
-                neuron_ini[n] = self._init_variable(pynn_n, init_vals[pynn_n])
+                neuron_ini[n] = self._init_variable(
+                                            is_var_name, init_vals[pynn_n])
             # Otherwise if this variable is manually initialised
             elif pref_n in extra_param_values:
                 # Set data type
-                extra_param_values[pref_n].dtype = (genn_to_numpy_types[t]
-                                                    if t in genn_to_numpy_types
-                                                    else np.float32)
+                extra_param_values[pref_n].dtype = (
+                    genn_to_numpy_types[t] if t in genn_to_numpy_types else np.float32)
                 # Evaluate values into neuron initialiser
-                neuron_ini[n] =\
-                    self._init_variable(pref_n, extra_param_values[pref_n])
+                neuron_ini[n] = self._init_variable(
+                                            is_var_name, extra_param_values[pref_n])
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
 
         return genn_model, neuron_params, neuron_ini
 
-    def _init_variable(self, name, param):
+    def _init_variable(self, is_var_name_type, param):
         if (isinstance(param.base_value, RandomDistribution) and
            isinstance(param.base_value.rng, NativeRNG) and
            not len(param.operations)):
@@ -201,7 +203,7 @@ class GeNNStandardModelType(StandardModelType):
             dist_name = param.base_value.name
             param_init = rng.init_var_snippet(dist_name, params)
             return init_var(param_init, params)
-        elif param.is_homogeneous:
+        elif param.is_homogeneous and not is_var_name_type:
             # if param is a constant send a scalar to device
             if param.shape is None:
                 param.shape = (1,)
