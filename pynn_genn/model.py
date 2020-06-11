@@ -268,23 +268,28 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         remove = []
         # Loop through connection parameters
         for n, p in iteritems(conn_params):
-            # if the param is mutable but was not expanded
-            # mark it for removal from conn_params but keep in vars
-            if n in mutable_vars and isinstance(p, LazyArray):
-                remove.append(n)
-                continue
-            # if not in vars or is mutable, keep in vars
-            elif not n in vars or n in mutable_vars:
-                continue
+            if isinstance(p, LazyArray):
+                # if mutable or will be randomly generated on device
+                # we remove it from conn_params so that later code properly
+                # initializes these
+                if n in mutable_vars or isinstance(p.base_value, RandomDistribution):
+                    remove.append(n)
+                    continue
 
-            # If this parameter is in the variable dictionary,
-            # but it is homogeneous
-            if ((n in conn.on_device_init_params and
-                    conn.on_device_init_params[n].is_homogeneous) or np.allclose(p, p[0])):
-                # remove it from vars
-                del vars[n]
-                # and add to param_names
-                param_names.append(n)
+                if (n in vars and n in conn.on_device_init_params and
+                        conn.on_device_init_params[n].is_homogeneous):
+                    # remove it from vars
+                    del vars[n]
+                    # and add to param_names
+                    param_names.append(n)
+            else:
+                # If this parameter is in the variable dictionary,
+                # but it is homogeneous
+                if (n in vars and np.allclose(p, p[0]) and n not in mutable_vars):
+                    # remove it from vars
+                    del vars[n]
+                    # and add to param_names
+                    param_names.append(n)
 
         # remove non-expanded from conn_params
         for n in remove:
