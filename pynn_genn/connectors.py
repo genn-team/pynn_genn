@@ -72,12 +72,9 @@ class GeNNConnectorMixin(object):
             for name, map in parameter_space.items():
                 if ((isinstance(map.base_value, RandomDistribution) and
                      isinstance(map.base_value.rng, NativeRNG)) or
-                     map.is_homogeneous):
+                        ( map.is_homogeneous and bool(1) )):
 
                     self.on_device_init_params[name] = map
-                    # if not map.is_homogeneous:
-                    #     pops.append(name)
-
                     pops.append(name)
 
             for name in pops:
@@ -116,7 +113,7 @@ class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
 
     def __init__(self, allow_self_connections=True, safe=True, callback=None,
-                 on_device_init=True, procedural=False):
+                 on_device_init=False, procedural=False):
         GeNNConnectorMixin.__init__(self, on_device_init, procedural, use_sparse=False)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,

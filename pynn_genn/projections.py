@@ -363,6 +363,10 @@ class Projection(common.Projection, ContextMixin):
         for c in params:
             params[c] = np.asarray(params[c])
 
+        # put back the params which were not expanded by PyNN
+        for c in self._connector.on_device_init_params:
+            params[c] = self._connector.on_device_init_params[c]
+
         num_synapses = len(pre_indices)
         if num_synapses == 0:
             logging.warning("Projection {} has no connections. "
@@ -370,15 +374,15 @@ class Projection(common.Projection, ContextMixin):
             return
 
         # Extract delays
-        if "delaySteps" in params:
-            delay_steps = params["delaySteps"]
-        else:
+        if "delaySteps" in self._connector.on_device_init_params:
             delay_steps = self._connector.on_device_init_params["delaySteps"]
             if delay_steps.is_homogeneous:
                 delay_steps.shape = (1,)
             else:
                 delay_steps.shape = (num_synapses,)
             delay_steps = delay_steps.evaluate(simplify=False)
+        else:
+            delay_steps = params["delaySteps"]
 
 
         # **TODO** add support for heterogeneous dendritic delay
@@ -421,8 +425,10 @@ class Projection(common.Projection, ContextMixin):
             conn_pre_inds = pre_indices[conn_mask]
             conn_post_inds = post_indices[conn_mask]
 
+            # NOTE: had to add a check for non-expanded params
             if self.use_sparse:
-                conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+                conn_params = {n: p[conn_mask] if not isinstance(p, LazyArray) else p
+                               for n, p in iteritems(params)}
             else:
                 ## GeNN stores synapses in this row-major order for dense matrices
                 ## PyNN in some cases (FromListConnector) uses column-major
@@ -430,7 +436,9 @@ class Projection(common.Projection, ContextMixin):
                 to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))
                 conn_mask[:] = conn_mask[to_row_major]
 
-                conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
+                conn_params = {n: (p[to_row_major])[conn_mask]
+                                if not isinstance(p, LazyArray) else p
+                                    for n, p in iteritems(params)}
 
             conn_params['connector']= self._connector
 

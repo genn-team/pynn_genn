@@ -265,17 +265,30 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                         if hasattr(self, "mutable_vars")
                         else set())
 
+        remove = []
         # Loop through connection parameters
         for n, p in iteritems(conn_params):
-            # If this parameter is in the variable dictionary,
-            # but it is homogenous
-            if (not isinstance(p, LazyArray) and n in vars and
-                    n not in mutable_vars and np.allclose(p, p[0])):
-                # Remove from vars
-                del vars[n]
+            # if the param is mutable but was not expanded
+            # mark it for removal from conn_params but keep in vars
+            if n in mutable_vars and isinstance(p, LazyArray):
+                remove.append(n)
+                continue
+            # if not in vars or is mutable, keep in vars
+            elif not n in vars or n in mutable_vars:
+                continue
 
-                # Add it to params
+            # If this parameter is in the variable dictionary,
+            # but it is homogeneous
+            if ((n in conn.on_device_init_params and
+                    conn.on_device_init_params[n].is_homogeneous) or np.allclose(p, p[0])):
+                # remove it from vars
+                del vars[n]
+                # and add to param_names
                 param_names.append(n)
+
+        # remove non-expanded from conn_params
+        for n in remove:
+            del conn_params[n]
 
         # Copy updated vars and parameters back into defs
         genn_defs["var_name_types"] = vars.items()
@@ -285,9 +298,17 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         genn_model = create_custom_weight_update_class(self.__class__.__name__,
                                                        **genn_defs)
 
-        # Use first entry in conn param for parameters
-        wum_params = {n: conn_params[n][0]
-                      for n in genn_defs["param_names"]}
+        # For homogeneous parameters
+        wum_params = {}
+        for n in genn_defs["param_names"]:
+            # If we prevented expansion and the parameter is homogeneous,
+            # get the value from the stored Connector version
+            if (n in conn.on_device_init_params and
+                    conn.on_device_init_params[n].is_homogeneous):
+                wum_params[n] = conn.on_device_init_params[n].base_value
+            else:
+                # If they have been expanded, use first entry in conn param for parameters
+                wum_params[n] = conn_params[n][0]
 
         # Loop through GeNN variables
         wum_init = {}
@@ -309,14 +330,14 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             else:
                 raise Exception("Variable '{}' not "
                                 "correctly initialised".format(n))
-        # Zero all presynaptic variables
+        # Zero all pre-synaptic variables
         # **TODO** other means of initialisation
         wum_pre_init = (None
                         if "pre_var_name_types" not in genn_defs
                         else {n[0]: 0.0
                               for n in genn_defs["pre_var_name_types"]})
 
-        # Zero all postsynaptic variables
+        # Zero all post-synaptic variables
         # **TODO** other means of initialisation
         wum_post_init = (None
                          if "post_var_name_types" not in genn_defs
