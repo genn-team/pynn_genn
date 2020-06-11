@@ -56,6 +56,7 @@ class State(common.control.BaseState):
             pop._create_native_population()
         for proj in self.projections:
             proj._create_native_projection()
+
         self.model.build(self.model_path)
         self.model.load(self.model_path)
 

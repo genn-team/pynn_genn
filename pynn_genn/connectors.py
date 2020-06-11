@@ -56,6 +56,13 @@ class GeNNConnectorMixin(object):
             distance_map = Connector._generate_distance_map(self, projection)
 
         parameter_space = projection.synapse_type.native_parameters
+        # TODO: in the documentation, we claim that a parameter value can be
+        #       a list or 1D array of the same length as the number of connections.
+        #       We do not currently handle this scenario, although it is only
+        #       really useful for fixed-number connectors anyway.
+        #       Probably the best solution is to remove the parameter at this stage,
+        #       then set it after the connections have already been created.
+        parameter_space.shape = (projection.pre.size, projection.post.size)
 
         # Remove randomly generated variables from the (host) parameter_space
         # if the user so chooses. We keep a copy of the removed (not expanded)
@@ -68,18 +75,14 @@ class GeNNConnectorMixin(object):
                      map.is_homogeneous):
 
                     self.on_device_init_params[name] = map
+                    # if not map.is_homogeneous:
+                    #     pops.append(name)
+
                     pops.append(name)
 
             for name in pops:
                 parameter_space.pop(name)
 
-        # TODO: in the documentation, we claim that a parameter value can be
-        #       a list or 1D array of the same length as the number of connections.
-        #       We do not currently handle this scenario, although it is only
-        #       really useful for fixed-number connectors anyway.
-        #       Probably the best solution is to remove the parameter at this stage,
-        #       then set it after the connections have already been created.
-        parameter_space.shape = (projection.pre.size, projection.post.size)
         for name, map in parameter_space.items():
             if callable(map.base_value):
                 if isinstance(map.base_value, IndexBasedExpression):
