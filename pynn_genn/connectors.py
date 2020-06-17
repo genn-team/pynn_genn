@@ -66,7 +66,7 @@ class GeNNConnectorMixin(object):
         # Remove randomly generated variables from the (host) parameter_space
         # if the user so chooses. We keep a copy of the removed (not expanded)
         # parameters in the Connector object
-        if self.on_device_init or self.procedural:
+        if self.on_device_init:
             pops = []
             for name, map in parameter_space.items():
                 if ((isinstance(map.base_value, RandomDistribution) and
