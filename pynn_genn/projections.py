@@ -14,11 +14,13 @@ from pyNN.connectors import AllToAllConnector, FromListConnector, \
                             FromFileConnector
 from pyNN.core import ezip
 from pyNN.space import Space
+from pyNN.parameters import LazyArray
 
 from . import simulator
 from .standardmodels.synapses import StaticSynapse
 from .model import sanitize_label
 from .contexts import ContextMixin
+from .random import NativeRNG
 
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
@@ -129,16 +131,7 @@ class Projection(common.Projection, ContextMixin):
         # Native projections list. Remains empty if no projections are generated.
         self._sub_projections = []
 
-        # **TODO** leave type up to Connector types
-        n_conns = 0
-        max_conns = float(presynaptic_population.size * postsynaptic_population.size)
-        if isinstance(connector, FromListConnector) or \
-            isinstance(connector, FromFileConnector):
-            n_conns = len(connector.conn_list)
-
-        self.use_sparse = (False if isinstance(connector, AllToAllConnector) or (max_conns == n_conns)
-                           else True)
-
+        self.use_sparse = connector.use_sparse
         # Generate name stem for sub-projections created from this projection
         # **NOTE** superclass will always populate label PROPERTY
         # with something moderately useful i.e. at least unique
@@ -370,6 +363,10 @@ class Projection(common.Projection, ContextMixin):
         for c in params:
             params[c] = np.asarray(params[c])
 
+        # put back the params which were not expanded by PyNN
+        for c in self._connector.on_device_init_params:
+            params[c] = self._connector.on_device_init_params[c]
+
         num_synapses = len(pre_indices)
         if num_synapses == 0:
             logging.warning("Projection {} has no connections. "
@@ -377,11 +374,20 @@ class Projection(common.Projection, ContextMixin):
             return
 
         # Extract delays
-        delay_steps = params["delaySteps"]
+        if "delaySteps" in self._connector.on_device_init_params:
+            delay_steps = self._connector.on_device_init_params["delaySteps"]
+            if delay_steps.is_homogeneous:
+                delay_steps.shape = (1,)
+            else:
+                delay_steps.shape = (num_synapses,)
+            delay_steps = delay_steps.evaluate(simplify=False)
+        else:
+            delay_steps = params["delaySteps"]
 
-        # If delays aren't all the same
+
         # **TODO** add support for heterogeneous dendritic delay
         if not np.allclose(delay_steps, delay_steps[0]):
+            # If delays aren't all the same
             # Get average delay
             delay_steps = int(round(np.mean(delay_steps)))
             logging.warning("Projection {}: GeNN does not support variable "
@@ -419,8 +425,10 @@ class Projection(common.Projection, ContextMixin):
             conn_pre_inds = pre_indices[conn_mask]
             conn_post_inds = post_indices[conn_mask]
 
+            # NOTE: had to add a check for non-expanded params
             if self.use_sparse:
-                conn_params = {n: p[conn_mask] for n, p in iteritems(params)}
+                conn_params = {n: p[conn_mask] if not isinstance(p, LazyArray) else p
+                               for n, p in iteritems(params)}
             else:
                 ## GeNN stores synapses in this row-major order for dense matrices
                 ## PyNN in some cases (FromListConnector) uses column-major
@@ -428,8 +436,11 @@ class Projection(common.Projection, ContextMixin):
                 to_row_major = np.lexsort((conn_post_inds, conn_pre_inds))
                 conn_mask[:] = conn_mask[to_row_major]
 
-                conn_params = {n: (p[to_row_major])[conn_mask] for n, p in iteritems(params)}
+                conn_params = {n: (p[to_row_major])[conn_mask]
+                                if not isinstance(p, LazyArray) else p
+                                    for n, p in iteritems(params)}
 
+            conn_params['connector']= self._connector
 
             # Build GeNN postsynaptic model
             psm_model, psm_params, psm_ini =\
