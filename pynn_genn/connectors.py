@@ -221,7 +221,7 @@ class FromFileConnector(GeNNConnectorMixin, FromFilePyNN):
     __doc__ = FromFilePyNN.__doc__
 
     def __init__(self,  file, distributed=False, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self, False)
+        GeNNConnectorMixin.__init__(self, on_device_init=False)
         FromFilePyNN.__init__(self, file, distributed,
                               safe=safe, callback=callback)
 
@@ -243,7 +243,6 @@ class ArrayConnector(GeNNConnectorMixin, ArrayPyNN):
     __doc__ = ArrayPyNN.__doc__
 
     def __init__(self, array, safe=True, callback=None):
-        on_device_init = False
-        GeNNConnectorMixin.__init__(self, on_device_init)
+        GeNNConnectorMixin.__init__(self, on_device_init=False)
         ArrayPyNN.__init__(self, array, safe=safe, callback=callback)
 
