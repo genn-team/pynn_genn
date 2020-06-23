@@ -161,6 +161,13 @@ class Projection(common.Projection, ContextMixin):
             else:
                 conn_params[p_name].extend(repeat(p_val, times=num_synapses))
 
+    @ContextMixin.use_contextual_arguments()
+    def _on_device_connect(self, pre_size, post_size,
+                           conn_pre_indices, conn_post_indices, conn_params,
+                           **connection_parameters):
+        for k, m in iteritems(connection_parameters):
+            conn_params[k] = m
+
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
@@ -327,6 +334,8 @@ class Projection(common.Projection, ContextMixin):
         else:
             return [(pop, neuron_slice, conn_mask)]
 
+
+
     def _create_native_projection(self):
         """Create GeNN projections (aka synaptic populatiosn)
             This function is supposed to be called by the simulator
@@ -354,6 +363,7 @@ class Projection(common.Projection, ContextMixin):
                                   conn_params=params):
             self._connector.connect(self)
 
+
         # Convert pre and postsynaptic indices to numpy arrays
         pre_indices = np.asarray(pre_indices, dtype=np.uint32)
         post_indices = np.asarray(post_indices, dtype=np.uint32)
@@ -367,20 +377,15 @@ class Projection(common.Projection, ContextMixin):
         for c in self._connector.on_device_init_params:
             params[c] = self._connector.on_device_init_params[c]
 
-        num_synapses = len(pre_indices)
-        if num_synapses == 0:
-            logging.warning("Projection {} has no connections. "
-                            "Ignoring.".format(self.label))
-            return
-
         # Extract delays
+        # If the delays were not expanded on host, check if homogeneous and
+        # evaluate through the LazyArray method
         if "delaySteps" in self._connector.on_device_init_params:
             delay_steps = self._connector.on_device_init_params["delaySteps"]
-            if delay_steps.is_homogeneous:
-                delay_steps.shape = (1,)
-            else:
-                delay_steps.shape = (num_synapses,)
-            delay_steps = delay_steps.evaluate(simplify=False)
+            simplify = delay_steps.is_homogeneous
+            delay_steps = delay_steps.evaluate(simplify=simplify)
+            delay_steps = [delay_steps] if simplify else delay_steps
+        # If delays were expanded, just pass them
         else:
             delay_steps = params["delaySteps"]
 
@@ -401,6 +406,52 @@ class Projection(common.Projection, ContextMixin):
         # As delay is homogeneous, use to obtain minimum delay
         # **TODO** this is a pretty hacky solution
         self.min_delay = (delay_steps + 1) * self._simulator.state.dt
+
+        # If both pre_indices and post_indices are empty, it means that we
+        # prevented PyNN from expanding indices
+        if len(pre_indices) == 0 and len(post_indices) == 0:
+            self._on_device_init_native_projection(
+                matrix_type, prefix, params, delay_steps)
+        else:
+            self._on_host_init_native_projection(
+                pre_indices, post_indices, matrix_type, prefix, params, delay_steps)
+
+
+    def _on_device_init_native_projection(self, matrix_type, prefix, params, delay_steps):
+        print('_on_device_native_projection')
+        # If connectivity is sparse, configure sparse connectivity
+        genn_label = "%s_%u" % (self._genn_label_stem,
+                                len(self._sub_projections))
+        conn_init = self._connector._init_connectivity(self)
+        psm_model, psm_params, psm_ini = \
+            self.post.celltype.build_genn_psm(self.post._native_parameters,
+                                             self.post.initial_values,
+                                             prefix)
+        params['connector'] = self._connector
+        wum_model, wum_params, wum_init, wum_pre_init, wum_post_init = \
+                self.synapse_type.build_genn_wum(params,
+                                             self.initial_values)
+        syn_pop = simulator.state.model.add_synapse_population(
+            genn_label, matrix_type, delay_steps,
+            self.pre._pop, self.post._pop,
+            wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
+            psm_model, psm_params, psm_ini, conn_init)
+
+        # if self.use_sparse:
+        #     syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
+
+        self._sub_projections.append(
+            SubProjection(genn_label, self.pre, self.post,
+                slice(0, self.pre.size), slice(0, self.post.size), syn_pop, wum_params))
+        # # Build GeNN postsynaptic model
+
+    def _on_host_init_native_projection(self, pre_indices, post_indices,
+                                        matrix_type, prefix, params, delay_steps):
+        num_synapses = len(pre_indices)
+        if num_synapses == 0:
+            logging.warning("Projection {} has no connections. "
+                            "Ignoring.".format(self.label))
+            return
 
         # Build lists of actual pre and postsynaptic populations
         # we are connecting (i.e. rather than views, assemblies etc)

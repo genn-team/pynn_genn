@@ -1,7 +1,8 @@
 from copy import copy, deepcopy
 from pyNN.core import IndexBasedExpression
 from pyNN.parameters import LazyArray
-from pygenn.genn_model import create_custom_sparse_connect_init_snippet_class
+from pygenn.genn_model import init_connectivity,\
+    create_custom_sparse_connect_init_snippet_class
 # NOTE: Had to change the import names due to naming
 # resolution not working properly and losing the original
 # class when initializing. This is mainly due to using multiple
@@ -41,10 +42,40 @@ __all__ = [
 
 
 class GeNNConnectorMixin(object):
+    _builtin_inits = {
+        'OneToOneConnector': 'OneToOne',
+        'FixedProbabilityConnector': 'FixedProbability',
+        'FixedNumberPostConnector': 'FixedNumberPostWithReplacement',
+        'FixedTotalNumberConnector': 'FixedNumberTotalWithReplacement'
+    }
     def __init__(self, on_device_init=False, use_sparse=True):
         self.on_device_init = on_device_init
         self.use_sparse = use_sparse
         self.on_device_init_params = {}
+
+    def connect(self, projection):
+        # If we are going to expand on device, we don't need to generate masks,
+        # pre- or post indices
+        if self.on_device_init:
+            param_space = self._parameters_from_synapse_type(projection)
+            # Evaluate the lazy arrays containing the synaptic parameters
+            connection_parameters = {}
+            for name, map in param_space.items():
+                if map.is_homogeneous:
+                    connection_parameters[name] = map.evaluate(simplify=True)
+                else:
+                    connection_parameters[name] = map
+
+            projection._on_device_connect(projection.pre.size,
+                                          projection.post.size,
+                                          **connection_parameters)
+        # Otherwise, just go for the standard connect method and optimize
+        # whenever possible
+        else:
+            # get parents, we know that the first one is this Mixin and the
+            # second is the PyNN connector specific class
+            mixin, pynn_conn = self.__class__.__bases__
+            pynn_conn.connect(self, projection)
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -69,6 +100,8 @@ class GeNNConnectorMixin(object):
         if self.on_device_init:
             pops = []
             for name, map in parameter_space.items():
+                # if len(map.operations):
+                #     continue
                 if ((isinstance(map.base_value, RandomDistribution) and
                         isinstance(map.base_value.rng, NativeRNG)) or
                         map.is_homogeneous):
@@ -95,7 +128,15 @@ class GeNNConnectorMixin(object):
                     parameter_space[name] = map(distance_map)
         return parameter_space
 
+    def _init_connectivity(self, projection):
+        class_name = self.__class__.__name__
+        params = self._get_conn_init_params(projection)
+        if class_name in self._builtin_inits:
+            builtin_name = self._builtin_inits[class_name]
+            return init_connectivity(builtin_name, params)
 
+    def _get_conn_init_params(self, projection):
+        return {}
 
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
