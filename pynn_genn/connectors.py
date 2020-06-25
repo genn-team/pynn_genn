@@ -170,6 +170,8 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
         FixProbPyNN.__init__(self, p_connect, allow_self_connections,
                  rng, safe=safe, callback=callback)
 
+    def _get_conn_init_params(self, projection):
+        return {'prob': self.p_connect}
 
 class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
     __doc__ = FixTotalPyNN.__doc__
@@ -180,6 +182,9 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
         GeNNConnectorMixin.__init__(self, on_device_init)
         FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
                               rng, safe=safe, callback=callback)
+
+    def _get_conn_init_params(self, projection):
+        return {'total': self.n}
 
 
 class FixedNumberPreConnector(GeNNConnectorMixin, FixNumPrePyNN):
@@ -203,6 +208,8 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
         FixNumPostPyNN.__init__(self, n, allow_self_connections,
                             with_replacement, rng, safe=safe, callback=callback)
 
+    def _get_conn_init_params(self, projection):
+        return {'rowLength': self.n}
 
 class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
     __doc__ = DistProbPyNN.__doc__

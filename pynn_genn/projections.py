@@ -1,3 +1,8 @@
+try:
+    xrange
+except NameError:  # Python 3
+    xrange = range
+
 from collections import defaultdict, namedtuple, Iterable
 from itertools import product, repeat
 import logging
@@ -235,6 +240,7 @@ class Projection(common.Projection, ContextMixin):
         # Return variables as tuple
         return tuple(variables)
 
+
     def _get_attributes_as_list(self, names):
         # Dig out reference to GeNN model
         genn_model = self._simulator.state.model
@@ -418,35 +424,58 @@ class Projection(common.Projection, ContextMixin):
 
 
     def _on_device_init_native_projection(self, matrix_type, prefix, params, delay_steps):
-        print('_on_device_native_projection')
-        # If connectivity is sparse, configure sparse connectivity
-        genn_label = "%s_%u" % (self._genn_label_stem,
-                                len(self._sub_projections))
-        conn_init = self._connector._init_connectivity(self)
+        """ Create an on-device connectivity initializer based projection, this
+        removes the need to compute things on host so we can use less memory and
+        faster network initialization
+        :param matrix_type: Whether we are using a dense or sparse matrix
+        :param prefix: for the connection type (excitatory or inhibitory)
+        :param params: connection parameters, required synapse_type.build_genn_wum
+        :param delay_steps: delay used by connections
+        :return:
+        """
+        # Build GeNN postsynaptic model
         psm_model, psm_params, psm_ini = \
             self.post.celltype.build_genn_psm(self.post._native_parameters,
                                              self.post.initial_values,
                                              prefix)
+
+        # add a the Connector object to the parameters
         params['connector'] = self._connector
+        # Build GeNN weight update model
         wum_model, wum_params, wum_init, wum_pre_init, wum_post_init = \
                 self.synapse_type.build_genn_wum(params,
                                              self.initial_values)
+
+        # generate an on-device connectivity initializer object
+        conn_init = self._connector._init_connectivity(self)
+
+        # generate a unique label
+        genn_label = "%s_%u" % (self._genn_label_stem,
+                                len(self._sub_projections))
+
+        # Create GeNN synapse population
         syn_pop = simulator.state.model.add_synapse_population(
             genn_label, matrix_type, delay_steps,
             self.pre._pop, self.post._pop,
             wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
             psm_model, psm_params, psm_ini, conn_init)
 
-        # if self.use_sparse:
-        #     syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
-
         self._sub_projections.append(
             SubProjection(genn_label, self.pre, self.post,
                 slice(0, self.pre.size), slice(0, self.post.size), syn_pop, wum_params))
-        # # Build GeNN postsynaptic model
 
     def _on_host_init_native_projection(self, pre_indices, post_indices,
                                         matrix_type, prefix, params, delay_steps):
+        """If the projection HAS to be generated on host (i.e. using a FromListConnector)
+        then go through the standard connectivity path
+        :param pre_indices: indices for the pre-synaptic population neurons
+        :param post_indices: indices for the post-synaptic population neurons
+        :param matrix_type: Whether we are using a dense or sparse matrix
+        :param prefix: for the connection type (excitatory or inhibitory)
+        :param params: connection parameters, required synapse_type.build_genn_wum
+        :param delay_steps: delay used by connections
+        :return:
+        """
         num_synapses = len(pre_indices)
         if num_synapses == 0:
             logging.warning("Projection {} has no connections. "
