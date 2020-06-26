@@ -119,6 +119,7 @@ class NativeRNG(NativeRNG):
         return simulator.state.native_rng
 
     def __deepcopy__(self, memo):
+        # fake a deepcopy to keep a single NativeRNG
         return simulator.state.native_rng
 
 

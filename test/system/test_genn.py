@@ -1,6 +1,6 @@
 from nose.plugins.skip import SkipTest
 from .scenarios.registry import registry
-from nose.tools import assert_equal, assert_not_equal, assert_greater
+from nose.tools import assert_equal, assert_not_equal, assert_greater, assert_less_equal
 from pyNN.utility import init_logging, assert_arrays_equal
 import numpy
 import copy
@@ -103,7 +103,7 @@ def v_rest():
     assert_greater(p, min_p)
 
 
-def v_init(sim):
+def v_init():
     if not have_genn:
         raise SkipTest
     sim = pynn_genn
@@ -139,7 +139,8 @@ def v_init(sim):
     assert_greater(p, min_p)
 
 
-def w_init_o2o(sim):
+def w_init_o2o():
+    # this now tests both weight and connectivity on-device generation
     if not have_genn:
         raise SkipTest
     sim = pynn_genn
@@ -182,9 +183,154 @@ def w_init_o2o(sim):
     min_p = 0.05
     assert_greater(p, min_p)
 
+def conn_init_fix_prob():
+    if not have_genn:
+        raise SkipTest
+    sim = pynn_genn
+
+    np_rng = sim.random.NumpyRNG(seed=1)
+    rng = sim.random.NativeRNG(np_rng, seed=1)
+
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_pre = 10000
+    n_post = 1000
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    pre = sim.Population(n_pre, sim.IF_curr_exp, params,
+                         label='pre')
+    post = sim.Population(n_post, sim.IF_curr_exp, params,
+                          label='post')
+
+    dist_params = {'low': 0.0, 'high': 10.0}
+    dist = 'uniform'
+    rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
+    var = 'weight'
+    on_device_init = bool(1)
+    p_conn = 0.3
+    conn = sim.FixedProbabilityConnector(p_connect=p_conn,
+                                         on_device_init=on_device_init)
+    syn = sim.StaticSynapse(weight=rand_dist, delay=1)
+    proj = sim.Projection(pre, post, conn, synapse_type=syn)
+
+    sim.run(10)
+
+    comp_var = numpy.asarray(proj.getWeights(format='array'))
+    connected = numpy.where(~numpy.isnan(comp_var))
+    comp_var = comp_var[connected]
+    num_active = comp_var.size
+    sim.end()
+
+    ideal_num_conn = n_pre * n_post * p_conn
+    one_percent = ideal_num_conn * 0.01
+    abs_diff = numpy.abs(num_active - ideal_num_conn)
+    assert_less_equal(abs_diff, one_percent)
+
+    scale = dist_params['high'] - dist_params['low']
+    s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
+    min_p = 0.05
+    assert_greater(p, min_p)
+
+def conn_init_fix_total():
+    if not have_genn:
+        raise SkipTest
+    sim = pynn_genn
+
+    np_rng = sim.random.NumpyRNG(seed=1)
+    rng = sim.random.NativeRNG(np_rng, seed=1)
+
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_pre = 10000
+    n_post = 1000
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    pre = sim.Population(n_pre, sim.IF_curr_exp, params,
+                         label='pre')
+    post = sim.Population(n_post, sim.IF_curr_exp, params,
+                          label='post')
+
+    dist_params = {'low': 0.0, 'high': 10.0}
+    dist = 'uniform'
+    rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
+    var = 'weight'
+    on_device_init = bool(1)
+    n = n_post
+    conn = sim.FixedTotalNumberConnector(n, on_device_init=on_device_init)
+    syn = sim.StaticSynapse(weight=rand_dist, delay=1)
+    proj = sim.Projection(pre, post, conn, synapse_type=syn)
+
+    sim.run(10)
+
+    comp_var = numpy.asarray(proj.getWeights(format='array'))
+    connected = numpy.where(~numpy.isnan(comp_var))
+    comp_var = comp_var[connected]
+    num_active = comp_var.size
+    sim.end()
+
+    one_percent = n * 0.01
+    abs_diff = numpy.abs(num_active - n)
+    assert_less_equal(abs_diff, one_percent)
+
+    scale = dist_params['high'] - dist_params['low']
+    s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
+    min_p = 0.05
+    assert_greater(p, min_p)
+
+def conn_init_fix_post():
+    if not have_genn:
+        raise SkipTest
+    sim = pynn_genn
+
+    np_rng = sim.random.NumpyRNG(seed=1)
+    rng = sim.random.NativeRNG(np_rng, seed=1)
+
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_pre = 10000
+    n_post = 1000
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    pre = sim.Population(n_pre, sim.IF_curr_exp, params,
+                         label='pre')
+    post = sim.Population(n_post, sim.IF_curr_exp, params,
+                          label='post')
+
+    dist_params = {'low': 0.0, 'high': 10.0}
+    dist = 'uniform'
+    rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
+    var = 'weight'
+    on_device_init = bool(1)
+    n = 121
+    conn = sim.FixedNumberPostConnector(n, on_device_init=on_device_init)
+    syn = sim.StaticSynapse(weight=rand_dist, delay=1)
+    proj = sim.Projection(pre, post, conn, synapse_type=syn)
+
+    sim.run(10)
+
+    comp_var = numpy.asarray(proj.getWeights(format='array'))
+    n_cols = []
+    for r in comp_var:
+        n_cols.append(len(numpy.where(~numpy.isnan(r))[0]))
+    connected = numpy.where(~numpy.isnan(comp_var))
+    comp_var = comp_var[connected]
+    num_active = comp_var.size
+    sim.end()
+
+    abs_diff = numpy.abs(n - numpy.mean(n_cols))
+    epsilon = 0.01
+    assert abs_diff <= epsilon
+
+    scale = dist_params['high'] - dist_params['low']
+    s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
+    min_p = 0.05
+    assert_greater(p, min_p)
 
 if __name__ == '__main__':
     test_scenarios()
     rng_checks()
     v_rest()
-    w_init_o2o()
+    w_init_o2o() # this also tests connectivity init
+    conn_init_fix_prob()
+    conn_init_fix_total()
+    conn_init_fix_post()
