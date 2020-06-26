@@ -56,7 +56,7 @@ class GeNNConnectorMixin(object):
     def connect(self, projection):
         # If we are going to expand on device, we don't need to generate masks,
         # pre- or post indices
-        if self.on_device_init:
+        if self.on_device_init and self.connectivity_init_possible():
             param_space = self._parameters_from_synapse_type(projection)
             # Evaluate the lazy arrays containing the synaptic parameters
             connection_parameters = {}
@@ -128,10 +128,14 @@ class GeNNConnectorMixin(object):
                     parameter_space[name] = map(distance_map)
         return parameter_space
 
+    def connectivity_init_possible(self):
+        class_name = self.__class__.__name__
+        return class_name in self._builtin_inits
+
     def _init_connectivity(self, projection):
         class_name = self.__class__.__name__
         params = self._get_conn_init_params(projection)
-        if class_name in self._builtin_inits:
+        if self.connectivity_init_possible():
             builtin_name = self._builtin_inits[class_name]
             return init_connectivity(builtin_name, params)
 

@@ -415,7 +415,7 @@ class Projection(common.Projection, ContextMixin):
 
         # If both pre_indices and post_indices are empty, it means that we
         # prevented PyNN from expanding indices
-        if len(pre_indices) == 0 and len(post_indices) == 0:
+        if self._connector.connectivity_init_possible():
             self._on_device_init_native_projection(
                 matrix_type, prefix, params, delay_steps)
         else:
