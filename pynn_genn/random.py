@@ -118,6 +118,10 @@ class NativeRNG(NativeRNG):
             ))
         return simulator.state.native_rng
 
+    def __deepcopy__(self, memo):
+        return simulator.state.native_rng
+
+
     def __str__(self):
         return 'NativeRNG GeNN(seed=%s)' % self.seed
 
