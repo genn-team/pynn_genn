@@ -198,6 +198,11 @@ class Projection(common.Projection, ContextMixin):
 
                 # Loop through sub-populations
                 for sub in self._sub_projections:
+                    # if we were able to initialize connectivity on device
+                    # we need to get it before examining variables
+                    if self._connector.connectivity_init_possible():
+                        sub.syn_pop.pull_connectivity_from_device()
+
                     # Get connection indices in
                     sub_pre_inds = sub.syn_pop.get_sparse_pre_inds()
                     sub_post_inds = sub.syn_pop.get_sparse_post_inds()
