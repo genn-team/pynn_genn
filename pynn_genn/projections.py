@@ -166,13 +166,6 @@ class Projection(common.Projection, ContextMixin):
             else:
                 conn_params[p_name].extend(repeat(p_val, times=num_synapses))
 
-    @ContextMixin.use_contextual_arguments()
-    def _on_device_connect(self, pre_size, post_size,
-                           conn_pre_indices, conn_post_indices, conn_params,
-                           **connection_parameters):
-        for k, m in iteritems(connection_parameters):
-            conn_params[k] = m
-
     def _set_initial_value_array(self, variable, initial_value):
         pass
 
@@ -200,7 +193,7 @@ class Projection(common.Projection, ContextMixin):
                 for sub in self._sub_projections:
                     # if we were able to initialize connectivity on device
                     # we need to get it before examining variables
-                    if self._connector.connectivity_init_possible():
+                    if self._connector.connectivity_init_possible:
                         sub.syn_pop.pull_connectivity_from_device()
 
                     # Get connection indices in
@@ -369,10 +362,15 @@ class Projection(common.Projection, ContextMixin):
         # Build connectivity
         # **NOTE** this build connector matching shape of PROJECTION
         # this means that it will match pre and post view or assembly
-        with self.get_new_context(conn_pre_indices=pre_indices,
-                                  conn_post_indices=post_indices,
-                                  conn_params=params):
-            self._connector.connect(self)
+        if self._connector.connectivity_init_possible and self._connector.on_device_init:
+            _params = self._connector._parameters_from_synapse_type(self)
+            for p_name, p_val in iteritems(_params):
+                params[p_name] = p_val
+        else:
+            with self.get_new_context(conn_pre_indices=pre_indices,
+                                      conn_post_indices=post_indices,
+                                      conn_params=params):
+                self._connector.connect(self)
 
 
         # Convert pre and postsynaptic indices to numpy arrays
@@ -420,7 +418,7 @@ class Projection(common.Projection, ContextMixin):
 
         # If both pre_indices and post_indices are empty, it means that we
         # prevented PyNN from expanding indices
-        if self._connector.connectivity_init_possible():
+        if self._connector.connectivity_init_possible:
             self._on_device_init_native_projection(
                 matrix_type, prefix, params, delay_steps)
         else:
@@ -452,7 +450,7 @@ class Projection(common.Projection, ContextMixin):
                                              self.initial_values)
 
         # generate an on-device connectivity initializer object
-        conn_init = self._connector._init_connectivity(self)
+        conn_init = self._connector._init_connectivity()
 
         # generate a unique label
         genn_label = "%s_%u" % (self._genn_label_stem,

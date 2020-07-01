@@ -194,7 +194,7 @@ def conn_init_fix_prob():
     timestep = 1.
     sim.setup(timestep)
 
-    n_pre = 10000
+    n_pre = 1000
     n_post = 1000
     params = copy.copy(sim.IF_curr_exp.default_parameters)
     pre = sim.Population(n_pre, sim.IF_curr_exp, params,
@@ -242,7 +242,7 @@ def conn_init_fix_total():
     timestep = 1.
     sim.setup(timestep)
 
-    n_pre = 10000
+    n_pre = 1000
     n_post = 1000
     params = copy.copy(sim.IF_curr_exp.default_parameters)
     pre = sim.Population(n_pre, sim.IF_curr_exp, params,
@@ -288,7 +288,7 @@ def conn_init_fix_post():
     timestep = 1.
     sim.setup(timestep)
 
-    n_pre = 10000
+    n_pre = 1000
     n_post = 1000
     params = copy.copy(sim.IF_curr_exp.default_parameters)
     pre = sim.Population(n_pre, sim.IF_curr_exp, params,

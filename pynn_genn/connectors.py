@@ -42,40 +42,12 @@ __all__ = [
 
 
 class GeNNConnectorMixin(object):
-    _builtin_inits = {
-        'OneToOneConnector': 'OneToOne',
-        'FixedProbabilityConnector': 'FixedProbability',
-        'FixedNumberPostConnector': 'FixedNumberPostWithReplacement',
-        'FixedTotalNumberConnector': 'FixedNumberTotalWithReplacement'
-    }
     def __init__(self, on_device_init=False, use_sparse=True):
         self.on_device_init = on_device_init
         self.use_sparse = use_sparse
         self.on_device_init_params = {}
-
-    def connect(self, projection):
-        # If we are going to expand on device, we don't need to generate masks,
-        # pre- or post indices
-        if self.on_device_init and self.connectivity_init_possible():
-            param_space = self._parameters_from_synapse_type(projection)
-            # Evaluate the lazy arrays containing the synaptic parameters
-            connection_parameters = {}
-            for name, map in param_space.items():
-                if map.is_homogeneous:
-                    connection_parameters[name] = map.evaluate(simplify=True)
-                else:
-                    connection_parameters[name] = map
-
-            projection._on_device_connect(projection.pre.size,
-                                          projection.post.size,
-                                          **connection_parameters)
-        # Otherwise, just go for the standard connect method and optimize
-        # whenever possible
-        else:
-            # get parents, we know that the first one is this Mixin and the
-            # second is the PyNN connector specific class
-            mixin, pynn_conn = self.__class__.__bases__
-            pynn_conn.connect(self, projection)
+        self.connectivity_init_possible = False
+        self._builtin_name = ""
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -128,19 +100,17 @@ class GeNNConnectorMixin(object):
                     parameter_space[name] = map(distance_map)
         return parameter_space
 
-    def connectivity_init_possible(self):
-        class_name = self.__class__.__name__
-        return class_name in self._builtin_inits
+    def _init_connectivity(self):
+        if self.connectivity_init_possible:
+            return init_connectivity(self._builtin_name, self._conn_init_params)
 
-    def _init_connectivity(self, projection):
-        class_name = self.__class__.__name__
-        params = self._get_conn_init_params(projection)
-        if self.connectivity_init_possible():
-            builtin_name = self._builtin_inits[class_name]
-            return init_connectivity(builtin_name, params)
+        raise Exception('Requested on-device sparse connectivity initializer for '
+                        'a connector which is not (yet) supported')
 
-    def _get_conn_init_params(self, projection):
+    @property
+    def _conn_init_params(self):
         return {}
+
 
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
@@ -152,6 +122,8 @@ class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
         OneToOnePyNN.__init__(
             self, safe=safe, callback=callback)
 
+        self._builtin_name = 'OneToOne'
+        self.connectivity_init_possible = True
 
 class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
@@ -174,20 +146,29 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
         FixProbPyNN.__init__(self, p_connect, allow_self_connections,
                  rng, safe=safe, callback=callback)
 
-    def _get_conn_init_params(self, projection):
+        self._builtin_name = ('FixedProbability' if allow_self_connections else
+                              'FixedProbabilityNoAutapse')
+        self.connectivity_init_possible = True
+
+    @property
+    def _conn_init_params(self):
         return {'prob': self.p_connect}
 
 class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
     __doc__ = FixTotalPyNN.__doc__
 
-    def __init__(self, n, allow_self_connections=True, with_replacement=False,
+    def __init__(self, n, allow_self_connections=True, with_replacement=True,
                  rng=None, safe=True, callback=None,
                  on_device_init=False):
         GeNNConnectorMixin.__init__(self, on_device_init)
         FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
                               rng, safe=safe, callback=callback)
 
-    def _get_conn_init_params(self, projection):
+        self._builtin_name = 'FixedNumberTotalWithReplacement'
+        self.connectivity_init_possible = True if with_replacement else False
+
+    @property
+    def _conn_init_params(self):
         return {'total': self.n}
 
 
@@ -212,7 +193,13 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
         FixNumPostPyNN.__init__(self, n, allow_self_connections,
                             with_replacement, rng, safe=safe, callback=callback)
 
-    def _get_conn_init_params(self, projection):
+        self._builtin_name = 'FixedNumberPostWithReplacement'
+        self.connectivity_init_possible = True if with_replacement else False
+
+
+
+    @property
+    def _conn_init_params(self):
         return {'rowLength': self.n}
 
 class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
