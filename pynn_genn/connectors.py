@@ -148,7 +148,7 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
 
         self._builtin_name = ('FixedProbability' if allow_self_connections else
                               'FixedProbabilityNoAutapse')
-        self.connectivity_init_possible = True
+        self.connectivity_init_possible = (True and isinstance(rng, NativeRNG))
 
     @property
     def _conn_init_params(self):
@@ -165,7 +165,8 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
                               rng, safe=safe, callback=callback)
 
         self._builtin_name = 'FixedNumberTotalWithReplacement'
-        self.connectivity_init_possible = True if with_replacement else False
+        self.connectivity_init_possible = ((True if with_replacement else False) and
+                                           isinstance(rng, NativeRNG))
 
     @property
     def _conn_init_params(self):
@@ -194,7 +195,8 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
                             with_replacement, rng, safe=safe, callback=callback)
 
         self._builtin_name = 'FixedNumberPostWithReplacement'
-        self.connectivity_init_possible = True if with_replacement else False
+        self.connectivity_init_possible = ((True if with_replacement else False) and
+                                           isinstance(rng, NativeRNG))
 
 
 
