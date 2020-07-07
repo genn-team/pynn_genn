@@ -42,14 +42,18 @@ __all__ = [
 ]
 
 
-class NonNativeRGN(Warning):
-    pass
+class NonNativeRNG(Warning):
+    def __str__(self):
+        return "Use the NativeRNG to expand the connectivity on device"
 
 class WithReplacementOnly(Warning):
-    pass
+    def __str__(self):
+        return ("Connections are currently randomly generated on device "
+                "with replacement only. To enable on-device expansion, set "
+                "the argument with_replacement to True.")
 
 
-warnings.simplefilter("once", NonNativeRGN)
+warnings.simplefilter("once", NonNativeRNG)
 warnings.simplefilter("once", WithReplacementOnly)
 
 
@@ -121,16 +125,6 @@ class GeNNConnectorMixin(object):
     def _conn_init_params(self):
         return {}
 
-    def _warn_connectivity_rng(self):
-        warnings.warn("Use the NativeRNG to expand the connectivity on device",
-                      NonNativeRGN)
-
-    def _warn_connectivity_replacement(self):
-        warnings.warn("Connections are currently randomly generated on device "
-                      "with replacement only. To enable on-device expansion, set "
-                      "the argument with_replacement to True.",
-                      WithReplacementOnly)
-
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
 
@@ -167,7 +161,7 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
         self.connectivity_init_possible = isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity_rng()
+            warnings.warn(NonNativeRNG())
 
     @property
     def _conn_init_params(self):
@@ -187,11 +181,10 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity_rng()
+            warnings.warn(NonNativeRNG())
 
         if not with_replacement:
-            self._warn_connectivity_replacement()
-
+            warnings.warn(WithReplacementOnly())
 
     @property
     def _conn_init_params(self):
@@ -221,11 +214,10 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity_rng()
+            warnings.warn(NonNativeRNG())
 
         if not with_replacement:
-            self._warn_connectivity_replacement()
-
+            warnings.warn(WithReplacementOnly())
 
     @property
     def _conn_init_params(self):
@@ -239,7 +231,7 @@ class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
                  rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         DistProbPyNN.__init__(self, d_expression, allow_self_connections,
-                 rng, safe=safe, callback=callback)
+                              rng, safe=safe, callback=callback)
 
 
 class DisplacementDependentProbabilityConnector(
@@ -250,7 +242,7 @@ class DisplacementDependentProbabilityConnector(
                  rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         DisplaceProbPyNN.__init__(self, disp_function, allow_self_connections,
-                 rng, safe=safe, callback=callback)
+                                  rng, safe=safe, callback=callback)
 
 
 class IndexBasedProbabilityConnector(GeNNConnectorMixin, IndexProbPyNN):
@@ -260,7 +252,7 @@ class IndexBasedProbabilityConnector(GeNNConnectorMixin, IndexProbPyNN):
                  rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         IndexProbPyNN.__init__(self, index_expression, allow_self_connections,
-                 rng, safe=safe, callback=callback)
+                               rng, safe=safe, callback=callback)
 
 
 class SmallWorldConnector(GeNNConnectorMixin, SmallWorldPyNN):
@@ -270,7 +262,7 @@ class SmallWorldConnector(GeNNConnectorMixin, SmallWorldPyNN):
                  n_connections=None, rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         SmallWorldPyNN.__init__(self, degree, rewiring, allow_self_connections,
-                 n_connections, rng,  safe=safe, callback=callback)
+                                n_connections, rng,  safe=safe, callback=callback)
 
 
 class FromListConnector(GeNNConnectorMixin, FromListPyNN):
