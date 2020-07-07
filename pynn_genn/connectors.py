@@ -1,5 +1,6 @@
 from copy import copy, deepcopy
 from pyNN.core import IndexBasedExpression
+import warnings
 from pyNN.parameters import LazyArray
 from pygenn.genn_model import init_connectivity,\
     create_custom_sparse_connect_init_snippet_class
@@ -39,6 +40,17 @@ __all__ = [
     "FromListConnector", "FromFileConnector",
     "CloneConnector", "ArrayConnector"
 ]
+
+
+class NonNativeRGN(Warning):
+    pass
+
+class WithReplacementOnly(Warning):
+    pass
+
+
+warnings.simplefilter("once", NonNativeRGN)
+warnings.simplefilter("once", WithReplacementOnly)
 
 
 class GeNNConnectorMixin(object):
@@ -109,6 +121,15 @@ class GeNNConnectorMixin(object):
     def _conn_init_params(self):
         return {}
 
+    def _warn_connectivity(self):
+        warnings.warn("Use the NativeRNG to expand the connectivity on device",
+                      NonNativeRGN)
+
+    def _warn_connectivity_replacement(self):
+        warnings.warn("Connections are currently randomly generated on device "
+                      "with replacement only. To enable on-device expansion, set "
+                      "the argument with_replacement to True.",
+                      WithReplacementOnly)
 
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
@@ -145,6 +166,9 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
                               'FixedProbabilityNoAutapse')
         self.connectivity_init_possible = isinstance(rng, NativeRNG)
 
+        if not isinstance(rng, NativeRNG):
+            self._warn_connectivity()
+
     @property
     def _conn_init_params(self):
         return {'prob': self.p_connect}
@@ -161,6 +185,13 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
 
         self._builtin_name = 'FixedNumberTotalWithReplacement'
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
+
+        if not isinstance(rng, NativeRNG):
+            self._warn_connectivity()
+
+        if not with_replacement:
+            self._warn_connectivity_replacement()
+
 
     @property
     def _conn_init_params(self):
@@ -188,6 +219,13 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
 
         self._builtin_name = 'FixedNumberPostWithReplacement'
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
+
+        if not isinstance(rng, NativeRNG):
+            self._warn_connectivity()
+
+        if not with_replacement:
+            self._warn_connectivity_replacement()
+
 
     @property
     def _conn_init_params(self):
