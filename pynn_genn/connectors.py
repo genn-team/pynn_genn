@@ -121,7 +121,7 @@ class GeNNConnectorMixin(object):
     def _conn_init_params(self):
         return {}
 
-    def _warn_connectivity(self):
+    def _warn_connectivity_rng(self):
         warnings.warn("Use the NativeRNG to expand the connectivity on device",
                       NonNativeRGN)
 
@@ -167,7 +167,7 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
         self.connectivity_init_possible = isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity()
+            self._warn_connectivity_rng()
 
     @property
     def _conn_init_params(self):
@@ -187,7 +187,7 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity()
+            self._warn_connectivity_rng()
 
         if not with_replacement:
             self._warn_connectivity_replacement()
@@ -221,7 +221,7 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
         self.connectivity_init_possible = with_replacement and isinstance(rng, NativeRNG)
 
         if not isinstance(rng, NativeRNG):
-            self._warn_connectivity()
+            self._warn_connectivity_rng()
 
         if not with_replacement:
             self._warn_connectivity_replacement()
