@@ -67,7 +67,6 @@ def rng_checks():
     assert_equal(seed, rng2.seed)
 
 
-
 def v_rest():
     if not have_genn:
         raise SkipTest
@@ -161,9 +160,7 @@ def w_init_o2o():
     dist_params = {'low': 0.0, 'high': 10.0}
     dist = 'uniform'
     rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
-    var = 'weight'
-    on_device_init = bool(1)
-    conn = sim.OneToOneConnector(on_device_init=on_device_init)
+    conn = sim.OneToOneConnector()
     syn = sim.StaticSynapse(weight=rand_dist, delay=1)
     proj = sim.Projection(pre, post, conn, synapse_type=syn)
 
@@ -182,6 +179,7 @@ def w_init_o2o():
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
     min_p = 0.05
     assert_greater(p, min_p)
+
 
 def conn_init_fix_prob():
     if not have_genn:
@@ -205,11 +203,9 @@ def conn_init_fix_prob():
     dist_params = {'low': 0.0, 'high': 10.0}
     dist = 'uniform'
     rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
-    var = 'weight'
-    on_device_init = bool(1)
     p_conn = 0.3
     conn = sim.FixedProbabilityConnector(p_connect=p_conn,
-                                         on_device_init=on_device_init)
+                                         rng=rng)
     syn = sim.StaticSynapse(weight=rand_dist, delay=1)
     proj = sim.Projection(pre, post, conn, synapse_type=syn)
 
@@ -230,6 +226,7 @@ def conn_init_fix_prob():
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
     min_p = 0.05
     assert_greater(p, min_p)
+
 
 def conn_init_fix_total():
     if not have_genn:
@@ -253,10 +250,8 @@ def conn_init_fix_total():
     dist_params = {'low': 0.0, 'high': 10.0}
     dist = 'uniform'
     rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
-    var = 'weight'
-    on_device_init = bool(1)
     n = n_post
-    conn = sim.FixedTotalNumberConnector(n, on_device_init=on_device_init)
+    conn = sim.FixedTotalNumberConnector(n, with_replacement=True, rng=rng)
     syn = sim.StaticSynapse(weight=rand_dist, delay=1)
     proj = sim.Projection(pre, post, conn, synapse_type=syn)
 
@@ -276,6 +271,7 @@ def conn_init_fix_total():
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
     min_p = 0.05
     assert_greater(p, min_p)
+
 
 def conn_init_fix_post():
     if not have_genn:
@@ -299,10 +295,8 @@ def conn_init_fix_post():
     dist_params = {'low': 0.0, 'high': 10.0}
     dist = 'uniform'
     rand_dist = sim.random.RandomDistribution(dist, rng=rng, **dist_params)
-    var = 'weight'
-    on_device_init = bool(1)
     n = 121
-    conn = sim.FixedNumberPostConnector(n, on_device_init=on_device_init)
+    conn = sim.FixedNumberPostConnector(n, with_replacement=True, rng=rng)
     syn = sim.StaticSynapse(weight=rand_dist, delay=1)
     proj = sim.Projection(pre, post, conn, synapse_type=syn)
 
@@ -325,6 +319,7 @@ def conn_init_fix_post():
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
     min_p = 0.05
     assert_greater(p, min_p)
+
 
 if __name__ == '__main__':
     test_scenarios()

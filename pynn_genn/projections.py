@@ -193,8 +193,7 @@ class Projection(common.Projection, ContextMixin):
                 for sub in self._sub_projections:
                     # if we were able to initialize connectivity on device
                     # we need to get it before examining variables
-                    if (self._connector.connectivity_init_possible and
-                            self._connector.on_device_init):
+                    if self._connector.connectivity_init_possible:
                         sub.syn_pop.pull_connectivity_from_device()
 
                     # Get connection indices in
@@ -362,7 +361,7 @@ class Projection(common.Projection, ContextMixin):
 
         # if we want to build the connectivity on device we just need to parse
         # the parameters into a dictionary, no need to build pre/post indices
-        if (self._connector.connectivity_init_possible and self._connector.on_device_init):
+        if self._connector.connectivity_init_possible:
             _params = self._connector._parameters_from_synapse_type(self)
             for p_name, p_val in iteritems(_params):
                 params[p_name] = p_val
@@ -423,7 +422,7 @@ class Projection(common.Projection, ContextMixin):
 
         # If both pre_indices and post_indices are empty, it means that we
         # prevented PyNN from expanding indices
-        if (self._connector.connectivity_init_possible and self._connector.on_device_init):
+        if self._connector.connectivity_init_possible:
             self._on_device_init_native_projection(
                 matrix_type, prefix, params, delay_steps)
         else:

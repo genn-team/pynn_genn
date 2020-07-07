@@ -122,9 +122,16 @@ class NativeRNG(NativeRNG):
         # fake a deepcopy to keep a single NativeRNG
         return simulator.state.native_rng
 
-
     def __str__(self):
         return 'NativeRNG GeNN(seed=%s)' % self.seed
+
+    def __getattr__(self, name):
+        """
+        This is to give the PyNN RNGs the same methods as the wrapped RNGs
+        (:class:`numpy.random.RandomState` or the GSL RNGs.)
+        """
+        return getattr(self._host_rng, name)
+
 
     @property
     def parallel_safe(self):
