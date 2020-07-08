@@ -1,3 +1,8 @@
+try:
+    xrange
+except NameError:  # Python 3
+    xrange = range
+
 from collections import defaultdict, namedtuple, Iterable
 from itertools import product, repeat
 import logging
@@ -186,6 +191,11 @@ class Projection(common.Projection, ContextMixin):
 
                 # Loop through sub-populations
                 for sub in self._sub_projections:
+                    # if we were able to initialize connectivity on device
+                    # we need to get it before examining variables
+                    if self._connector.connectivity_init_possible:
+                        sub.syn_pop.pull_connectivity_from_device()
+
                     # Get connection indices in
                     sub_pre_inds = sub.syn_pop.get_sparse_pre_inds()
                     sub_post_inds = sub.syn_pop.get_sparse_post_inds()
@@ -227,6 +237,7 @@ class Projection(common.Projection, ContextMixin):
 
         # Return variables as tuple
         return tuple(variables)
+
 
     def _get_attributes_as_list(self, names):
         # Dig out reference to GeNN model
@@ -327,6 +338,8 @@ class Projection(common.Projection, ContextMixin):
         else:
             return [(pop, neuron_slice, conn_mask)]
 
+
+
     def _create_native_projection(self):
         """Create GeNN projections (aka synaptic populatiosn)
             This function is supposed to be called by the simulator
@@ -346,13 +359,23 @@ class Projection(common.Projection, ContextMixin):
         post_indices = []
         params = defaultdict(list)
 
+        # if we want to build the connectivity on device we just need to parse
+        # the parameters into a dictionary, no need to build pre/post indices
+        if self._connector.connectivity_init_possible:
+            _params = self._connector._parameters_from_synapse_type(self)
+            for p_name, p_val in iteritems(_params):
+                params[p_name] = p_val
         # Build connectivity
         # **NOTE** this build connector matching shape of PROJECTION
         # this means that it will match pre and post view or assembly
-        with self.get_new_context(conn_pre_indices=pre_indices,
-                                  conn_post_indices=post_indices,
-                                  conn_params=params):
-            self._connector.connect(self)
+        # **NOTE** if parameters are to be expanded on device, this will
+        # mainly create the connectivity
+        else:
+            with self.get_new_context(conn_pre_indices=pre_indices,
+                                      conn_post_indices=post_indices,
+                                      conn_params=params):
+                self._connector.connect(self)
+
 
         # Convert pre and postsynaptic indices to numpy arrays
         pre_indices = np.asarray(pre_indices, dtype=np.uint32)
@@ -367,20 +390,15 @@ class Projection(common.Projection, ContextMixin):
         for c in self._connector.on_device_init_params:
             params[c] = self._connector.on_device_init_params[c]
 
-        num_synapses = len(pre_indices)
-        if num_synapses == 0:
-            logging.warning("Projection {} has no connections. "
-                            "Ignoring.".format(self.label))
-            return
-
         # Extract delays
+        # If the delays were not expanded on host, check if homogeneous and
+        # evaluate through the LazyArray method
         if "delaySteps" in self._connector.on_device_init_params:
             delay_steps = self._connector.on_device_init_params["delaySteps"]
-            if delay_steps.is_homogeneous:
-                delay_steps.shape = (1,)
-            else:
-                delay_steps.shape = (num_synapses,)
-            delay_steps = delay_steps.evaluate(simplify=False)
+            simplify = delay_steps.is_homogeneous
+            delay_steps = delay_steps.evaluate(simplify=simplify)
+            delay_steps = [delay_steps] if simplify else delay_steps
+        # If delays were expanded, just pass them
         else:
             delay_steps = params["delaySteps"]
 
@@ -401,6 +419,75 @@ class Projection(common.Projection, ContextMixin):
         # As delay is homogeneous, use to obtain minimum delay
         # **TODO** this is a pretty hacky solution
         self.min_delay = (delay_steps + 1) * self._simulator.state.dt
+
+        # If both pre_indices and post_indices are empty, it means that we
+        # prevented PyNN from expanding indices
+        if self._connector.connectivity_init_possible:
+            self._on_device_init_native_projection(
+                matrix_type, prefix, params, delay_steps)
+        else:
+            self._on_host_init_native_projection(
+                pre_indices, post_indices, matrix_type, prefix, params, delay_steps)
+
+
+    def _on_device_init_native_projection(self, matrix_type, prefix, params, delay_steps):
+        """ Create an on-device connectivity initializer based projection, this
+        removes the need to compute things on host so we can use less memory and
+        faster network initialization
+        :param matrix_type: Whether we are using a dense or sparse matrix
+        :param prefix: for the connection type (excitatory or inhibitory)
+        :param params: connection parameters, required synapse_type.build_genn_wum
+        :param delay_steps: delay used by connections
+        :return:
+        """
+        # Build GeNN postsynaptic model
+        psm_model, psm_params, psm_ini = \
+            self.post.celltype.build_genn_psm(self.post._native_parameters,
+                                             self.post.initial_values,
+                                             prefix)
+
+        # add a the Connector object to the parameters
+        params['connector'] = self._connector
+        # Build GeNN weight update model
+        wum_model, wum_params, wum_init, wum_pre_init, wum_post_init = \
+                self.synapse_type.build_genn_wum(params,
+                                             self.initial_values)
+
+        # generate an on-device connectivity initializer object
+        conn_init = self._connector._init_connectivity()
+
+        # generate a unique label
+        genn_label = "%s_%u" % (self._genn_label_stem,
+                                len(self._sub_projections))
+
+        # Create GeNN synapse population
+        syn_pop = simulator.state.model.add_synapse_population(
+            genn_label, matrix_type, delay_steps,
+            self.pre._pop, self.post._pop,
+            wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
+            psm_model, psm_params, psm_ini, conn_init)
+
+        self._sub_projections.append(
+            SubProjection(genn_label, self.pre, self.post,
+                slice(0, self.pre.size), slice(0, self.post.size), syn_pop, wum_params))
+
+    def _on_host_init_native_projection(self, pre_indices, post_indices,
+                                        matrix_type, prefix, params, delay_steps):
+        """If the projection HAS to be generated on host (i.e. using a FromListConnector)
+        then go through the standard connectivity path
+        :param pre_indices: indices for the pre-synaptic population neurons
+        :param post_indices: indices for the post-synaptic population neurons
+        :param matrix_type: Whether we are using a dense or sparse matrix
+        :param prefix: for the connection type (excitatory or inhibitory)
+        :param params: connection parameters, required synapse_type.build_genn_wum
+        :param delay_steps: delay used by connections
+        :return:
+        """
+        num_synapses = len(pre_indices)
+        if num_synapses == 0:
+            logging.warning("Projection {} has no connections. "
+                            "Ignoring.".format(self.label))
+            return
 
         # Build lists of actual pre and postsynaptic populations
         # we are connecting (i.e. rather than views, assemblies etc)

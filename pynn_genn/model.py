@@ -329,7 +329,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
             elif n in self.default_initial_values:
                 wum_init[n] = self.default_initial_values[n]
             # Otherwise, if the parameter is to be initialized on device
-            elif n in conn.on_device_init_params and conn.on_device_init:
+            elif n in conn.on_device_init_params:
                 wum_init[n] = self._init_variable(True,
                                                   conn.on_device_init_params[n])
             else:
