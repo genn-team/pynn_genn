@@ -21,11 +21,24 @@ from pyNN.core import ezip
 from pyNN.space import Space
 from pyNN.parameters import LazyArray
 
+from pygenn import genn_wrapper
+
 from . import simulator
 from .standardmodels.synapses import StaticSynapse
 from .model import sanitize_label
 from .contexts import ContextMixin
-from .random import NativeRNG
+from .random import NativeRNG, RandomDistribution
+
+
+class RetrieveProceduralWeights(Exception):
+    def __str__(self):
+        return ("Downloading weights from device when using procedural "
+                "connectivity is not supported")
+
+
+class RetrieveProceduralConnectivity(Exception):
+    def __str__(self):
+        return ("Downloading procedural connectivity from device is not supported")
 
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
@@ -137,6 +150,11 @@ class Projection(common.Projection, ContextMixin):
         self._sub_projections = []
 
         self.use_sparse = connector.use_sparse
+
+        # iniatlize this as False and later on we can actually asses if it
+        # is possible to use procedural synapses or not
+        self.use_procedural = False
+
         # Generate name stem for sub-projections created from this projection
         # **NOTE** superclass will always populate label PROPERTY
         # with something moderately useful i.e. at least unique
@@ -177,7 +195,11 @@ class Projection(common.Projection, ContextMixin):
         for sub_pop in self._sub_projections:
             # Loop through names and pull variables
             for n in names:
-                if n != "presynaptic_index" and n != "postsynaptic_index" and n in sub_pop.syn_pop.vars:
+                if n == "g" and self.use_procedural:
+                    raise RetrieveProceduralWeights()
+
+                if (n != "presynaptic_index" and n != "postsynaptic_index" and
+                        n in sub_pop.syn_pop.vars):
                     genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
         # If projection is sparse
@@ -194,6 +216,8 @@ class Projection(common.Projection, ContextMixin):
                     # if we were able to initialize connectivity on device
                     # we need to get it before examining variables
                     if self._connector.connectivity_init_possible:
+                        if self.use_procedural:
+                            raise RetrieveProceduralConnectivity()
                         sub.syn_pop.pull_connectivity_from_device()
 
                     # Get connection indices in
@@ -215,6 +239,9 @@ class Projection(common.Projection, ContextMixin):
         else:
             # Loop through variables
             for n in names[0]:
+                if n == "g" and self.use_procedural:
+                    raise RetrieveProceduralWeights()
+
                 # Create empty array to hold variable
                 var = np.empty((self.pre.size, self.post.size))
 
@@ -247,6 +274,9 @@ class Projection(common.Projection, ContextMixin):
         for sub_pop in self._sub_projections:
             # Loop through names and pull variables
             for n in names:
+                if n == "g" and self.use_procedural:
+                    raise RetrieveProceduralWeights()
+
                 if n != "presynaptic_index" and n != "postsynaptic_index":
                     genn_model.pull_var_from_device(sub_pop.genn_label, n)
 
@@ -338,17 +368,39 @@ class Projection(common.Projection, ContextMixin):
         else:
             return [(pop, neuron_slice, conn_mask)]
 
+    def _use_procedural(self, params):
+
+        if not self._connector.use_procedural:
+            return False
+
+        if not isinstance(self.synapse_type, StaticSynapse):
+            # todo: warn about procedural and plastic
+            return False
+
+        weights_ok = False
+        if 'g' in params:
+            g = params['g']
+            # if weights were not expanded and weights are homogeneous (constant)
+            # or are to be generated on device
+            if (isinstance(g, LazyArray) and
+                    (g.is_homogeneous or
+                    (isinstance(g.base_value, RandomDistribution) and
+                     isinstance(g.base_value.rng, NativeRNG)))):
+                    weights_ok = True
+            # if weights were expanded but are homegeneous
+            elif not np.allclose(g, g[0]):
+                weights_ok = True
+
+        connect_ok = (self._connector.connectivity_init_possible or
+                      isinstance(self._connector, AllToAllConnector))
+
+        return (weights_ok and connect_ok)
 
 
     def _create_native_projection(self):
         """Create GeNN projections (aka synaptic populatiosn)
             This function is supposed to be called by the simulator
         """
-        if self.use_sparse:
-            matrix_type = "SPARSE_INDIVIDUALG"
-        else:
-            matrix_type = "DENSE_INDIVIDUALG"
-
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
         # neuron parameters into postsynaptic model parameters
@@ -376,7 +428,6 @@ class Projection(common.Projection, ContextMixin):
                                       conn_params=params):
                 self._connector.connect(self)
 
-
         # Convert pre and postsynaptic indices to numpy arrays
         pre_indices = np.asarray(pre_indices, dtype=np.uint32)
         post_indices = np.asarray(post_indices, dtype=np.uint32)
@@ -389,6 +440,15 @@ class Projection(common.Projection, ContextMixin):
         # put back the params which were not expanded by PyNN
         for c in self._connector.on_device_init_params:
             params[c] = self._connector.on_device_init_params[c]
+
+        self.use_procedural = self._use_procedural(params)
+        if self.use_procedural:
+            matrix_type = "PROCEDURAL_PROCEDURALG"
+        elif self.use_sparse:
+            matrix_type = "SPARSE_INDIVIDUALG"
+        else:
+            matrix_type = "DENSE_INDIVIDUALG"
+
 
         # Extract delays
         # If the delays were not expanded on host, check if homogeneous and
@@ -427,10 +487,12 @@ class Projection(common.Projection, ContextMixin):
                 matrix_type, prefix, params, delay_steps)
         else:
             self._on_host_init_native_projection(
-                pre_indices, post_indices, matrix_type, prefix, params, delay_steps)
+                pre_indices, post_indices, matrix_type, prefix, params,
+                delay_steps)
 
 
-    def _on_device_init_native_projection(self, matrix_type, prefix, params, delay_steps):
+    def _on_device_init_native_projection(
+            self, matrix_type, prefix, params, delay_steps):
         """ Create an on-device connectivity initializer based projection, this
         removes the need to compute things on host so we can use less memory and
         faster network initialization
@@ -467,9 +529,16 @@ class Projection(common.Projection, ContextMixin):
             wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
             psm_model, psm_params, psm_ini, conn_init)
 
+        if self.use_procedural:
+            syn_pop.pop.set_span_type(
+                genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
+            syn_pop.pop.set_num_threads_per_spike(
+                simulator.state.num_threads_per_spike)
+            # todo: warn about performance and tweaking num_threads_per_spike
+
         self._sub_projections.append(
-            SubProjection(genn_label, self.pre, self.post,
-                slice(0, self.pre.size), slice(0, self.post.size), syn_pop, wum_params))
+            SubProjection(genn_label, self.pre, self.post, slice(0, self.pre.size),
+                          slice(0, self.post.size), syn_pop, wum_params))
 
     def _on_host_init_native_projection(self, pre_indices, post_indices,
                                         matrix_type, prefix, params, delay_steps):
@@ -554,6 +623,13 @@ class Projection(common.Projection, ContextMixin):
             # If connectivity is sparse, configure sparse connectivity
             if self.use_sparse:
                 syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
+
+            if self.use_procedural:
+                syn_pop.pop.set_span_type(
+                    genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
+                syn_pop.pop.set_num_threads_per_spike(
+                    simulator.state.num_threads_per_spike)
+                # todo: warn about performance and tweaking num_threads_per_spike
 
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,

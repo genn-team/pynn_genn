@@ -58,11 +58,12 @@ warnings.simplefilter("once", WithReplacementOnly)
 
 
 class GeNNConnectorMixin(object):
-    def __init__(self, use_sparse=True):
+    def __init__(self, use_sparse=True, use_procedural=False):
         self.use_sparse = use_sparse
         self.on_device_init_params = {}
         self.connectivity_init_possible = False
         self._builtin_name = ""
+        self.use_procedural = use_procedural
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -128,8 +129,8 @@ class GeNNConnectorMixin(object):
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
 
-    def __init__(self, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+    def __init__(self, safe=True, callback=None, use_procedural=False):
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         OneToOnePyNN.__init__(
             self, safe=safe, callback=callback)
 
@@ -140,8 +141,10 @@ class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
 class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
 
-    def __init__(self, allow_self_connections=True, safe=True, callback=None,):
-        GeNNConnectorMixin.__init__(self, use_sparse=False)
+    def __init__(self, allow_self_connections=True, safe=True, callback=None,
+                 use_procedural=False):
+        GeNNConnectorMixin.__init__(self, use_sparse=False,
+                                    use_procedural=use_procedural)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)
@@ -151,8 +154,9 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
     __doc__ = FixProbPyNN.__doc__
 
     def __init__(self, p_connect, allow_self_connections=True,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         FixProbPyNN.__init__(self, p_connect, allow_self_connections,
                  rng, safe=safe, callback=callback)
 
@@ -172,8 +176,9 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
     __doc__ = FixTotalPyNN.__doc__
 
     def __init__(self, n, allow_self_connections=True, with_replacement=True,
-                 rng=None, safe=True, callback=None,):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
                               rng, safe=safe, callback=callback)
 
@@ -195,8 +200,9 @@ class FixedNumberPreConnector(GeNNConnectorMixin, FixNumPrePyNN):
     __doc__ = FixNumPrePyNN.__doc__
 
     def __init__(self, n, allow_self_connections=True, with_replacement=False,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         FixNumPrePyNN.__init__(self, n, allow_self_connections, with_replacement,
                                rng, safe=safe, callback=callback)
 
@@ -205,8 +211,9 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
     __doc__ = FixNumPostPyNN.__doc__
 
     def __init__(self, n, allow_self_connections=True, with_replacement=False,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         FixNumPostPyNN.__init__(self, n, allow_self_connections,
                             with_replacement, rng, safe=safe, callback=callback)
 
@@ -228,8 +235,9 @@ class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
     __doc__ = DistProbPyNN.__doc__
 
     def __init__(self, d_expression, allow_self_connections=True,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         DistProbPyNN.__init__(self, d_expression, allow_self_connections,
                               rng, safe=safe, callback=callback)
 
@@ -239,8 +247,9 @@ class DisplacementDependentProbabilityConnector(
     __doc__ = DisplaceProbPyNN.__doc__
 
     def __init__(self, disp_function, allow_self_connections=True,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         DisplaceProbPyNN.__init__(self, disp_function, allow_self_connections,
                                   rng, safe=safe, callback=callback)
 
@@ -249,8 +258,8 @@ class IndexBasedProbabilityConnector(GeNNConnectorMixin, IndexProbPyNN):
     __doc__ = IndexProbPyNN.__doc__
 
     def __init__(self, index_expression, allow_self_connections=True,
-                 rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 rng=None, safe=True, callback=None, use_procedural=False):
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         IndexProbPyNN.__init__(self, index_expression, allow_self_connections,
                                rng, safe=safe, callback=callback)
 
@@ -259,8 +268,9 @@ class SmallWorldConnector(GeNNConnectorMixin, SmallWorldPyNN):
     __doc__ = SmallWorldPyNN.__doc__
 
     def __init__(self, degree, rewiring, allow_self_connections=True,
-                 n_connections=None, rng=None, safe=True, callback=None):
-        GeNNConnectorMixin.__init__(self)
+                 n_connections=None, rng=None, safe=True, callback=None,
+                 use_procedural=False):
+        GeNNConnectorMixin.__init__(self, use_procedural=use_procedural)
         SmallWorldPyNN.__init__(self, degree, rewiring, allow_self_connections,
                                 n_connections, rng,  safe=safe, callback=callback)
 
