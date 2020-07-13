@@ -3,6 +3,8 @@ try:
 except NameError:  # Python 3
     xrange = range
 
+import warnings
+
 from collections import defaultdict, namedtuple, Iterable
 from itertools import product, repeat
 import logging
@@ -35,17 +37,18 @@ class RetrieveProceduralWeightsException(Exception):
         return ("Downloading weights from device when using procedural "
                 "connectivity is not supported")
 
-
 class RetrieveProceduralConnectivityException(Exception):
     def __str__(self):
         return ("Downloading procedural connectivity from device is not supported")
 
+class PositiveNumThreadsException(Exception):
+    def __str__(self):
+        return ("The parameter num_threads_per_spike has to be greater than 0")
 
 class TuneThreadsPerSpikeWarning(Warning):
     def __str__(self):
         return ("Performance of network may vary if num_threads_per_spike is not "
                 "appropriately selected")
-
 
 class OneToOneThreadsPerSpikeWarning(Warning):
     def __str__(self):
@@ -169,6 +172,8 @@ class Projection(common.Projection, ContextMixin):
         # iniatlize this as False and later on we can actually asses if it
         # is possible to use procedural synapses or not
         self.use_procedural = False
+        if num_threads_per_spike <= 0:
+            raise PositiveNumThreadsException()
         self.num_threads_per_spike = num_threads_per_spike
 
         # Generate name stem for sub-projections created from this projection
