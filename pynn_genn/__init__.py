@@ -47,7 +47,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get("rank", 0)
     simulator.state.num_processes = extra_params.get("num_processes", 1)
-    simulator.state.num_threads_per_spike = extra_params.get("num_threads_per_spike", 8)
+    simulator.state.num_threads_per_spike = extra_params.get("num_threads_per_spike", 16)
 
     # If backend is specified, use that
     if "backend" in extra_params:

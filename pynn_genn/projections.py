@@ -16,7 +16,7 @@ import numpy as np
 
 from pyNN import common
 from pyNN.connectors import AllToAllConnector, FromListConnector, \
-                            FromFileConnector
+                            FromFileConnector, OneToOneConnector
 from pyNN.core import ezip
 from pyNN.space import Space
 from pyNN.parameters import LazyArray
@@ -532,9 +532,14 @@ class Projection(common.Projection, ContextMixin):
         if self.use_procedural:
             syn_pop.pop.set_span_type(
                 genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
-            syn_pop.pop.set_num_threads_per_spike(
-                simulator.state.num_threads_per_spike)
-            # todo: warn about performance and tweaking num_threads_per_spike
+            print(simulator.state.num_threads_per_spike)
+            if isinstance(self._connector, OneToOneConnector):
+                syn_pop.pop.set_num_threads_per_spike(1)
+            else:
+                syn_pop.pop.set_num_threads_per_spike(
+                    simulator.state.num_threads_per_spike)
+                # todo: warn about performance and tweaking num_threads_per_spike
+
 
         self._sub_projections.append(
             SubProjection(genn_label, self.pre, self.post, slice(0, self.pre.size),
@@ -623,13 +628,6 @@ class Projection(common.Projection, ContextMixin):
             # If connectivity is sparse, configure sparse connectivity
             if self.use_sparse:
                 syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
-
-            if self.use_procedural:
-                syn_pop.pop.set_span_type(
-                    genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
-                syn_pop.pop.set_num_threads_per_spike(
-                    simulator.state.num_threads_per_spike)
-                # todo: warn about performance and tweaking num_threads_per_spike
 
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
