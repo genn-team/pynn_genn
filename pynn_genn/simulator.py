@@ -23,7 +23,6 @@ class State(common.control.BaseState):
         self.clear()
         self.dt = 0.1
         self.t = 0.0
-        self.num_threads_per_spike = 8
         self.num_current_sources = 0
         self.native_rng = None
 
