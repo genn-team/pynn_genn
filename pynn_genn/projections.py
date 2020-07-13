@@ -152,7 +152,7 @@ class Projection(common.Projection, ContextMixin):
     def __init__(self, presynaptic_population, postsynaptic_population,
                  connector, synapse_type=None, source=None,
                  receptor_type=None, space=Space(), label=None,
-                 num_threads_per_spike=None):
+                 use_procedural=False, num_threads_per_spike=None):
         # Make a deep copy of synapse type
         # so projection can independently change parameters
         synapse_type = deepcopy(synapse_type)
@@ -169,10 +169,10 @@ class Projection(common.Projection, ContextMixin):
 
         self.use_sparse = connector.use_sparse
 
-        # iniatlize this as False and later on we can actually asses if it
+        # later on we can actually asses if it
         # is possible to use procedural synapses or not
-        self.use_procedural = False
-        if num_threads_per_spike <= 0:
+        self.use_procedural = use_procedural
+        if not num_threads_per_spike is None and num_threads_per_spike <= 0:
             raise PositiveNumThreadsException()
         self.num_threads_per_spike = num_threads_per_spike
 
@@ -391,7 +391,7 @@ class Projection(common.Projection, ContextMixin):
 
     def can_use_procedural(self, params):
 
-        if not self._connector.use_procedural:
+        if not self.use_procedural:
             return False
 
         if not isinstance(self.synapse_type, StaticSynapse):
@@ -462,8 +462,8 @@ class Projection(common.Projection, ContextMixin):
         for c in self._connector.on_device_init_params:
             params[c] = self._connector.on_device_init_params[c]
 
-        self.use_procedural = self.can_use_procedural(params)
-        if self.use_procedural:
+        use_procedural = self.can_use_procedural(params)
+        if use_procedural:
             matrix_type = "PROCEDURAL_PROCEDURALG"
         elif self.use_sparse:
             matrix_type = "SPARSE_INDIVIDUALG"
@@ -505,15 +505,43 @@ class Projection(common.Projection, ContextMixin):
         # prevented PyNN from expanding indices
         if self._connector.connectivity_init_possible:
             self._on_device_init_native_projection(
-                matrix_type, prefix, params, delay_steps)
+                matrix_type, prefix, params, delay_steps, use_procedural)
         else:
             self._on_host_init_native_projection(
                 pre_indices, post_indices, matrix_type, prefix, params,
-                delay_steps)
+                delay_steps, use_procedural)
+
+    def _setup_procedural(self, synaptic_population):
+        # if we can use a procedural connection set the apropriate span type
+        synaptic_population.pop.set_span_type(
+            genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
+
+        # if we want and can use a procedural connection, check for
+        # the number of threads selected by teh user
+        n_thr = self.num_threads_per_spike
+        # if it wasn't set
+        if self.num_threads_per_spike is None:
+            # and it's a 1-to-1 just set it to 1
+            if isinstance(self._connector, OneToOneConnector):
+                n_thr = 1
+            # if it is another connector, just set it to the default
+            # and warn the user that they may be able to do better
+            else:
+                n_thr = DEFAULT_NUM_THREADS_PER_SPIKE
+                warnings.warn(TuneThreadsPerSpikeWarning())
+        # if it was set and it's a 1-to-1 and the number of threads is not 1
+        # warn the user about this and set it to 1
+        elif (isinstance(self._connector, OneToOneConnector) and
+                self.num_threads_per_spike != 1) :
+            n_thr = 1
+            warnings.warn(OneToOneThreadsPerSpikeWarning())
+
+        # finally pass the value to GeNN
+        synaptic_population.pop.set_num_threads_per_spike(n_thr)
 
 
     def _on_device_init_native_projection(
-            self, matrix_type, prefix, params, delay_steps):
+            self, matrix_type, prefix, params, delay_steps, use_procedural):
         """ Create an on-device connectivity initializer based projection, this
         removes the need to compute things on host so we can use less memory and
         faster network initialization
@@ -550,41 +578,15 @@ class Projection(common.Projection, ContextMixin):
             wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
             psm_model, psm_params, psm_ini, conn_init)
 
-        if self.use_procedural:
-            # if we can use a procedural connection set the apropriate span type
-            syn_pop.pop.set_span_type(
-                genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
-
-            # if we want and can use a procedural connection, check for
-            # the number of threads selected by teh user
-            n_thr = self.num_threads_per_spike
-            # if it wasn't set
-            if self.num_threads_per_spike is None:
-                # and it's a 1-to-1 just set it to 1
-                if isinstance(self._connector, OneToOneConnector):
-                    n_thr = 1
-                # if it is another connector, just set it to the default
-                # and warn the user that they may be able to do better
-                else:
-                    n_thr = DEFAULT_NUM_THREADS_PER_SPIKE
-                    warnings.warn(TuneThreadsPerSpikeWarning())
-            # if it was set and it's a 1-to-1 and the number of threads is not 1
-            # warn the user about this and set it to 1
-            elif (isinstance(self._connector, OneToOneConnector) and
-                    self.num_threads_per_spike != 1) :
-                n_thr = 1
-                warnings.warn(OneToOneThreadsPerSpikeWarning())
-
-            # finally pass the value to GeNN
-            syn_pop.pop.set_num_threads_per_spike(n_thr)
-
+        if use_procedural:
+            self._setup_procedural(syn_pop)
 
         self._sub_projections.append(
             SubProjection(genn_label, self.pre, self.post, slice(0, self.pre.size),
                           slice(0, self.post.size), syn_pop, wum_params))
 
-    def _on_host_init_native_projection(self, pre_indices, post_indices,
-                                        matrix_type, prefix, params, delay_steps):
+    def _on_host_init_native_projection(self, pre_indices, post_indices, matrix_type,
+                                        prefix, params, delay_steps, use_procedural):
         """If the projection HAS to be generated on host (i.e. using a FromListConnector)
         then go through the standard connectivity path
         :param pre_indices: indices for the pre-synaptic population neurons
@@ -666,6 +668,9 @@ class Projection(common.Projection, ContextMixin):
             # If connectivity is sparse, configure sparse connectivity
             if self.use_sparse:
                 syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)
+
+            if use_procedural:
+                self._setup_procedural(syn_pop)
 
             self._sub_projections.append(
                 SubProjection(genn_label, pre_pop, post_pop,
