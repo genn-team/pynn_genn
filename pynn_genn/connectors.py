@@ -142,8 +142,7 @@ class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
 
     def __init__(self, allow_self_connections=True, safe=True, callback=None,
                  use_procedural=False):
-        GeNNConnectorMixin.__init__(self, use_sparse=False,
-                                    use_procedural=use_procedural)
+        GeNNConnectorMixin.__init__(self, use_sparse=False)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)
