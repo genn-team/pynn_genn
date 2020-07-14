@@ -45,6 +45,10 @@ class PositiveNumThreadsException(Exception):
     def __str__(self):
         return ("The parameter num_threads_per_spike has to be greater than 0")
 
+class OnlyStaticWeightsProceduralException(Exception):
+    def __str__(self):
+        return ("Only static projections can be generated as procedural.")
+
 class TuneThreadsPerSpikeWarning(Warning):
     def __str__(self):
         return ("Performance of network may vary if num_threads_per_spike is not "
@@ -216,6 +220,8 @@ class Projection(common.Projection, ContextMixin):
         for sub_pop in self._sub_projections:
             # Loop through names and pull variables
             for n in names:
+                # grabbing weights when using procedurally generated projections
+                # is not possible
                 if n == "g" and self.use_procedural:
                     raise RetrieveProceduralWeightsException()
 
@@ -237,6 +243,8 @@ class Projection(common.Projection, ContextMixin):
                     # if we were able to initialize connectivity on device
                     # we need to get it before examining variables
                     if self._connector.connectivity_init_possible:
+                        # grabbing connectivity when using procedurally generated
+                        # projections is not possible
                         if self.use_procedural:
                             raise RetrieveProceduralConnectivityException()
                         sub.syn_pop.pull_connectivity_from_device()
@@ -261,6 +269,8 @@ class Projection(common.Projection, ContextMixin):
             # Loop through variables
             for n in names[0]:
                 if n == "g" and self.use_procedural:
+                    # grabbing weights when using procedurally generated projections
+                    # is not possible
                     raise RetrieveProceduralWeightsException()
 
                 # Create empty array to hold variable
@@ -296,6 +306,8 @@ class Projection(common.Projection, ContextMixin):
             # Loop through names and pull variables
             for n in names:
                 if n == "g" and self.use_procedural:
+                    # grabbing weights when using procedurally generated projections
+                    # is not possible
                     raise RetrieveProceduralWeightsException()
 
                 if n != "presynaptic_index" and n != "postsynaptic_index":
@@ -390,35 +402,44 @@ class Projection(common.Projection, ContextMixin):
             return [(pop, neuron_slice, conn_mask)]
 
     def can_use_procedural(self, params):
+        # do a series of checks to see if the projection can be computed
+        # on the fly by the GPU
 
+        # select the apropriate matrix type given the connector type
+        if isinstance(self._connector, AllToAllConnector):
+            mtx_type = "DENSE_PROCEDURALG"
+        else:
+            mtx_type = "PROCEDURAL_PROCEDURALG"
+
+        # did the user ask for a procedural projection?
         if not self.use_procedural:
-            return False
+            return False, mtx_type
 
+        # did the user set the projection as plastic? not valid!
         if not isinstance(self.synapse_type, StaticSynapse):
-            # todo: warn about procedural and plastic
-            return False
+            # todo: should this be a warning?
+            raise OnlyStaticWeightsProceduralException()
+            # return False
 
         weights_ok = False
         if 'g' in params:
             g = params['g']
-            # if weights were not expanded and weights are homogeneous (constant)
-            # or are to be generated on device
+            # if weights were not expanded and are either homogeneous (constant)
+            # or to be generated on device
             if (isinstance(g, LazyArray) and
                     (g.is_homogeneous or
                     (isinstance(g.base_value, RandomDistribution) and
                      isinstance(g.base_value.rng, NativeRNG)))):
                     weights_ok = True
             # if weights were expanded but are homegeneous
+            # todo: not sure if this case can happen?
             elif not np.allclose(g, g[0]):
                 weights_ok = True
 
+        # can we generate the connectivity on device or
+        # is easily assumed as in the All-to-All
         connect_ok = (self._connector.connectivity_init_possible or
                       isinstance(self._connector, AllToAllConnector))
-
-        if isinstance(self._connector, AllToAllConnector):
-            mtx_type = "DENSE_PROCEDURALG"
-        else:
-            mtx_type = "PROCEDURAL_PROCEDURALG"
 
         return (weights_ok and connect_ok), mtx_type
 
@@ -474,7 +495,6 @@ class Projection(common.Projection, ContextMixin):
             matrix_type = "SPARSE_INDIVIDUALG"
         else:
             matrix_type = "DENSE_INDIVIDUALG"
-
 
         # Extract delays
         # If the delays were not expanded on host, check if homogeneous and
@@ -557,6 +577,7 @@ class Projection(common.Projection, ContextMixin):
         :param prefix: for the connection type (excitatory or inhibitory)
         :param params: connection parameters, required synapse_type.build_genn_wum
         :param delay_steps: delay used by connections
+        :param use_procedural: whether this projection can be generated on the fly
         :return:
         """
         # Build GeNN postsynaptic model
@@ -603,6 +624,7 @@ class Projection(common.Projection, ContextMixin):
         :param prefix: for the connection type (excitatory or inhibitory)
         :param params: connection parameters, required synapse_type.build_genn_wum
         :param delay_steps: delay used by connections
+        :param use_procedural: whether this projection can be generated on the fly
         :return:
         """
         num_synapses = len(pre_indices)

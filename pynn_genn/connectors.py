@@ -140,8 +140,7 @@ class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
 class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
 
-    def __init__(self, allow_self_connections=True, safe=True, callback=None,
-                 use_procedural=False):
+    def __init__(self, allow_self_connections=True, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self, use_sparse=False)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
@@ -153,7 +152,6 @@ class FixedProbabilityConnector(GeNNConnectorMixin, FixProbPyNN):
 
     def __init__(self, p_connect, allow_self_connections=True,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         FixProbPyNN.__init__(self, p_connect, allow_self_connections,
                  rng, safe=safe, callback=callback)
@@ -175,7 +173,6 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
 
     def __init__(self, n, allow_self_connections=True, with_replacement=True,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
                               rng, safe=safe, callback=callback)
@@ -199,7 +196,6 @@ class FixedNumberPreConnector(GeNNConnectorMixin, FixNumPrePyNN):
 
     def __init__(self, n, allow_self_connections=True, with_replacement=False,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         FixNumPrePyNN.__init__(self, n, allow_self_connections, with_replacement,
                                rng, safe=safe, callback=callback)
@@ -210,7 +206,6 @@ class FixedNumberPostConnector(GeNNConnectorMixin, FixNumPostPyNN):
 
     def __init__(self, n, allow_self_connections=True, with_replacement=False,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         FixNumPostPyNN.__init__(self, n, allow_self_connections,
                             with_replacement, rng, safe=safe, callback=callback)
@@ -234,7 +229,6 @@ class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
 
     def __init__(self, d_expression, allow_self_connections=True,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         DistProbPyNN.__init__(self, d_expression, allow_self_connections,
                               rng, safe=safe, callback=callback)
@@ -246,7 +240,6 @@ class DisplacementDependentProbabilityConnector(
 
     def __init__(self, disp_function, allow_self_connections=True,
                  rng=None, safe=True, callback=None):
-
         GeNNConnectorMixin.__init__(self)
         DisplaceProbPyNN.__init__(self, disp_function, allow_self_connections,
                                   rng, safe=safe, callback=callback)
@@ -266,8 +259,7 @@ class SmallWorldConnector(GeNNConnectorMixin, SmallWorldPyNN):
     __doc__ = SmallWorldPyNN.__doc__
 
     def __init__(self, degree, rewiring, allow_self_connections=True,
-                 n_connections=None, rng=None, safe=True, callback=None,
-                 use_procedural=False):
+                 n_connections=None, rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         SmallWorldPyNN.__init__(self, degree, rewiring, allow_self_connections,
                                 n_connections, rng,  safe=safe, callback=callback)
