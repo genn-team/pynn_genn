@@ -415,7 +415,12 @@ class Projection(common.Projection, ContextMixin):
         connect_ok = (self._connector.connectivity_init_possible or
                       isinstance(self._connector, AllToAllConnector))
 
-        return (weights_ok and connect_ok)
+        if isinstance(self._connector, AllToAllConnector):
+            mtx_type = "DENSE_PROCEDURALG"
+        else:
+            mtx_type = "PROCEDURAL_PROCEDURALG"
+
+        return (weights_ok and connect_ok), mtx_type
 
 
     def _create_native_projection(self):
@@ -462,9 +467,9 @@ class Projection(common.Projection, ContextMixin):
         for c in self._connector.on_device_init_params:
             params[c] = self._connector.on_device_init_params[c]
 
-        use_procedural = self.can_use_procedural(params)
+        use_procedural, mtx_type = self.can_use_procedural(params)
         if use_procedural:
-            matrix_type = "PROCEDURAL_PROCEDURALG"
+            matrix_type = mtx_type
         elif self.use_sparse:
             matrix_type = "SPARSE_INDIVIDUALG"
         else:
@@ -512,6 +517,9 @@ class Projection(common.Projection, ContextMixin):
                 delay_steps, use_procedural)
 
     def _setup_procedural(self, synaptic_population):
+        if isinstance(self._connector, AllToAllConnector):
+            return
+
         # if we can use a procedural connection set the apropriate span type
         synaptic_population.pop.set_span_type(
             genn_wrapper.SynapseGroup.SpanType_PRESYNAPTIC)
