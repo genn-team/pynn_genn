@@ -313,12 +313,136 @@ def conn_init_fix_post():
 
     abs_diff = numpy.abs(n - numpy.mean(n_cols))
     epsilon = 0.01
-    assert abs_diff <= epsilon
+    assert_less_equal(abs_diff, epsilon)
 
     scale = dist_params['high'] - dist_params['low']
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')
     min_p = 0.05
     assert_greater(p, min_p)
+
+def conn_proc_o2o():
+    import numpy as np
+    import pynn_genn as sim
+    import copy
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_neurons = 100
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    pre = sim.Population(n_neurons, sim.SpikeSourceArray,
+                         {'spike_times': [[1 + i] for i in range(n_neurons)]},
+                         label='pre')
+    params['tau_syn_E'] = 5.
+    post = sim.Population(n_neurons, sim.IF_curr_exp, params,
+                          label='post')
+    post.record('spikes')
+
+    conn = sim.OneToOneConnector()
+    syn = sim.StaticSynapse(weight=5, delay=1)
+    proj = sim.Projection(pre, post, conn, synapse_type=syn,
+                          use_procedural=bool(1), num_threads_per_spike=1)
+
+    sim.run(2 * n_neurons)
+    data = post.get_data()
+    spikes = np.asarray(data.segments[0].spiketrains)
+    sim.end()
+
+    all_at_appr_time = 0
+    sum_spikes = 0
+    for i, times in enumerate(spikes):
+        sum_spikes += len(times)
+        if int(times[0]) == (i + 9):
+            all_at_appr_time += 1
+
+    assert_equal(sum_spikes, n_neurons)
+    assert_equal(all_at_appr_time, n_neurons)
+
+def conn_proc_a2a():
+    import numpy as np
+    import pynn_genn as sim
+    import copy
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_neurons = 100
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    pre = sim.Population(n_neurons, sim.SpikeSourceArray,
+                         {'spike_times': [[1] for _ in range(n_neurons)]},
+                         label='pre')
+    params['tau_syn_E'] = 5.
+    post = sim.Population(n_neurons, sim.IF_curr_exp, params,
+                          label='post')
+    post.record('spikes')
+
+    conn = sim.AllToAllConnector()
+    syn = sim.StaticSynapse(weight=5. / n_neurons, delay=1)  # rand_dist)
+    proj = sim.Projection(pre, post, conn, synapse_type=syn,
+                          use_procedural=bool(1))
+
+    sim.run(2 * n_neurons)
+    data = post.get_data()
+    spikes = np.asarray(data.segments[0].spiketrains)
+
+    sim.end()
+
+    all_at_appr_time = 0
+    sum_spikes = 0
+    for i, times in enumerate(spikes):
+        sum_spikes += len(times)
+        if int(times[0]) == 9:
+            all_at_appr_time += 1
+
+    assert_equal(sum_spikes, n_neurons)
+    assert_equal(all_at_appr_time, n_neurons)
+
+def conn_proc_fix_post():
+    import numpy as np
+    import pynn_genn as sim
+    import copy
+    from pynn_genn.random import NativeRNG, NumpyRNG, RandomDistribution
+
+    np_rng = NumpyRNG()
+    rng = NativeRNG(np_rng)
+
+    timestep = 1.
+    sim.setup(timestep)
+
+    n_pre = 100
+    n_post = 50000
+    params = copy.copy(sim.IF_curr_exp.default_parameters)
+    times = [[1] for _ in range(n_pre)]
+    pre = sim.Population(n_pre, sim.SpikeSourceArray,
+                         {'spike_times': times},
+                         label='pre')
+    post = sim.Population(n_post, sim.IF_curr_exp, params,
+                          label='post')
+    post.record('spikes')
+
+    n = 2
+    dist_params = {'low': 4.99, 'high': 5.01}
+    dist = 'uniform'
+    rand_dist = RandomDistribution(dist, rng=rng, **dist_params)
+    conn = sim.FixedNumberPostConnector(n, with_replacement=True, rng=rng)
+    syn = sim.StaticSynapse(weight=rand_dist, delay=1)  # rand_dist)
+    # needed to use 1 thread per spike to get correct results,
+    # this is because the number of connections?
+    proj = sim.Projection(pre, post, conn, synapse_type=syn,
+                          use_procedural=bool(1), num_threads_per_spike=1)
+
+    sim.run(100)
+    data = post.get_data()
+    spikes = np.asarray(data.segments[0].spiketrains)
+    sim.end()
+
+    all_at_appr_time = 0
+    sum_spikes = 0
+    for i, times in enumerate(spikes):
+        sum_spikes += (1 if len(times) else 0)
+        if len(times) == 1 and times[0] == 9:
+            all_at_appr_time += 1
+
+    assert_less_equal(np.abs(sum_spikes - (n_pre * n)), 2)
+    assert_less_equal(np.abs(all_at_appr_time - (n_pre * n)), 2)
 
 
 if __name__ == '__main__':
@@ -329,3 +453,8 @@ if __name__ == '__main__':
     conn_init_fix_prob()
     conn_init_fix_total()
     conn_init_fix_post()
+    # todo: these tests are not super good, need to think a better way
+    conn_proc_o2o()
+    conn_proc_a2a()
+    conn_proc_fix_post()
+
