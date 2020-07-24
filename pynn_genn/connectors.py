@@ -4,6 +4,7 @@ import warnings
 from pyNN.parameters import LazyArray
 from pygenn.genn_model import init_connectivity,\
     create_custom_sparse_connect_init_snippet_class
+from pyNN import space
 # NOTE: Had to change the import names due to naming
 # resolution not working properly and losing the original
 # class when initializing. This is mainly due to using multiple
@@ -38,7 +39,7 @@ __all__ = [
     "DisplacementDependentProbabilityConnector",
     "IndexBasedProbabilityConnector", "SmallWorldConnector",
     "FromListConnector", "FromFileConnector",
-    "CloneConnector", "ArrayConnector"
+    "CloneConnector", "ArrayConnector", "MaxDistanceFixedProbabilityConnector",
 ]
 
 
@@ -63,6 +64,8 @@ class GeNNConnectorMixin(object):
         self.on_device_init_params = {}
         self.connectivity_init_possible = False
         self._builtin_name = ""
+        self._needs_populations_shapes = False
+        self.shapes = None
 
     def _parameters_from_synapse_type(self, projection, distance_map=None):
         """
@@ -116,7 +119,8 @@ class GeNNConnectorMixin(object):
 
     def _init_connectivity(self):
         if self.connectivity_init_possible:
-            return init_connectivity(self._builtin_name, self._conn_init_params)
+            param_space = self._conn_init_params
+            return init_connectivity(self._builtin_name, param_space)
 
         raise Exception('Requested on-device sparse connectivity initializer for '
                         'a connector which is not (yet) supported')
@@ -124,6 +128,42 @@ class GeNNConnectorMixin(object):
     @property
     def _conn_init_params(self):
         return {}
+
+    def _parse_shapes(self, pop_space, pop_size):
+        # width, height, depth == nx, ny, nz
+        if isinstance(pop_space, space.Line):
+            _shape = (pop_size, 1, 1)
+            _pos = (pop_space.x0, pop_space.y, pop_space.z)
+            _dx = (pop_space.dx, 0., 0.)
+        elif isinstance(pop_space, space.Grid2D):
+            width, height = pop_space.calculate_size(pop_size)
+            _shape = (width, height, 1)
+            _pos = (pop_space.x0, pop_space.y0, pop_space.z)
+            _dx = (pop_space.dx, pop_space.dy, 0.)
+        elif isinstance(pop_space, space.Grid3D):
+            _shape = pop_space.calculate_size(pop_size)
+            _pos = (pop_space.x0, pop_space.y0, pop_space.z0)
+            _dx = (pop_space.dx, pop_space.dy, pop_space.dz)
+        else:
+            raise Exception("Space type not supported")
+
+        return _shape, _pos, _dx
+
+
+    def _set_shape_params(self, projection):
+        pre_sh, pre_pos, pre_dx = self._parse_shapes(
+                            projection.pre._structure, projection.pre.size)
+        post_sh, post_pos, post_dx = self._parse_shapes(
+                            projection.post._structure, projection.post.size)
+        self.shapes = {
+            'pre_nx': pre_sh[0], 'pre_ny': pre_sh[1], 'pre_nz': pre_sh[2],
+            'pre_x0':pre_pos[0], 'pre_y0':pre_pos[1], 'pre_z0':pre_pos[2],
+            'pre_dx': pre_dx[0], 'pre_dy': pre_dx[1], 'pre_dz': pre_dx[2],
+            'post_nx': post_sh[0], 'post_ny': post_sh[1], 'post_nz': post_sh[2],
+            'post_x0': post_pos[0], 'post_y0': post_pos[1], 'post_z0': post_pos[2],
+            'post_dx': post_dx[0], 'post_dy': post_dx[1], 'post_dz': post_dx[2],
+        }
+
 
 class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
     __doc__ = OneToOnePyNN.__doc__
@@ -232,6 +272,32 @@ class DistanceDependentProbabilityConnector(GeNNConnectorMixin, DistProbPyNN):
         GeNNConnectorMixin.__init__(self)
         DistProbPyNN.__init__(self, d_expression, allow_self_connections,
                               rng, safe=safe, callback=callback)
+        self._needs_populations_shapes = True
+        self.shapes = None
+
+
+class MaxDistanceFixedProbabilityConnector(DistanceDependentProbabilityConnector):
+    __doc__ = DistanceDependentProbabilityConnector.__doc__
+
+    def __init__(self, max_dist, probability, allow_self_connections=True,
+                 rng=None, safe=True, callback=None):
+        d_expr = "%s * ( d <= %s)"%(probability, max_dist)
+        DistanceDependentProbabilityConnector.__init__(
+            self, d_expr, allow_self_connections, rng, safe, callback)
+        self.probability = probability
+        self.max_dist = max_dist
+        self._builtin_name = 'MaxDistanceFixedProbability'
+        self.connectivity_init_possible = isinstance(rng, NativeRNG)
+        self._needs_populations_shapes = True
+        self.shapes = None
+
+    @property
+    def _conn_init_params(self):
+        params = {
+            'prob': self.probability,
+            'max_dist': self.max_dist,
+        }
+        return dict(list(params.items()) + list(self.shapes.items()))
 
 
 class DisplacementDependentProbabilityConnector(

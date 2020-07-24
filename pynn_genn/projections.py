@@ -525,6 +525,8 @@ class Projection(common.Projection, ContextMixin):
         # As delay is homogeneous, use to obtain minimum delay
         # **TODO** this is a pretty hacky solution
         self.min_delay = (delay_steps + 1) * self._simulator.state.dt
+        if self._connector._needs_populations_shapes:
+            self._connector._set_shape_params(self)
 
         # If both pre_indices and post_indices are empty, it means that we
         # prevented PyNN from expanding indices
