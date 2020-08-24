@@ -352,8 +352,10 @@ class Projection(common.Projection, ContextMixin):
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
         # neuron parameters into postsynaptic model parameters
-        prefix = "inh_" if self.receptor_type == "inhibitory" else "exc_"
-
+        if self.receptor_type in ("excitatory", "inhibitory"):
+            prefix = "inh_" if self.receptor_type.startswith("inh") else "exc_"
+        else:
+            prefix = self.receptor_type + "_"
         #  Create connections rows to hold synapses
         pre_indices = []
         post_indices = []

@@ -229,8 +229,14 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
         creator = partial(create_custom_postsynaptic_class,
                           self.genn_postsyn_name)
 
+        _defs = copy.deepcopy(self.postsyn_defs)
+        if isinstance(_defs.definitions['decay_code'], dict):
+            _defs.definitions['decay_code'] = _defs.definitions['decay_code'][prefix]
+        if isinstance(_defs.definitions['apply_input_code'], dict):
+            _defs.definitions['apply_input_code'] = _defs.definitions['apply_input_code'][prefix]
+
         # Build model
-        return self.build_genn_model(self.postsyn_defs, native_params,
+        return self.build_genn_model(_defs, native_params,
                                      init_vals, creator, prefix)
 
     def build_genn_neuron(self, native_params, init_vals):
