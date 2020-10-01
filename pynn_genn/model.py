@@ -228,12 +228,13 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
         # Build callable to create a custom PSM from defs
         creator = partial(create_custom_postsynaptic_class,
                           self.genn_postsyn_name)
-
+        # [:-1] to remove the "_" added before
+        pfx = prefix[:-1]
         _defs = copy.deepcopy(self.postsyn_defs)
         if isinstance(_defs.definitions['decay_code'], dict):
-            _defs.definitions['decay_code'] = _defs.definitions['decay_code'][prefix]
+            _defs.definitions['decay_code'] = _defs.definitions['decay_code'][pfx]
         if isinstance(_defs.definitions['apply_input_code'], dict):
-            _defs.definitions['apply_input_code'] = _defs.definitions['apply_input_code'][prefix]
+            _defs.definitions['apply_input_code'] = _defs.definitions['apply_input_code'][pfx]
 
         # Build model
         return self.build_genn_model(_defs, native_params,
