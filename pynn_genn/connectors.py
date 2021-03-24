@@ -140,7 +140,7 @@ class OneToOneConnector(GeNNConnectorMixin, OneToOnePyNN):
 class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
 
-    def __init__(self, allow_self_connections=True, safe=True, callback=None,):
+    def __init__(self, allow_self_connections=True, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self, use_sparse=False)
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
@@ -172,7 +172,7 @@ class FixedTotalNumberConnector(GeNNConnectorMixin, FixTotalPyNN):
     __doc__ = FixTotalPyNN.__doc__
 
     def __init__(self, n, allow_self_connections=True, with_replacement=True,
-                 rng=None, safe=True, callback=None,):
+                 rng=None, safe=True, callback=None):
         GeNNConnectorMixin.__init__(self)
         FixTotalPyNN.__init__(self, n, allow_self_connections, with_replacement,
                               rng, safe=safe, callback=callback)
