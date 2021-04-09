@@ -11,10 +11,12 @@ from functools import partial
 import numpy as np
 import lazyarray as la
 from pyNN.standardmodels import cells, build_translations
+from pyNN import errors
 from ..simulator import state
 import logging
 from ..model import GeNNStandardCellType, GeNNDefinitions, DDTemplate
 from pygenn.genn_model import create_custom_neuron_class
+
 
 logger = logging.getLogger("PyNN")
 
@@ -771,6 +773,19 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
             ("spike_times", "spikeTimes"),
         ),
         extra_param_values = {})
+    def __init__(self, **parameters):
+        spike_times = parameters.get("spike_times", None)
+        self._check_spike_times(spike_times)
+        cells.SpikeSourceArray.__init__(self, **parameters)
+        GeNNStandardCellType.__init__(self, **parameters)
+
+
+    def _check_spike_times(self, spike_times):
+        for seq in spike_times:
+            seq = np.asarray(seq)
+            if np.any(seq[:-1] > seq[1:]):
+                raise errors.InvalidParameterValueError(
+                    "Spike times given to SpikeSourceArray must be in increasing order")
 
     def get_extra_global_neuron_params(self, native_params, init_vals):
         # Get spike times

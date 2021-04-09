@@ -284,8 +284,8 @@ def conn_init_fix_post():
     timestep = 1.
     sim.setup(timestep)
 
-    n_pre = 1000
-    n_post = 1000
+    n_pre = 5000
+    n_post = 5000
     params = copy.copy(sim.IF_curr_exp.default_parameters)
     pre = sim.Population(n_pre, sim.IF_curr_exp, params,
                          label='pre')
@@ -312,8 +312,8 @@ def conn_init_fix_post():
     sim.end()
 
     abs_diff = numpy.abs(n - numpy.mean(n_cols))
-    epsilon = 0.01
-    assert abs_diff <= epsilon
+    fpc = n * 0.05
+    assert_less_equal(abs_diff, fpc)
 
     scale = dist_params['high'] - dist_params['low']
     s, p = stats.kstest((comp_var - dist_params['low']) / scale, 'uniform')

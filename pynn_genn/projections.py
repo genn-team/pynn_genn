@@ -184,7 +184,7 @@ class Projection(common.Projection, ContextMixin):
         variables = []
         if self.use_sparse:
             # Loop through variables
-            for n in names[0]:
+            for n in names:
                 # Create empty array to hold variable and initialise to NaN
                 var = np.empty((self.pre.size, self.post.size))
                 var[:] = np.nan
@@ -214,7 +214,7 @@ class Projection(common.Projection, ContextMixin):
         # Otherwise
         else:
             # Loop through variables
-            for n in names[0]:
+            for n in names:
                 # Create empty array to hold variable
                 var = np.empty((self.pre.size, self.post.size))
 
@@ -284,7 +284,6 @@ class Projection(common.Projection, ContextMixin):
                     variables.append(np.tile(np.arange(self.post.size),
                                              self.pre.size))
 
-            # Otherwise, stack together the variables
             # from each sub-projection and add to list
             else:
                 variables.append(np.hstack(p.syn_pop.get_var_values(n)
