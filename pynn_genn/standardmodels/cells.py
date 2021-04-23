@@ -773,12 +773,12 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
             ("spike_times", "spikeTimes"),
         ),
         extra_param_values = {})
+
     def __init__(self, **parameters):
-        spike_times = parameters.get("spike_times", None)
+        spike_times = parameters.get("spike_times", [])
         self._check_spike_times(spike_times)
         cells.SpikeSourceArray.__init__(self, **parameters)
         GeNNStandardCellType.__init__(self, **parameters)
-
 
     def _check_spike_times(self, spike_times):
         for seq in spike_times:

@@ -165,8 +165,10 @@ class Recorder(recording.Recorder):
     def _local_count(self, variable, filter_ids=None):
         N = {}
         if variable == "spikes":
+            mon = self.monitors[variable]
             for id in self.filter_recorded(variable, filter_ids):
-                N[int(id)] = 2
+                id = int(id)
+                N[id] = len(mon.data[mon.id_data_idx_map[id]])
         else:
             raise Exception("Only implemented for spikes")
         return N
