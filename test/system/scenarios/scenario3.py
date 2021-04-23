@@ -66,6 +66,7 @@ def scenario3(sim):
 
     initial_weight_distr = RandomDistribution('uniform', low=w_min, high=w_max)
     connections.randomizeWeights(initial_weight_distr)
+    sim.run(1)
     initial_weights = connections.get('weight', format='array', gather=False)
     assert initial_weights.min() >= w_min
     assert initial_weights.max() < w_max

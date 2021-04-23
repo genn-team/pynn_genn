@@ -33,7 +33,8 @@ def ticket166(sim, plot_figure=False):
     # note we add no new spikes to the second source
     t = sim.run(t_step)  # first neuron gets depolarized again
 
-    vm = cells.get_data().segments[0].analogsignals[0]
+    neo = cells.get_data()
+    vm = neo.segments[0].analogsignals[0]
     final_v_0 = vm[-1, 0]
     final_v_1 = vm[-1, 1]
 

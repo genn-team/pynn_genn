@@ -27,6 +27,8 @@ from .model import sanitize_label
 from .contexts import ContextMixin
 from .random import NativeRNG
 
+from warnings import warn
+
 # Tuple type used to store details of GeNN sub-projections
 SubProjection = namedtuple("SubProjection",
                            ["genn_label", "pre_pop", "post_pop",
@@ -167,7 +169,9 @@ class Projection(common.Projection, ContextMixin):
                 conn_params[p_name].extend(repeat(p_val, times=num_synapses))
 
     def _set_initial_value_array(self, variable, initial_value):
-        pass
+        warn("Setting initial value as array is not yet supported:"
+             "{}\n\t{}".format(variable, initial_value))
+
 
     def _get_attributes_as_arrays(self, names, multiple_synapses="sum"):
         # Dig out reference to GeNN model
