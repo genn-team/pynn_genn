@@ -1,10 +1,11 @@
 
 
 from nose.tools import assert_equal, assert_true, assert_false, assert_raises
-from numpy.testing import assert_array_equal
+# from numpy.testing import assert_array_equal
 import quantities as pq
 import numpy
 from .registry import register
+from pyNN.utility import assert_arrays_equal
 
 try:
     import scipy
@@ -96,7 +97,7 @@ def issue321(sim):
     v = cells.get_data().segments[0].filter(name='v')[0]
     sim.end()
     # the DCSource and StepCurrentSource should be equivalent
-    assert_array_equal(v[:, 1], v[:, 2])
+    assert_arrays_equal(v[:, 1], v[:, 2])
     # Ideally, the three cells should have identical traces, but in
     # practice there is always a delay with NEST until the current from
     # a current generator kicks in

@@ -17,6 +17,7 @@ def all_to_all_static_no_self(sim):
     p = sim.Population(5, sim.IF_cond_exp())
     synapse_type = sim.StaticSynapse(weight=RandomDistribution('gamma', k=2.0, theta=0.5), delay="0.2+0.3*d")
     prj = sim.Projection(p, p, sim.AllToAllConnector(allow_self_connections=False), synapse_type)
+    sim.run(1)
     weights = prj.get('weight', format='array', gather=False)
     print(weights)
     delays = prj.get('delay', format='list', gather=False)

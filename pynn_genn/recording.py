@@ -168,7 +168,8 @@ class Recorder(recording.Recorder):
             mon = self.monitors[variable]
             for id in self.filter_recorded(variable, filter_ids):
                 id = int(id)
-                N[id] = len(mon.data[mon.id_data_idx_map[id]])
+                data_idx = mon.id_data_idx_map[int(id) - mon.start_id]
+                N[id] = len(mon.data[data_idx])
         else:
             raise Exception("Only implemented for spikes")
         return N

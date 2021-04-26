@@ -116,7 +116,7 @@ class Connection(common.Connection):
 '''
 
 
-class Projection(common.Projection, ContextMixin):
+class Projection(ContextMixin, common.Projection):
     __doc__ = common.Projection.__doc__
     _simulator = simulator
     _static_synapse_class = StaticSynapse
@@ -150,6 +150,8 @@ class Projection(common.Projection, ContextMixin):
         self._simulator.state.projections.append(self)
 
     def set(self, **attributes):
+        # todo: self.synapse_type.parameter_space is a read-only
+        #       find a way to update without breaking PyNN more
         self.synapse_type.parameter_space.update(**attributes)
 
     @ContextMixin.use_contextual_arguments()
@@ -404,7 +406,6 @@ class Projection(common.Projection, ContextMixin):
         # If delays were expanded, just pass them
         else:
             delay_steps = params["delaySteps"]
-
 
         # **TODO** add support for heterogeneous dendritic delay
         if not np.allclose(delay_steps, delay_steps[0]):
