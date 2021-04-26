@@ -167,7 +167,7 @@ class Recorder(recording.Recorder):
         if variable == "spikes":
             for id in self.filter_recorded(variable, filter_ids):
                 id = int(id)
-                data_idx = mon.id_data_idx_map[int(id) - mon.start_id]
+                data_idx = mon.id_data_idx_map[id - mon.start_id]
                 N[id] = len(mon.data[data_idx])
         else:
             raise Exception("Only implemented for spikes")
