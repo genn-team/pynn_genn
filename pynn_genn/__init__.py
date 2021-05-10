@@ -47,6 +47,7 @@ def setup(timestep=DEFAULT_TIMESTEP, min_delay=DEFAULT_MIN_DELAY,
     simulator.state.max_delay = max_delay
     simulator.state.mpi_rank = extra_params.get("rank", 0)
     simulator.state.num_processes = extra_params.get("num_processes", 1)
+    simulator.state.reuse_genn_model = extra_params.get("reuse_genn_model", False)
 
     # If backend is specified, use that
     if "backend" in extra_params:
