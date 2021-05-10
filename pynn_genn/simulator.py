@@ -69,9 +69,10 @@ class State(common.control.BaseState):
             model_exists = os.path.isfile(os.path.join(self.model_path, 
                                                        "runner_Release.dll"))
         else:
-            model_exists = os.path.isfile(os.path.join(self.model_path, 
-                                                       self.name + "_CODE",
-                                                       "librunner.so"))
+            model_exists = os.path.isfile(
+                os.path.join(self.model_path, 
+                             self.model.model_name + "_CODE",
+                             "librunner.so"))
         if not self.reuse_genn_model or not model_exists:
             self.model.build(self.model_path)
         self.model.load(self.model_path)
