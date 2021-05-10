@@ -1,6 +1,9 @@
-from pyNN import common
-from pygenn import GeNNModel
+import os
 from six import iteritems, itervalues
+
+from pyNN import common
+
+from pygenn import GeNNModel
 
 name = "genn"
 
@@ -24,6 +27,7 @@ class State(common.control.BaseState):
         self.dt = 0.1
         self.t = 0.0
         self.num_current_sources = 0
+        self.reuse_genn_model = False
         self.native_rng = None
 
     @property
@@ -58,7 +62,19 @@ class State(common.control.BaseState):
         for proj in self.projections:
             proj._create_native_projection()
 
-        self.model.build(self.model_path)
+        # Build and load GeNN model
+        # **THINK** this logic is common with mlGeNN so maybe
+        # model_filename should be a GeNNModel property?
+        if os.name == 'nt':
+            model_exists = os.path.isfile(os.path.join(self.model_path, 
+                                                       "runner_Release.dll"))
+        else:
+            model_exists = os.path.isfile(
+                os.path.join(self.model_path, 
+                             self.model.model_name + "_CODE",
+                             "librunner.so"))
+        if not self.reuse_genn_model or not model_exists:
+            self.model.build(self.model_path)
         self.model.load(self.model_path)
 
         self._built = True
