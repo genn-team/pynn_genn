@@ -180,6 +180,27 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
         if hasattr(self.timing_dependence, "post_spike_code"):
             self.wum_defs["post_spike_code"] = self.timing_dependence.post_spike_code
 
+    @property
+    def parameter_space(self):
+        return super(STDPMechanism, self).parameter_space
+
+    @parameter_space.setter
+    def parameter_space(self, ps):
+        self.weight = ps.pop('weight')
+        self.delay = ps.pop('delay')
+        self.dendritic_delay_fraction = ps.pop('dendritic_delay_fraction')
+
+        timing_parameters = self.timing_dependence.parameter_space
+        for k in timing_parameters.keys():
+            timing_parameters[k] = ps[k]
+        self.timing_dependence.parameter_space = timing_parameters
+
+        weight_parameters = self.weight_dependence.parameter_space
+        for k in weight_parameters.keys():
+            weight_parameters[k] = ps[k]
+        self.weight_dependence.parameter_space = weight_parameters
+
+
 class WeightDependence(object):
 
     vars = {

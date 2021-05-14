@@ -55,7 +55,10 @@ def test_record_vm_and_gsyn_from_assembly(sim):
     sim.connect(inputs, cells, weight=0.1, delay=0.5, receptor_type='inhibitory')
     sim.connect(inputs, cells, weight=0.1, delay=0.3, receptor_type='excitatory')
     cells.record('v')
+
+    # todo: gsyn is still not supported in GeNN
     cells[2:9].record(['gsyn_exc', 'gsyn_inh'])
+
 #    for p in cells.populations:
 #        assert_equal(p.recorders['v'].recorded, set(p.all_cells))
 
@@ -158,8 +161,8 @@ def test_mix_procedural_and_oo(sim):
 
     data_proc = get_io(fn_proc).read()[0]
     data_oo = get_io(fn_oo).read()[0]
-    assert_arrays_equal(data_proc.segments[0].analogsignals[0],
-                        data_oo.segments[0].analogsignals[0])
+    assert_arrays_almost_equal(data_proc.segments[0].analogsignals[0],
+                               data_oo.segments[0].analogsignals[0])
 
     os.remove(fn_proc)
     os.remove(fn_oo)
