@@ -241,6 +241,8 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
         return self.build_genn_model(self.neuron_defs, native_params,
                                      init_vals, creator)
 
+    def _test_parameters(self):
+        pass
 
 class GeNNStandardSynapseType(GeNNStandardModelType):
     def build_genn_wum(self, conn_params, init_vals):

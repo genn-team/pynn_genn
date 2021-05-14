@@ -141,7 +141,11 @@ class AllToAllConnector(GeNNConnectorMixin, AllToAllPyNN):
     __doc__ = AllToAllPyNN.__doc__
 
     def __init__(self, allow_self_connections=True, safe=True, callback=None,):
-        GeNNConnectorMixin.__init__(self, use_sparse=False)
+        # If we do not allow self-connections we end up with a matrix which is
+        # not dense and this breaks dense synapses in PyGeNN. The solution(?)
+        # so far is to use a 'sparse' matrix.
+        GeNNConnectorMixin.__init__(self,
+                                    use_sparse=(not allow_self_connections))
         AllToAllPyNN.__init__(
                             self, allow_self_connections=allow_self_connections,
                             safe=safe, callback=callback)

@@ -109,6 +109,8 @@ class Population(common.Population):
                                                      sanitize_label(label))
 
     def _create_cells(self):
+        self.celltype._test_parameters()
+
         id_range = np.arange(simulator.state.id_counter,
                              simulator.state.id_counter + self.size)
         self.all_cells = np.array([simulator.ID(id) for id in id_range],

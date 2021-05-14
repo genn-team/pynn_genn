@@ -66,11 +66,17 @@ def scenario3(sim):
 
     initial_weight_distr = RandomDistribution('uniform', low=w_min, high=w_max)
     connections.randomizeWeights(initial_weight_distr)
+
+    # NOTE: trigger connectivity generation in GeNN
     sim.run(1)
+
     initial_weights = connections.get('weight', format='array', gather=False)
     assert initial_weights.min() >= w_min
     assert initial_weights.max() < w_max
     assert initial_weights[0, 0] != initial_weights[1, 0]
+
+    # because we did a run(1) before
+    sim.reset()
 
     pre.record('spikes')
     post.record('spikes')
@@ -103,4 +109,5 @@ def scenario3(sim):
 if __name__ == '__main__':
     from pyNN.utility import get_simulator
     sim, args = get_simulator()
+    # import pynn_genn as sim
     scenario3(sim)

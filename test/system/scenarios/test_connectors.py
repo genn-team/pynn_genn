@@ -9,8 +9,7 @@ from .registry import register
 
 
 # TODO: add some tests with projections between Assemblies and PopulationViews
-
-
+# TODO: heterogeneous delays are not implemented yet
 @register()
 def all_to_all_static_no_self(sim):
     sim.setup()

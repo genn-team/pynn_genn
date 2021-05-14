@@ -152,7 +152,9 @@ class Projection(ContextMixin, common.Projection):
     def set(self, **attributes):
         # todo: self.synapse_type.parameter_space is a read-only
         #       find a way to update without breaking PyNN more
-        self.synapse_type.parameter_space.update(**attributes)
+        ps = self.synapse_type.parameter_space# .update(**attributes)
+        ps.update(**attributes)
+        self.synapse_type.parameter_space = ps
 
     @ContextMixin.use_contextual_arguments()
     def _convergent_connect(self, presynaptic_indices, postsynaptic_index,
