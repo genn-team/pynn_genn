@@ -19,7 +19,6 @@ def all_to_all_static_no_self(sim):
     prj = sim.Projection(p, p, sim.AllToAllConnector(allow_self_connections=False), synapse_type)
     sim.run(1)
     weights = prj.get('weight', format='array', gather=False)
-    print(weights)
     delays = prj.get('delay', format='list', gather=False)
     i, j, d = numpy.array(delays).T
     assert_arrays_almost_equal(d, 0.2 + 0.3 * abs(i - j), 1e-9)
