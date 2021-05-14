@@ -7,18 +7,26 @@ from .registry import register
 
 #init_logging(None, debug=True)
 
+# TODO: Most of these faile due to connectivity not being generated until
+#       sim.run() is called. Non-existent connectivity then makes numpy.hstack
+#       raise an Exception because there is no data to stack.
+#       :
+#       There is a problem with getting delays back which breaks all testing
+#       after this occurs, I need to dig up a bit more about this.
+#       Another hick-up is that heterogeneous delays are not implemented yet
+#       so assert_arrays_(almost_)equal is always going to fail.
+
 
 # TODO: add some tests with projections between Assemblies and PopulationViews
-# TODO: heterogeneous delays are not implemented yet
 @register()
 def all_to_all_static_no_self(sim):
     sim.setup()
     p = sim.Population(5, sim.IF_cond_exp())
     synapse_type = sim.StaticSynapse(weight=RandomDistribution('gamma', k=2.0, theta=0.5), delay="0.2+0.3*d")
     prj = sim.Projection(p, p, sim.AllToAllConnector(allow_self_connections=False), synapse_type)
-    sim.run(1)
+    sim.run(0)
     weights = prj.get('weight', format='array', gather=False)
-    assert np.sum(np.isnan(weights)) == 5, "Number of NaN connections should be equal to population size"
+    assert numpy.sum(numpy.isnan(weights)) == 5, "Number of NaN connections should be equal to population size"
 
     # TODO: this completely breaks the simulation / test run
     # delays = prj.get('delay', format='list', gather=False)

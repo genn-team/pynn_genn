@@ -5,7 +5,7 @@ from nose.tools import assert_equal, assert_true, assert_false, assert_raises
 import quantities as pq
 import numpy
 from .registry import register
-from pyNN.utility import assert_arrays_equal
+from pyNN.utility import assert_arrays_equal, assert_arrays_almost_equal
 
 try:
     import scipy
@@ -97,7 +97,7 @@ def issue321(sim):
     v = cells.get_data().segments[0].filter(name='v')[0]
     sim.end()
     # the DCSource and StepCurrentSource should be equivalent
-    assert_arrays_equal(v[:, 1], v[:, 2])
+    assert_arrays_almost_equal(v[:, 1], v[:, 2], 0.001)
     # Ideally, the three cells should have identical traces, but in
     # practice there is always a delay with NEST until the current from
     # a current generator kicks in
@@ -509,7 +509,8 @@ def issue497(sim):
     # verify that acsources has value at t = start as 'amplitude'
     assert_true (abs(i_ac2[int(start2 / sim_dt), 0] - amplitude * pq.nA) < 1e-9)
 
-
+# todo: most of these are not yet implemented in PyNN GeNN but should be
+#       easy to work them out
 @register()
 def issue512(sim):
     """

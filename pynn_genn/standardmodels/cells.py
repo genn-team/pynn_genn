@@ -780,14 +780,16 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
 
     def _test_parameters(self):
         spike_times = self.parameter_space['spike_times']
-        self._check_spike_times(spike_times)
+        if spike_times.shape is not None:
+            self._check_spike_times(spike_times)
 
     def _check_spike_times(self, spike_times):
         for seq in spike_times:
             seq = seq.value
-            if np.any(seq[:-1] > seq[1:]):
-                raise errors.InvalidParameterValueError(
-                    "Spike times given to SpikeSourceArray must be in increasing order")
+            if len(seq):
+                if np.any(seq[:-1] > seq[1:]):
+                    raise errors.InvalidParameterValueError(
+                        "Spike times given to SpikeSourceArray must be in increasing order")
 
     def get_extra_global_neuron_params(self, native_params, init_vals):
         # Get spike times

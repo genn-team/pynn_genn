@@ -175,7 +175,10 @@ class Recorder(recording.Recorder):
         return N
 
     def _clear_simulator(self):
-        pass
+        # Clear out data
+        for m in itervalues(self.monitors):
+            m.store_to_cache()
+
 
     def _reset(self):
         # Reset what is recorded

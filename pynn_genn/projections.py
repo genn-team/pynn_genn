@@ -294,8 +294,8 @@ class Projection(ContextMixin, common.Projection):
 
             # from each sub-projection and add to list
             else:
-                variables.append(np.hstack(p.syn_pop.get_var_values(n)
-                                           for p in self._sub_projections))
+                variables.append(np.hstack([p.syn_pop.get_var_values(n)
+                                            for p in self._sub_projections]))
 
         # Unzip into list of tuples and return
         return list(zip(*variables))
