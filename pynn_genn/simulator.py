@@ -113,6 +113,11 @@ class State(common.control.BaseState):
 
     def clear(self):
         self.model = GeNNModel("float", "GeNNModel")
+        
+        # we need to reset these for reusing built models to work
+        common.Projection._nProj = 0
+        common.Population._nPop = 0
+
         self.populations = []
         self.projections = []
         self.recorders = set([])
