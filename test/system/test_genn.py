@@ -321,6 +321,55 @@ def conn_init_fix_post():
     assert_greater(p, min_p)
 
 
+def test_multiple_runs_reuse_model():
+    if not have_genn:
+        raise SkipTest
+    
+    sim = pynn_genn
+
+    sim.setup(timestep=1)
+    
+    p0 = sim.Population(1, sim.IF_curr_exp, {})
+
+    assert sim.common.Population._nPop == 1, 'one population added'
+
+    p1 = sim.Population(1, sim.IF_curr_exp, {})
+
+    assert sim.common.Population._nPop == 2, 'two populations added'
+
+    j0 = sim.Projection(p0, p1, sim.OneToOneConnector())
+
+    assert sim.common.Projection._nProj == 1, 'one projection added'
+
+    sim.run(0)
+
+    sim.reset()
+
+    assert sim.common.Population._nPop == 2, 'two populations added'
+    assert sim.common.Projection._nProj == 1, 'one projection added'
+    
+    sim.end()
+
+    # new simulation setup means we reset counting for neuron and synapse pops
+    sim.setup(timestep=1)
+    
+    assert sim.common.Population._nPop == 0, 'zero after setup'
+    assert sim.common.Projection._nProj == 0, 'zero after setup'
+
+    # restart counting    
+    p0 = sim.Population(1, sim.IF_curr_exp, {})
+
+    assert sim.common.Population._nPop == 1, 'one population added'
+
+    p1 = sim.Population(1, sim.IF_curr_exp, {})
+
+    assert sim.common.Population._nPop == 2, 'two populations added'
+
+    j0 = sim.Projection(p0, p1, sim.OneToOneConnector())
+
+    assert sim.common.Projection._nProj == 1, 'one projection added'
+
+
 if __name__ == '__main__':
     test_scenarios()
     rng_checks()
