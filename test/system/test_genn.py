@@ -328,46 +328,59 @@ def test_multiple_runs_reuse_model():
     sim = pynn_genn
 
     sim.setup(timestep=1)
-    
-    p0 = sim.Population(1, sim.IF_curr_exp, {})
+    assert sim.common.Population._nPop == 0, 'zero after setup populations'
+    assert sim.common.Projection._nProj == 0, 'zero after setup projections'
+    assert sim.state.num_current_sources == 0, 'zero after setup current sources'
 
+    p0 = sim.Population(1, sim.IF_curr_exp, {})
     assert sim.common.Population._nPop == 1, 'one population added'
 
-    p1 = sim.Population(1, sim.IF_curr_exp, {})
+    dc0 = sim.DCSource(amplitude=0.5, start=20.0, stop=80.0)
+    assert sim.state.num_current_sources == 0, 'no current source without injecting'
 
+    dc0.inject_into(p0)
+    assert sim.state.num_current_sources == 1, 'one current source after injecting'
+
+    p1 = sim.Population(1, sim.IF_curr_exp, {})
     assert sim.common.Population._nPop == 2, 'two populations added'
 
     j0 = sim.Projection(p0, p1, sim.OneToOneConnector())
-
     assert sim.common.Projection._nProj == 1, 'one projection added'
 
     sim.run(0)
 
     sim.reset()
 
-    assert sim.common.Population._nPop == 2, 'two populations added'
-    assert sim.common.Projection._nProj == 1, 'one projection added'
-    
+    assert sim.common.Population._nPop == 2, 'two populations after reset'
+    assert sim.common.Projection._nProj == 1, 'one projection after reset'
+    assert sim.state.num_current_sources == 1, 'one current source after reset'
+
     sim.end()
 
     # new simulation setup means we reset counting for neuron and synapse pops
-    sim.setup(timestep=1)
-    
-    assert sim.common.Population._nPop == 0, 'zero after setup'
-    assert sim.common.Projection._nProj == 0, 'zero after setup'
+    sim.setup(timestep=1, reuse_genn_model=True)
 
-    # restart counting    
+    # restart counting
+    assert sim.common.Population._nPop == 0, 'zero after setup populations'
+    assert sim.common.Projection._nProj == 0, 'zero after setup projections'
+    assert sim.state.num_current_sources == 0, 'zero after setup current sources'
+
     p0 = sim.Population(1, sim.IF_curr_exp, {})
-
     assert sim.common.Population._nPop == 1, 'one population added'
 
-    p1 = sim.Population(1, sim.IF_curr_exp, {})
+    dc0 = sim.DCSource(amplitude=0.5, start=20.0, stop=80.0)
+    assert sim.state.num_current_sources == 0, 'no current source without injecting'
 
+    dc0.inject_into(p0)
+    assert sim.state.num_current_sources == 1, 'one current source after injecting'
+
+    p1 = sim.Population(1, sim.IF_curr_exp, {})
     assert sim.common.Population._nPop == 2, 'two populations added'
 
     j0 = sim.Projection(p0, p1, sim.OneToOneConnector())
-
     assert sim.common.Projection._nProj == 1, 'one projection added'
+
+    sim.run(0)
 
 
 if __name__ == '__main__':
