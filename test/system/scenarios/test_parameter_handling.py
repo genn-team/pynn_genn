@@ -1,7 +1,7 @@
 
 import numpy
 from numpy import nan
-from numpy.testing import assert_array_equal, assert_array_almost_equal
+#from numpy.testing import assert_array_equal, assert_array_almost_equal
 from nose.tools import assert_equal
 from pyNN.utility import assert_arrays_equal, assert_arrays_almost_equal
 from .registry import register
@@ -125,21 +125,21 @@ def test_set_synaptic_parameters_partially_connected(sim):
     expected = positional_weights
     actual = prj.get('weight', format='array')
     if mpi_rank == 0:
-        assert_array_equal(actual, expected)
+        assert_arrays_equal(actual, expected)
 
     u_list = [0.9, 0.8, 0.7, 0.6, 0.5]
     prj.set(U=u_list)
     expected = numpy.array([[0.9, nan], [0.8, 0.7], [nan, 0.6], [0.5, nan]])
     actual = prj.get('U', format='array')
     if mpi_rank == 0:
-        assert_array_equal(actual, expected)
+        assert_arrays_equal(actual, expected)
 
     f_delay = lambda d: 0.5 + d
     prj.set(delay=f_delay)
     expected = numpy.array([[0.5, nan], [1.5, 0.5], [nan, 1.5], [3.5, nan]])
     actual = prj.get('delay', format='array')
     if mpi_rank == 0:
-        assert_array_equal(actual, expected)
+        assert_arrays_equal(actual, expected)
 
     # final sanity check
     expected = numpy.array([
@@ -152,7 +152,7 @@ def test_set_synaptic_parameters_partially_connected(sim):
     actual = numpy.array(prj.get(['weight', 'delay', 'U'], format='list'))
     if mpi_rank == 0:
         ind = numpy.lexsort((actual[:, 1], actual[:, 0]))
-        assert_array_equal(actual[ind], expected)
+        assert_arrays_equal(actual[ind], expected)
 test_set_synaptic_parameters_partially_connected.__test__ = False
 
 
@@ -236,7 +236,7 @@ def test_set_synaptic_parameters_multiply_connected(sim):
     actual = numpy.array(prj.get(['weight', 'delay', 'U'], format='list'))
     if mpi_rank == 0:
         ind = numpy.lexsort((actual[:, 1], actual[:, 0]))
-        assert_array_equal(actual[ind], expected)
+        assert_arrays_equal(actual[ind], expected)
 test_set_synaptic_parameters_multiply_connected.__test__ = False
 
 

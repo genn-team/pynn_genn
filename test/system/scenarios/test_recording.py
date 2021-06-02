@@ -3,7 +3,7 @@ import os
 import numpy
 import quantities as pq
 from nose.tools import assert_equal, assert_true
-from numpy.testing import assert_array_equal, assert_array_almost_equal
+#from numpy.testing import assert_array_equal, assert_array_almost_equal
 from neo.io import get_io
 from pyNN.utility import assert_arrays_equal, assert_arrays_almost_equal, init_logging, normalized_filename
 from .registry import register
@@ -34,8 +34,8 @@ def test_reset_recording(sim):
     sim.end()
     ti = lambda i: data.segments[i].analogsignals[0].times
     assert_arrays_equal(ti(0), ti(1))
-    assert_array_equal(data.segments[0].analogsignals[0].channel_index.channel_ids, numpy.array([3]))
-    assert_array_equal(data.segments[1].analogsignals[0].channel_index.channel_ids, numpy.array([4]))
+    assert_arrays_equal(data.segments[0].analogsignals[0].channel_index.channel_ids, numpy.array([3]))
+    assert_arrays_equal(data.segments[1].analogsignals[0].channel_index.channel_ids, numpy.array([4]))
     vi = lambda i: data.segments[i].analogsignals[0]
     assert vi(0).shape == vi(1).shape == (101, 1)
     assert vi(0)[0, 0] == vi(1)[0, 0] == p.initial_values['v'].evaluate(simplify=True) * pq.mV  # the first value should be the same
@@ -80,20 +80,20 @@ def test_record_vm_and_gsyn_from_assembly(sim):
     assert_equal(gsyn_p1.shape, (n_points, 4))
     assert_equal(gsyn_all.shape, (n_points, 7))
 
-    assert_array_equal(vm_p1[:, 3], vm_all[:, 8])
+    assert_arrays_equal(vm_p1[:, 3], vm_all[:, 8])
 
-    assert_array_equal(vm_p0.channel_index.index, numpy.arange(5))
-    assert_array_equal(vm_p1.channel_index.index, numpy.arange(6))
-    assert_array_equal(vm_all.channel_index.index, numpy.arange(11))
-    assert_array_equal(vm_p0.channel_index.channel_ids, numpy.arange(5))
-    assert_array_equal(vm_p1.channel_index.channel_ids, numpy.arange(6))
-    assert_array_equal(vm_all.channel_index.channel_ids, numpy.arange(11))
-    assert_array_equal(gsyn_p0.channel_index.index, numpy.arange(3))
-    assert_array_equal(gsyn_p1.channel_index.index, numpy.arange(4))
-    assert_array_equal(gsyn_all.channel_index.index, numpy.arange(7))
-    assert_array_equal(gsyn_p0.channel_index.channel_ids, numpy.array([2, 3, 4]))
-    assert_array_equal(gsyn_p1.channel_index.channel_ids, numpy.arange(4))
-    assert_array_equal(gsyn_all.channel_index.channel_ids, numpy.arange(2, 9))
+    assert_arrays_equal(vm_p0.channel_index.index, numpy.arange(5))
+    assert_arrays_equal(vm_p1.channel_index.index, numpy.arange(6))
+    assert_arrays_equal(vm_all.channel_index.index, numpy.arange(11))
+    assert_arrays_equal(vm_p0.channel_index.channel_ids, numpy.arange(5))
+    assert_arrays_equal(vm_p1.channel_index.channel_ids, numpy.arange(6))
+    assert_arrays_equal(vm_all.channel_index.channel_ids, numpy.arange(11))
+    assert_arrays_equal(gsyn_p0.channel_index.index, numpy.arange(3))
+    assert_arrays_equal(gsyn_p1.channel_index.index, numpy.arange(4))
+    assert_arrays_equal(gsyn_all.channel_index.index, numpy.arange(7))
+    assert_arrays_equal(gsyn_p0.channel_index.channel_ids, numpy.array([2, 3, 4]))
+    assert_arrays_equal(gsyn_p1.channel_index.channel_ids, numpy.arange(4))
+    assert_arrays_equal(gsyn_all.channel_index.channel_ids, numpy.arange(2, 9))
 
     sim.end()
 test_record_vm_and_gsyn_from_assembly.__test__ = False
@@ -158,8 +158,9 @@ def test_mix_procedural_and_oo(sim):
 
     data_proc = get_io(fn_proc).read()[0]
     data_oo = get_io(fn_oo).read()[0]
-    assert_array_equal(data_proc.segments[0].analogsignals[0],
-                       data_oo.segments[0].analogsignals[0])
+    assert_arrays_almost_equal(data_proc.segments[0].analogsignals[0],
+                               data_oo.segments[0].analogsignals[0],
+                               0.01)
 
     os.remove(fn_proc)
     os.remove(fn_oo)

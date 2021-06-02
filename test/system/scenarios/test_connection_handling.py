@@ -5,7 +5,8 @@ Tests of the fine-grained connection API
 
 from __future__ import division
 from nose.tools import assert_equal, assert_almost_equal, assert_is_instance
-from numpy.testing import assert_array_equal
+#from numpy.testing import assert_array_equal
+from pyNN.utility import assert_arrays_equal
 import numpy as np
 from pyNN import common
 from .registry import register
@@ -41,7 +42,7 @@ def connection_access_weight_and_delay(sim):
     target[:, 1] = 0.5
     target[2, 0] = 0.0123
     target[2, 1] = 1.0
-    assert_array_equal(np.array(prj.get(('weight', 'delay'), format='list', with_address=False)),
+    assert_arrays_equal(np.array(prj.get(('weight', 'delay'), format='list', with_address=False)),
                        target)
 connection_access_weight_and_delay.__test__ = False
 
