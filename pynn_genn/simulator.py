@@ -117,6 +117,7 @@ class State(common.control.BaseState):
         # we need to reset these for reusing built models to work
         common.Projection._nProj = 0
         common.Population._nPop = 0
+        self.num_current_sources = 0
 
         self.populations = []
         self.projections = []
