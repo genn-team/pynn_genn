@@ -109,7 +109,6 @@ class Population(common.Population):
                                                      sanitize_label(label))
 
     def _create_cells(self):
-
         id_range = np.arange(simulator.state.id_counter,
                              simulator.state.id_counter + self.size)
         self.all_cells = np.array([simulator.ID(id) for id in id_range],
@@ -125,10 +124,10 @@ class Population(common.Population):
         # **NOTE** we always use PyNN parameters here
         self._parameters = deepcopy(self.celltype.parameter_space)
 
-        self.celltype._validate_parameters()
-
         # Set shape
         self._parameters.shape = (self.size,)
+
+        self.celltype._validate_parameters(self._parameters)
 
         for id in self.all_cells:
             id.parent = self

@@ -778,8 +778,8 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
         cells.SpikeSourceArray.__init__(self, **parameters)
         GeNNStandardCellType.__init__(self, **parameters)
 
-    def _validate_parameters(self):
-        spike_times = self.parameter_space['spike_times']
+    def _validate_parameters(self, parameters):
+        spike_times = parameters['spike_times']
         if spike_times.shape is not None:
             self._check_spike_times(spike_times)
 
