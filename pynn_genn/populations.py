@@ -109,7 +109,6 @@ class Population(common.Population):
                                                      sanitize_label(label))
 
     def _create_cells(self):
-        self.celltype._test_parameters()
 
         id_range = np.arange(simulator.state.id_counter,
                              simulator.state.id_counter + self.size)
@@ -125,6 +124,8 @@ class Population(common.Population):
         # Take a deep copy of cell type parameters
         # **NOTE** we always use PyNN parameters here
         self._parameters = deepcopy(self.celltype.parameter_space)
+
+        self.celltype._validate_parameters()
 
         # Set shape
         self._parameters.shape = (self.size,)
