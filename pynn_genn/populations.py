@@ -127,6 +127,8 @@ class Population(common.Population):
         # Set shape
         self._parameters.shape = (self.size,)
 
+        self.celltype._validate_parameters(self._parameters)
+
         for id in self.all_cells:
             id.parent = self
         simulator.state.id_counter += self.size
