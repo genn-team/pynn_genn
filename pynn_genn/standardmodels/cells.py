@@ -786,7 +786,8 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
     def _check_spike_times(self, spike_times):
         for seq in spike_times:
             seq = seq.value
-            if np.any(np.diff(seq) >= 0):
+            diff_seq = np.diff(seq)
+            if np.any(diff_seq <= 0):
                 raise errors.InvalidParameterValueError(
                     "Spike times given to SpikeSourceArray must be in increasing order")
 
