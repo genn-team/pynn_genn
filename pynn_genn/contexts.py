@@ -12,7 +12,6 @@ import collections
 import inspect
 import functools
 import sentinel
-from six import iteritems
 
 Required = sentinel.create('Required')
 """Allow specifying keyword arguments as required, i.e., they must be satisfied
@@ -103,7 +102,9 @@ class ContextMixin(object):
         def decorator(f):
             # Extract any positional and positional-and-key-word arguments
             # which may be set.
-            arg_names, varargs, keywords, defaults = inspect.getargspec(f)
+            spec = inspect.getfullargspec(f)
+            arg_names, _, keywords, defaults = (
+                spec.args, spec.varargs, spec.varkw, spec.defaults)
 
             # Sanity check: non-keyword-only arguments should't be present in
             # the keyword-only-arguments list.
@@ -131,7 +132,7 @@ class ContextMixin(object):
                 # Values from the context take priority over default argument
                 # values.
                 context = self.get_context_arguments()
-                for name, val in iteritems(context):
+                for name, val in context.iteritems():
                     if name in new_kwargs:
                         new_kwargs[name] = val
 
@@ -140,7 +141,7 @@ class ContextMixin(object):
                 new_kwargs.update(kwargs)
 
                 # Raise a TypeError if any `Required` sentinels remain
-                for k, v in iteritems(new_kwargs):
+                for k, v in new_kwargs.iteritems():
                     if v is Required:
                         raise TypeError(
                             "{!s}: missing argument {}".format(f.__name__, k))

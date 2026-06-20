@@ -1,6 +1,5 @@
 import numpy as np
 from math import fmod
-from six import iteritems, itervalues
 from pyNN import recording
 from . import simulator
 
@@ -59,7 +58,7 @@ class Monitor(object):
         """Fetch new data"""
         if timestep % self.sampling_timesteps == 0:
             self.time.append(timestep * self.recorder._simulator.state.dt)
-            for idd, i in iteritems(self.id_data_idx_map):
+            for idd, i in self.id_data_idx_map.iteritems():
                 # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
 
@@ -96,6 +95,7 @@ class SpikeMonitor(Monitor):
 
     def __call__(self, timestep):
         """Fetch new data"""
+        assert False
         if timestep % self.sampling_timesteps == 0:
             t = timestep * self.recorder._simulator.state.dt
             for i in self.recorder.population._pop.current_spikes:
@@ -136,16 +136,17 @@ class Recorder(recording.Recorder):
 
     def _record_vars(self, t):
         model = self._simulator.state.model
-        label = self.population._genn_label
+        pop = self.population._genn_label
 
         # Loop through monitors
-        for var, monitor in iteritems(self.monitors):
+        for var, monitor in self.monitors.iteritems():
             # If this variable is spikes, pull current spikes
             if var == "spikes":
-                model.pull_current_spikes_from_device(label)
+                assert False
+                #model.pull_current_spikes_from_device(label)
             # Otherwise pull variable (using translated name cached in monitor)
             else:
-                model.pull_var_from_device(label, monitor.translated)
+                pop.vars[monitor.translated].pull_from_device()
 
             # Update monitor
             monitor(t)

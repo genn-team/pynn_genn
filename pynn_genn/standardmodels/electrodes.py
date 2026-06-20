@@ -11,7 +11,7 @@ from lazyarray import larray
 from pyNN.standardmodels import electrodes, build_translations#, StandardCurrentSource
 from ..simulator import state
 import logging
-from pygenn.genn_model import create_custom_current_source_class
+from pygenn import create_current_source_model
 from ..model import GeNNStandardCurrentSource, GeNNDefinitions
 
 logger = logging.getLogger("PyNN")
@@ -37,9 +37,9 @@ class DCSource(GeNNStandardCurrentSource, electrodes.DCSource):
                     $(injectCurrent, $(amplitude));
                 }
             """,
-            "var_name_types": [
+            "vars": [
                 ("applyIinj", "unsigned char")],
-            "param_name_types" : {
+            "params" : {
                 "tStart": "scalar",
                 "tStop": "scalar",
                 "amplitude": "scalar"}
@@ -69,7 +69,7 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
                     }
                 }
             """,
-            "var_name_types": [
+            "vars": [
                 ("applyIinj", "unsigned char"),
                 ("startStep", "unsigned int"),
                 ("endStep", "unsigned int")],
@@ -85,13 +85,13 @@ class StepCurrentSource(GeNNStandardCurrentSource, electrodes.StepCurrentSource)
         # Concatenate together step amplitudes and times to form extra global parameter
         return {
             "stepAmpls" : np.concatenate([seq.value
-                                           for seq in native_params["stepAmpls"]]),
+                                          for seq in native_params["stepAmpls"]]),
             "stepTimes" : np.concatenate([seq.value
-                                           for seq in native_params["stepTimes"]])}
+                                          for seq in native_params["stepTimes"]])}
 
     def build_genn_current_source(self, native_params):
         # Create model using unmodified defs
-        genn_model = create_custom_current_source_class(
+        genn_model = create_current_source_model(
             self.genn_currentsource_name, **self.currentsource_defs.definitions)
 
         # Get spike times
@@ -135,9 +135,9 @@ class ACSource(GeNNStandardCurrentSource, electrodes.ACSource):
                     $(injectCurrent, $(Ampl) * sin($(Omega) * $(t) + $(PhaseRad)) + $(Offset));
                 }
             """,
-            "var_name_types": [
+            "vars": [
                 ("applyIinj", "unsigned char")],
-            "param_name_types" : {
+            "params" : {
                 "tStart": "scalar",
                 "tStop": "scalar",
                 "Ampl": "scalar",
@@ -168,9 +168,9 @@ class NoisyCurrentSource(GeNNStandardCurrentSource, electrodes.NoisyCurrentSourc
                 }
             """,
 
-            "var_name_types": [
+            "vars": [
                 ("applyIinj", "unsigned char")],
-            "param_name_types" : {
+            "params" : {
                 "tStart": "scalar",
                 "tStop": "scalar",
                 "meanDT": "scalar",

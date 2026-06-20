@@ -9,7 +9,6 @@ from copy import deepcopy
 from pyNN.standardmodels import synapses, StandardModelType, build_translations
 from ..simulator import state
 import logging
-from pygenn.genn_wrapper.WeightUpdateModels import StaticPulse
 from ..model import GeNNStandardSynapseType, GeNNDefinitions, DDTemplate
 
 logger = logging.getLogger("PyNN")
@@ -28,7 +27,7 @@ class StaticSynapse(synapses.StaticSynapse, GeNNStandardSynapseType):
     __doc__ = synapses.StaticSynapse.__doc__
 
     wum_defs = {
-        "sim_code" : "$(addToInSyn, $(g));\n",
+        "pre_spike_syn_code" : "$(addToInSyn, $(g));\n",
         "vars" : {"g": "scalar"}}
 
     translations = build_translations(
@@ -58,7 +57,7 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
     mutable_vars = set(["x", "y", "z", "u"])
 
     wum_defs = {
-        "sim_code" : """
+        "pre_spike_syn_code" : """
             const scalar deltaST = $(t) - $(sT_pre);
             $(z) *= exp(-deltaST / $(tauRec));
             $(z) += $(y) * (exp(-deltaST / $(tauPsc)) - exp(-deltaST / $(tauRec))) / (($(tauPsc) / $(tauRec)) - 1.0);
@@ -81,9 +80,7 @@ class TsodyksMarkramSynapse(synapses.TsodyksMarkramSynapse, GeNNStandardSynapseT
             "u": "scalar",
             "x": "scalar",
             "y": "scalar",
-            "z": "scalar"},
-
-        "is_pre_spike_time_required" : True}
+            "z": "scalar"}}
 
     translations = build_translations(
         ("weight",    "g"),
@@ -115,21 +112,18 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
 
     base_defs = {
         "vars" : {"g": "scalar"},
-        "pre_var_name_types": [],
-        "post_var_name_types": [],
+        "pre_vars": [],
+        "post_vars": [],
 
-        "sim_code" : DDTemplate("""
+        "pre_spike_syn_code" : DDTemplate("""
             $(addToInSyn, $(g));
             scalar dt = $(t) - $(sT_post);
             $${TD_CODE}
         """),
-        "learn_post_code" : DDTemplate("""
+        "post_spike_syn_code" : DDTemplate("""
             scalar dt = $(t) - $(sT_pre);
             $${TD_CODE}
         """),
-
-        "is_pre_spike_time_required" : True,
-        "is_post_spike_time_required" : True,
     }
 
     def _get_minimum_delay(self):
@@ -153,25 +147,25 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
         self.wum_defs["vars"].update(self.weight_dependence.vars)
 
         # Add pre and postsynaptic variables from timing dependence to definition
-        if hasattr(self.timing_dependence, "pre_var_name_types"):
-            self.wum_defs["pre_var_name_types"].extend(
-                self.timing_dependence.pre_var_name_types)
+        if hasattr(self.timing_dependence, "pre_vars"):
+            self.wum_defs["pre_vars"].extend(
+                self.timing_dependence.pre_vars)
 
-        if hasattr(self.timing_dependence, "post_var_name_types"):
-            self.wum_defs["post_var_name_types"].extend(
-                self.timing_dependence.post_var_name_types)
+        if hasattr(self.timing_dependence, "post_vars"):
+            self.wum_defs["post_vars"].extend(
+                self.timing_dependence.post_vars)
 
         # Apply substitutions to sim code
-        td_sim_code = self.timing_dependence.sim_code.substitute(
+        td_pre_spike_syn_code = self.timing_dependence.pre_spike_syn_code.substitute(
             WD_CODE=self.weight_dependence.depression_update_code)
-        self.wum_defs["sim_code"] =\
-            self.wum_defs["sim_code"].substitute(TD_CODE=td_sim_code)
+        self.wum_defs["pre_spike_syn_code"] =\
+            self.wum_defs["pre_spike_syn_code"].substitute(TD_CODE=td_pre_spike_syn_code)
 
         # Apply substitutions to post learn code
-        td_post_learn_code = self.timing_dependence.learn_post_code.substitute(
+        td_post_spike_syn_code = self.timing_dependence.post_spike_syn_code.substitute(
             WD_CODE=self.weight_dependence.potentiation_update_code)
-        self.wum_defs["learn_post_code"] =\
-            self.wum_defs["learn_post_code"].substitute(TD_CODE=td_post_learn_code)
+        self.wum_defs["post_spike_syn_code"] =\
+            self.wum_defs["post_spike_syn_code"].substitute(TD_CODE=post_spike_syn_code)
 
         # Use pre and postsynaptic spike code from timing dependence
         if hasattr(self.timing_dependence, "pre_spike_code"):

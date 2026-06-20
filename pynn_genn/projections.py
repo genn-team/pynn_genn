@@ -1,18 +1,10 @@
-try:
-    xrange
-except NameError:  # Python 3
-    xrange = range
-
-from collections import defaultdict, namedtuple, Iterable
+from collections import defaultdict, namedtuple
+from collections.abc import Iterable
 from itertools import product, repeat
 import logging
 from copy import deepcopy
-from six import iteritems, itervalues
-try:
-    from itertools import izip
-except ImportError:
-    izip = zip  # Python 3 zip returns an iterator already
 import numpy as np
+from pygenn import init_postsynaptic, init_weight_update
 
 from pyNN import common
 from pyNN.connectors import AllToAllConnector, FromListConnector, \
@@ -160,7 +152,7 @@ class Projection(common.Projection, ContextMixin):
                                         times=num_synapses))
 
         # Loop through connection _parameters
-        for p_name, p_val in iteritems(connection_parameters):
+        for p_name, p_val in connection_parameters.iteritems():
             if isinstance(p_val, Iterable):
                 conn_params[p_name].extend(p_val)
             else:
@@ -206,7 +198,7 @@ class Projection(common.Projection, ContextMixin):
                     if n in sub.wum_params:
                         sub_var[sub_pre_inds,sub_post_inds] = sub.wum_params[n]
                     else:
-                        sub_var[sub_pre_inds,sub_post_inds] = sub.syn_pop.get_var_values(n)
+                        sub_var[sub_pre_inds,sub_post_inds] = sub.syn_pop.vars[n].values
 
                 # Add variable to list
                 variables.append(var)
@@ -230,7 +222,7 @@ class Projection(common.Projection, ContextMixin):
                         var[sub.pre_slice, sub.post_slice] = sub.wum_params[n]
                     else:
                         var[sub.pre_slice, sub.post_slice] =\
-                            np.reshape(sub.syn_pop.get_var_values(n),sub_shape)
+                            np.reshape(sub.syn_pop.vars[n].values,sub_shape)
 
                 # Add variable to list
                 variables.append(var)
@@ -248,7 +240,7 @@ class Projection(common.Projection, ContextMixin):
             # Loop through names and pull variables
             for n in names:
                 if n != "presynaptic_index" and n != "postsynaptic_index":
-                    genn_model.pull_var_from_device(sub_pop.genn_label, n)
+                    sub_pop.vars[n].pull_from_device()
 
         # Loop through names of variables that are required
         variables = []
@@ -286,7 +278,7 @@ class Projection(common.Projection, ContextMixin):
 
             # from each sub-projection and add to list
             else:
-                variables.append(np.hstack(p.syn_pop.get_var_values(n)
+                variables.append(np.hstack(p.syn_pop.vars[n].values
                                            for p in self._sub_projections))
 
         # Unzip into list of tuples and return
@@ -344,9 +336,9 @@ class Projection(common.Projection, ContextMixin):
             This function is supposed to be called by the simulator
         """
         if self.use_sparse:
-            matrix_type = "SPARSE_INDIVIDUALG"
+            matrix_type = "SPARSE"
         else:
-            matrix_type = "DENSE_INDIVIDUALG"
+            matrix_type = "DENSE"
 
         # Set prefix based on receptor type
         # **NOTE** this is used to translate the right set of
@@ -362,7 +354,7 @@ class Projection(common.Projection, ContextMixin):
         # the parameters into a dictionary, no need to build pre/post indices
         if self._connector.connectivity_init_possible:
             _params = self._connector._parameters_from_synapse_type(self)
-            for p_name, p_val in iteritems(_params):
+            for p_name, p_val in _params.iteritems():
                 params[p_name] = p_val
         # Build connectivity
         # **NOTE** this build connector matching shape of PROJECTION
@@ -461,10 +453,12 @@ class Projection(common.Projection, ContextMixin):
 
         # Create GeNN synapse population
         syn_pop = simulator.state.model.add_synapse_population(
-            genn_label, matrix_type, delay_steps,
+            genn_label, matrix_type,
             self.pre._pop, self.post._pop,
-            wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
-            psm_model, psm_params, psm_ini, conn_init)
+            init_weight_update(wum_model, wum_params, wum_init, wum_pre_init, wum_post_init),
+            init_postsynaptic(psm_model, psm_params, psm_ini, conn_init))
+    
+        syn_pop.axonal_delay_steps = delay_steps
 
         self._sub_projections.append(
             SubProjection(genn_label, self.pre, self.post,
@@ -514,7 +508,7 @@ class Projection(common.Projection, ContextMixin):
             # NOTE: had to add a check for non-expanded params
             if self.use_sparse:
                 conn_params = {n: p[conn_mask] if not isinstance(p, LazyArray) else p
-                               for n, p in iteritems(params)}
+                               for n, p in params.iteritems()}
             else:
                 ## GeNN stores synapses in this row-major order for dense matrices
                 ## PyNN in some cases (FromListConnector) uses column-major
@@ -524,7 +518,7 @@ class Projection(common.Projection, ContextMixin):
 
                 conn_params = {n: (p[to_row_major])[conn_mask]
                                 if not isinstance(p, LazyArray) else p
-                                    for n, p in iteritems(params)}
+                                    for n, p in params.iteritems()}
 
             conn_params['connector']= self._connector
 
@@ -545,11 +539,13 @@ class Projection(common.Projection, ContextMixin):
 
             # Create GeNN synapse population
             syn_pop = simulator.state.model.add_synapse_population(
-                genn_label, matrix_type, delay_steps,
+                genn_label, matrix_type,
                 pre_pop._pop, post_pop._pop,
-                wum_model, wum_params, wum_init, wum_pre_init, wum_post_init,
-                psm_model, psm_params, psm_ini)
-
+                init_weight_update(wum_model, wum_params, wum_init, wum_pre_init, wum_post_init),
+                init_postsynaptic(psm_model, psm_params, psm_ini))
+            
+            syn_pop.axonal_delay_steps = delay_steps
+    
             # If connectivity is sparse, configure sparse connectivity
             if self.use_sparse:
                 syn_pop.set_sparse_connections(conn_pre_inds, conn_post_inds)

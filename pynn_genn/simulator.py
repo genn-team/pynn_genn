@@ -1,5 +1,4 @@
 import os
-from six import iteritems, itervalues
 
 from pyNN import common
 
@@ -54,8 +53,8 @@ class State(common.control.BaseState):
 
     def finalize(self):
         if not (self.native_rng is None):
-            self.model._model.set_seed(0 if self.native_rng.seed is None 
-                                       else self.native_rng.seed)
+            self.model.seed = (0 if self.native_rng.seed is None 
+                               else self.native_rng.seed)
 
         for pop in self.populations:
             pop._create_native_population()
@@ -90,7 +89,6 @@ class State(common.control.BaseState):
                 rec.init_data_views()
 
         # Synchronise model with our timestep
-        self.model.t = self.t
         self.model.timestep = int(round(self.t / self.dt))
 
         # Simulate
@@ -102,11 +100,6 @@ class State(common.control.BaseState):
             # Record any variables being recorded
             for rec in self.recorders:
                 rec._record_vars(timestep)
-
-            # Also update our t from the GeNN timestep
-            # **NOTE** GeNN steps time at end of timestep and PyNN expects opposite
-            # **NOTE** GeNN often using 32-bit float timesteps which fail a lot of tests
-            self.t = timestep * float(self.dt)
 
             # Advance model time
             self.model.step_time()

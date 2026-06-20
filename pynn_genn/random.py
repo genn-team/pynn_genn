@@ -1,7 +1,7 @@
 import numpy as np
 from pyNN.random import (NativeRNG,
                          AbstractRNG, NumpyRNG, RandomDistribution)
-from pygenn.genn_model import create_custom_init_var_snippet_class
+from pygenn import create_var_init_snippet
 from . import simulator
 
 import logging
@@ -69,7 +69,7 @@ class NativeRNG(NativeRNG):
         'normal_clipped_to_boundary': {
             'params': ('mu', 'sigma', 'low', 'high'),
             'check': lambda p: p['sigma'] > 0 and p['high'] > p['low'],
-            'code': """
+            'var_init_code': """
                 scalar normal = $(mu) + ($(gennrand_normal) * $(sigma));
                 $(value) = fmax( fmin(normal, $(high)), $(low) );
             """
@@ -77,14 +77,14 @@ class NativeRNG(NativeRNG):
         'exponential': {
             'params': ('beta'),
             'check': lambda p: p['beta'] > 0,
-            'code': """
+            'var_init_code': """
                 $(value) = $(beta) * $(gennrand_exponential);
             """
         },
         'gamma': {
             'params': ('k', 'theta'),
             'check': lambda p: p['theta'] > 0 and p['k'] > 0,
-            'code': """
+            'var_init_code': """
                 $(value) = $(k) * $(gennrand_gamma, $(theta));
             """
         },
@@ -173,9 +173,9 @@ class NativeRNG(NativeRNG):
                              "wrong range specified.".format(p))
 
         d = self._distributions[distribution]
-        return create_custom_init_var_snippet_class(
-                "pynn_genn_rand_{}".format(distribution),
-                param_names=d['params'], var_init_code=d['code'])
+        return create_var_init_snippet(
+            "pynn_genn_rand_{}".format(distribution),
+            params=d['params'], var_init_code=d['code'])
 
     def get_mean(self, distribution, parameters):
         return self._distributions[distribution]['mean'](parameters)

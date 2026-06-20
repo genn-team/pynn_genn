@@ -15,7 +15,7 @@ from pyNN import errors
 from ..simulator import state
 import logging
 from ..model import GeNNStandardCellType, GeNNDefinitions, DDTemplate
-from pygenn.genn_model import create_custom_neuron_class
+from pygenn import create_neuron_model
 
 
 logger = logging.getLogger("PyNN")
@@ -58,7 +58,7 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
                 $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
             }
             else {
-                $(RefracTime) -= DT;
+                $(RefracTime) -= dt;
             }
         """,
 
@@ -69,11 +69,11 @@ genn_neuron_defs["IF"] = GeNNDefinitions(
             $(RefracTime) = $(TauRefrac);
         """,
 
-        "var_name_types" : [
+        "vars" : [
             ("V", "scalar"),
             ("RefracTime", "scalar")],
         
-        "param_name_types": {
+        "params": {
             "Rmembrane": "scalar",  # Membrane resistance
             "ExpTC": "scalar",       # Membrane time constant [ms]
             "Vrest": "scalar",      # Resting membrane potential [mV]
@@ -106,7 +106,7 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
                 $(GRr) *= $(ExpRr);
             }
             else {
-                $(RefracTime) -= DT;
+                $(RefracTime) -= dt;
             }
         """,
 
@@ -119,13 +119,13 @@ genn_neuron_defs["Adapt"] = GeNNDefinitions(
             $(GRr) += $(QRr);
         """,
 
-        "var_name_types" : [
+        "vars" : [
             ("V", "scalar"),
             ("RefracTime", "scalar"),
             ("GSfa", "scalar"),
             ("GRr", "scalar")],
         
-        "param_name_types": {
+        "params": {
             "Rmembrane": "scalar",  # Membrane resistance
             "ExpTC": "scalar",      # Membrane decay
             "Vrest": "scalar",      # Resting membrane potential [mV]
@@ -173,7 +173,7 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
                 $(V) = alpha - ($(ExpTC) * (alpha - $(V)));
             }
             else {
-                $(RefracTime) -= DT;
+                $(RefracTime) -= dt;
             }
             
             $${ADAPT_DECAY_CODE}
@@ -190,12 +190,12 @@ genn_neuron_defs["GIF"] = GeNNDefinitions(
         """),
         
         # **NOTE** variables associated with adaption 'channels' get added when model is built
-        "var_name_types": [
+        "vars": [
             ("V", "scalar"),
             ("RefracTime", "scalar")],
     
         # **NOTE** parameters associated with adaption 'channels' get added when model is built
-        "param_name_types": {
+        "params": {
             "Rmembrane": "scalar",  # Membrane resistance
             "ExpTC": "scalar",       # Membrane time constant [ms]
             "Vrest": "scalar",      # Resting membrane potential [mV]
@@ -257,36 +257,36 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
             if($(deltaT) == 0.0) {
                 v1 = DV_DELTA_T_ZERO($(V), $(W));
                 w1 = DW($(V), $(W));
-                v2 = DV_DELTA_T_ZERO($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                v3 = DV_DELTA_T_ZERO($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                v4 = DV_DELTA_T_ZERO($(V) + (DT * v3), $(W) + (DT * w3));
-                w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+                v2 = DV_DELTA_T_ZERO($(V) + (dt * 0.5 * v1), $(W) + (dt * 0.5 * w1));
+                w2 = DW($(V) + (dt * 0.5 * v1), $(W) + (dt * 0.5 * w1));
+                v3 = DV_DELTA_T_ZERO($(V) + (dt * 0.5 * v2), $(W) + (dt * 0.5 * w2));
+                w3 = DW($(V) + (dt * 0.5 * v2), $(W) + (dt * 0.5 * w2));
+                v4 = DV_DELTA_T_ZERO($(V) + (dt * v3), $(W) + (dt * w3));
+                w4 = DW($(V) + (dt * v3), $(W) + (dt * w3));
             }
             else {
                 v1 = DV($(V), $(W));
                 w1 = DW($(V), $(W));
-                v2 = DV($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                w2 = DW($(V) + (DT * 0.5 * v1), $(W) + (DT * 0.5 * w1));
-                v3 = DV($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                w3 = DW($(V) + (DT * 0.5 * v2), $(W) + (DT * 0.5 * w2));
-                v4 = DV($(V) + (DT * v3), $(W) + (DT * w3));
-                w4 = DW($(V) + (DT * v3), $(W) + (DT * w3));
+                v2 = DV($(V) + (dt * 0.5 * v1), $(W) + (dt * 0.5 * w1));
+                w2 = DW($(V) + (dt * 0.5 * v1), $(W) + (dt * 0.5 * w1));
+                v3 = DV($(V) + (dt * 0.5 * v2), $(W) + (dt * 0.5 * w2));
+                w3 = DW($(V) + (dt * 0.5 * v2), $(W) + (dt * 0.5 * w2));
+                v4 = DV($(V) + (dt * v3), $(W) + (dt * w3));
+                w4 = DW($(V) + (dt * v3), $(W) + (dt * w3));
             }
 
             // If we're not in refractory period, update V
             if ($(RefracTime) <= 0.0) {
-                $(V) += (DT / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
+                $(V) += (dt / 6.0) * (v1 + (2.0f * (v2 + v3)) + v4);
             }
             else {
-                $(RefracTime) -= DT;
+                $(RefracTime) -= dt;
             }
 
             // If we're not above peak, update w
             // **NOTE** it's not safe to do this at peak as wn may well be huge
             if($(V) <= -40.0) {
-                $(W) += (DT / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
+                $(W) += (dt / 6.0) * (w1 + (2.0 * (w2 + w3)) + w4);
             }
         """,
 
@@ -299,12 +299,12 @@ genn_neuron_defs["AdExp"] = GeNNDefinitions(
             $(RefracTime) = $(TauRefrac);
         """,
 
-        "var_name_types" : [
+        "vars" : [
             ("V", "scalar"),
             ("W", "scalar"),# adaptation current, [nA]
             ("RefracTime", "scalar")],
         
-        "param_name_types": {
+        "params": {
             "C": "scalar",        # Membrane capacitance [nF]
             "TauM": "scalar",     # Membrane time constant [ms]
             "TauRefrac": "scalar",  # Refractoriness [ms]
@@ -349,15 +349,13 @@ genn_neuron_defs["Poisson"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
 
-        "var_name_types": [
+        "vars": [
             ("timeStepToSpike", "scalar")],
         
-        "param_name_types": {
+        "params": {
             "isi": "scalar",
             "spikeStart": "scalar",
             "duration": "scalar"},
-
-        "is_auto_refractory_required": False
     },
     translations = (
         ("rate",     "isi",         partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
@@ -379,17 +377,15 @@ genn_neuron_defs["PoissonRef"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
 
-        "var_name_types" : [
+        "vars" : [
             ("timeStepToSpike", "scalar"),
             ],
-        "param_name_types": {
+        "params": {
             "isi": "scalar",
             "TauRefrac": "scalar",
             "spikeStart": "scalar",
             "duration": "scalar",
            },
-
-        "is_auto_refractory_required": False
     },
     translations = (
         ("rate",       "isi",           partial(rate_to_isi, "rate"),  partial(isi_to_rate, "isi")),
@@ -413,16 +409,14 @@ genn_neuron_defs["Gamma"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(t) >= $(start) && $(t) < $(start) + $(duration) && $(timeStepToSpike) <= 0.0",
 
-        "var_name_types": [
+        "vars": [
             ("timeStepToSpike", "scalar")],
 
-        "param_name_types": {
+        "params": {
             "alpha": "scalar",
             "beta": "scalar",
             "start": "scalar",
             "duration": "scalar"},
-
-        "is_auto_refractory_required": False
     },
     translations = (
         ("alpha",       "alpha"),
@@ -455,13 +449,13 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(t) >= $(spikeStart) && $(t) < $(spikeStart) + $(duration) && $(timeStepToSpike) <= 0.0",
 
-        "var_name_types" : [
+        "vars" : [
             ("timeStepToSpike", "scalar"),
             ("startIndex", "unsigned int"),
             ("endIndex", "unsigned int")
         ],
 
-        "param_name_types": {
+        "params": {
             "spikeStart": "scalar",
             "duration": "scalar",
         },
@@ -471,8 +465,6 @@ genn_neuron_defs["InhGamma"] = GeNNDefinitions(
             ("tbins", "scalar*"),
             ("beta", "scalar*")
         ],
-
-        "is_auto_refractory_required": False
     },
     translations = (
         ("a",          "alpha"),
@@ -492,9 +484,9 @@ genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
                $(V)=$(c);
                $(U)+=$(d);
             }
-            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT; //at two times for numerical stability
-            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*DT;
-            $(U)+=$(a)*($(b)*$(V)-$(U))*DT;
+            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*dt; //at two times for numerical stability
+            $(V)+=0.5*(0.04*$(V)*$(V)+5.0*$(V)+140.0-$(U)+$(Isyn)+$(Ioffset))*dt;
+            $(U)+=$(a)*($(b)*$(V)-$(U))*dt;
             if ($(V) > 30.0) {
               $(V)=30.0;
             }
@@ -502,10 +494,10 @@ genn_neuron_defs["Izhikevich"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(V) >= 29.99",
 
-        "var_name_types" : [
+        "vars" : [
             ("V", "scalar"),
             ("U", "scalar")],
-        "param_name_types": {
+        "params": {
             "a": "scalar",
             "b": "scalar",
             "c": "scalar",
@@ -528,7 +520,7 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
         "sim_code" : """
             scalar Imem;
             unsigned int mt;
-            scalar mdt= DT/25.0;
+            scalar mdt= dt/25.0;
             for (mt=0; mt < 25; mt++) {
                Imem= -($(m)*$(m)*$(m)*$(h)*$(gNa)*($(V)-($(ENa)))+
                    $(n)*$(n)*$(n)*$(n)*$(gK)*($(V)-($(EK)))+
@@ -565,12 +557,12 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
 
         "threshold_condition_code" : "$(V) >= 33.0",
 
-        "var_name_types" : [
+        "vars" : [
             ("V", "scalar"),
             ("m", "scalar"),
             ("h", "scalar"),
             ("n", "scalar")],
-        "param_name_types": {
+        "params": {
             "gNa": "scalar",
             "ENa": "scalar",
             "gK": "scalar",
@@ -601,11 +593,12 @@ genn_neuron_defs["HH"] = GeNNDefinitions(
 genn_postsyn_defs = {}
 genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
     definitions = {
-        "decay_code" : "$(inSyn)*=$(expDecay);",
+        "sim_code" : """
+            injectCurrent(init * inSyn);
+            inSyn *= expDecay;
+            """,
 
-        "apply_input_code" : "$(Isyn) += $(init) * $(inSyn);",
-
-        "var_name_types" : [],
+        "vars" : [],
         "param_name_types" : {
             "expDecay": "scalar",
             "init": "scalar"}
@@ -621,12 +614,13 @@ genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
 
 genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
     definitions = {
-        "decay_code" : "$(inSyn)*=$(expDecay);",
+        "sim_code" : """
+            injectCurrent(init * inSyn * (E - V));
+            inSyn *= expDecay;
+            """,
 
-        "apply_input_code" : "$(Isyn) += $(init) * $(inSyn) * ($(E) - $(V));",
-
-        "var_name_types" : [],
-        "param_name_types" : {
+        "vars" : [],
+        "params" : {
             "expDecay": "scalar",
             "init": "scalar",
             "E": "scalar"}
@@ -644,16 +638,14 @@ genn_postsyn_defs["ExpCond"] = GeNNDefinitions(
 
 genn_postsyn_defs["AlphaCurr"] = GeNNDefinitions(
     definitions = {
-        "decay_code" : """
-            $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
-            $(inSyn)*=exp(-DT/$(tau));
-        """,
-
-        "apply_input_code" : "$(Isyn) += $(x);",
-
-        "var_name_types" : [
+        "sim_code" : """
+            injectCurrent(x);
+            x = exp(-dt/tau) * ((dt * inSyn * exp(1.0) / tau) + x);
+            inSyn*=exp(-dt/tau);
+            """,
+        "vars" : [
             ("x", "scalar")],
-        "param_name_types" : {
+        "params" : {
             "tau": "scalar"}
     },
     translations = (
@@ -667,16 +659,14 @@ genn_postsyn_defs["AlphaCurr"] = GeNNDefinitions(
 
 genn_postsyn_defs["AlphaCond"] = GeNNDefinitions(
     definitions = {
-        "decay_code" : """
-            $(x) = exp(-DT/$(tau)) * ((DT * $(inSyn) * exp(1.0f) / $(tau)) + $(x));
-            $(inSyn)*=exp(-DT/$(tau));
-        """,
-
-        "apply_input_code" : "$(Isyn) += ($(E) - $(V)) * $(x);",
-
-        "var_name_types" : [
+        "sim_code" : """
+            injectCurrent((E - V) * x);
+            x = exp(-dt/tau) * ((dt * inSyn * exp(1.0) / tau) + x);
+            inSyn*=exp(-dt/tau);
+            """,
+        "vars" : [
             ("x", "scalar")],
-        "param_name_types" : {
+        "params" : {
             "tau": "scalar",
             "E": "scalar"}
     },
@@ -765,9 +755,8 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
             "threshold_condition_code": "$(startSpike) != $(endSpike) && $(t) >= $(spikeTimes)[$(startSpike)]",
             "reset_code": "$(startSpike)++;\n",
 
-            "var_name_types": [("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
+            "vars": [("startSpike", "unsigned int"), ("endSpike", "unsigned int")],
             "extra_global_params": [("spikeTimes", "scalar*")],
-            "is_auto_refractory_required": False
         },
         translations = (
             ("spike_times", "spikeTimes"),
@@ -797,8 +786,8 @@ class SpikeSourceArray(cells.SpikeSourceArray, GeNNStandardCellType):
 
     def build_genn_neuron(self, native_params, init_vals):
         # Create model using unmodified defs
-        genn_model = create_custom_neuron_class(self.genn_neuron_name,
-                                                **self.neuron_defs.definitions)
+        genn_model = create_neuron_model(self.genn_neuron_name,
+                                         **self.neuron_defs.definitions)
 
         # Get spike times
         spk_times = native_params["spikeTimes"]
@@ -920,11 +909,11 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
         # Loop through adaption current channels
         for e in eta_indices:
             # Add state variable
-            amended_defs["var_name_types"].append(("Ieta%u" % e, "scalar"))
+            amended_defs["vars"].append(("Ieta%u" % e, "scalar"))
 
             # Add parameters
-            amended_defs["param_name_types"]["ExpTCEta%u" % e] = "scalar"
-            amended_defs["param_name_types"]["EtaA%u" % e] = "scalar"
+            amended_defs["params"]["ExpTCEta%u" % e] = "scalar"
+            amended_defs["params"]["EtaA%u" % e] = "scalar"
 
             adapt_current_code += "i -= $(Ieta%u);\n" % e
             adapt_decay_code += "$(Ieta%u) *= $(ExpTCEta%u);\n" % (e, e)
@@ -933,11 +922,11 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
         # Loop through threshod adaption channels
         for g in gamma_indices:
             # Add state variable
-            amended_defs["var_name_types"].append(("Vgamma%u" % g, "scalar"))
+            amended_defs["vars"].append(("Vgamma%u" % g, "scalar"))
 
             # Add parameters
-            amended_defs["param_name_types"]["ExpTCGamma%u" % g] = "scalar"
-            amended_defs["param_name_types"]["GammaA%u" % g] = "scalar"
+            amended_defs["params"]["ExpTCGamma%u" % g] = "scalar"
+            amended_defs["params"]["GammaA%u" % g] = "scalar"
 
             adapt_decay_code += "$(Vgamma%u) *= $(ExpTCGamma%u);\n" % (g, g)
             adapt_reset_code += "$(Vgamma%u) += $(GammaA%u);\n" % (g, g)
@@ -951,7 +940,7 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
 
         # If threshold is stochastic
         if self._is_param_non_zero(native_params, "DeltaV"):
-            adapt_thresh_code = "$(gennrand_uniform) < -expm1(-($(Lambda0) * exp(($(V) - %s) / $(DeltaV))) * DT)" % (threshold_voltage)
+            adapt_thresh_code = "$(gennrand_uniform) < -expm1(-($(Lambda0) * exp(($(V) - %s) / $(DeltaV))) * dt)" % (threshold_voltage)
         # Otherwise, threshold is deterministic
         else:
             adapt_thresh_code = "$(V) < (" + threshold_voltage + ")"
@@ -967,7 +956,7 @@ class GIF_cond_exp(cells.GIF_cond_exp, GeNNStandardCellType):
                 ADAPT_RESET_CODE=adapt_reset_code)
 
         # Build callable to create a custom neuron model from defs
-        creator = partial(create_custom_neuron_class, self.genn_neuron_name)
+        creator = partial(create_neuron_model, self.genn_neuron_name)
 
         # Build model
         return self.build_genn_model(amended_neuron_defs, native_params,

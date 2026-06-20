@@ -7,13 +7,12 @@ from copy import deepcopy
 from string import Template
 from lazyarray import larray
 import numpy as np
-from pygenn.genn_model import (create_custom_neuron_class,
-                               create_custom_postsynaptic_class,
-                               create_custom_current_source_class,
-                               create_custom_weight_update_class,
-                               init_var, init_connectivity)
+from pygenn import (create_neuron_model,
+                    create_postsynaptic_model,
+                    create_current_source_model,
+                    create_weight_update_model,
+                    init_var, init_sparse_connectivity)
 
-from pygenn import genn_wrapper
 from pyNN.standardmodels import (StandardModelType,
                                  StandardCellType,
                                  StandardCurrentSource,
@@ -21,7 +20,6 @@ from pyNN.standardmodels import (StandardModelType,
 from pynn_genn.random import NativeRNG, RandomDistribution
 from pyNN.parameters import LazyArray
 
-from six import iteritems, iterkeys
 import copy
 
 # Mapping from GeNN to numpy types
@@ -67,16 +65,12 @@ class GeNNStandardModelType(StandardModelType):
         # Take a deep copy of the definitions
         genn_defs = deepcopy(defs.definitions)
 
-        # Check that it doesn't already have its
-        # variables and parameters seperated out
-        assert "param_names" not in genn_defs
-
         # Start with variables that definitions say MUST be variables
-        var_name_types = genn_defs["var_name_types"]
+        vars = genn_defs["vars"]
 
         # **NOTE** all parameters are by default GeNN parameters
-        param_name_types = genn_defs["param_name_types"]
-        del genn_defs["param_name_types"]
+        params = genn_defs["params"]
+        del genn_defs["params"]
 
         # Loop through native parameters
         prefix_len = len(prefix)
@@ -86,17 +80,17 @@ class GeNNStandardModelType(StandardModelType):
             # If parameter is NOT homogeneous, has correct prefix
             # and, without the prefix, it is in parameters
             if (not param.is_homogeneous and field_name.startswith(prefix) and
-                field_name_no_prefix in param_name_types):
+                field_name_no_prefix in params):
                 # Add it to variables
-                var_name_types.append((field_name_no_prefix,
-                                       param_name_types[field_name_no_prefix]))
+                vars.append((field_name_no_prefix,
+                             params[field_name_no_prefix]))
 
                 # Remove from parameters
-                del param_name_types[field_name_no_prefix]
+                del params[field_name_no_prefix]
 
         # Loop through any extra parameters provided by model
         extra_param_values = {}
-        for param_name, param_val in iteritems(defs.extra_param_values):
+        for param_name, param_val in defs.extra_param_values.items():
             param_name_no_prefix = param_name[prefix_len:]
 
             # If prefix matches
@@ -118,15 +112,15 @@ class GeNNStandardModelType(StandardModelType):
                 # If parameter is not homogeneous
                 if not ini.is_homogeneous:
                     # Add it to variables
-                    var_name_types.append(
+                    vars.append(
                         (param_name_no_prefix,
-                         param_name_types[param_name_no_prefix]))
+                         params[param_name_no_prefix]))
 
                     # Remove from parameters
-                    del param_name_types[param_name_no_prefix]
+                    del params[param_name_no_prefix]
 
         # Set parameter names in defs
-        genn_defs["param_names"] = list(param_name_types.keys())
+        genn_defs["params"] = params
 
         # Create custom model
         genn_model = create_custom_model(**genn_defs)
@@ -142,7 +136,7 @@ class GeNNStandardModelType(StandardModelType):
 
         # Loop through GeNN parameters
         neuron_params = {}
-        for n in genn_defs["param_names"]:
+        for n in genn_defs["params"].keys():
             pref_n = prefix + n
 
             # If this variable is a native parameter,
@@ -159,7 +153,7 @@ class GeNNStandardModelType(StandardModelType):
 
         # Loop through GeNN variables
         neuron_ini = {}
-        for n, t in var_name_types:
+        for n, t in vars:
             pref_n = prefix + n
 
             # If this variable is a native parameter,
@@ -226,7 +220,7 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def build_genn_psm(self, native_params, init_vals, prefix):
         # Build callable to create a custom PSM from defs
-        creator = partial(create_custom_postsynaptic_class,
+        creator = partial(create_postsynaptic_model,
                           self.genn_postsyn_name)
 
         # Build model
@@ -235,7 +229,7 @@ class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def build_genn_neuron(self, native_params, init_vals):
         # Build callable to create a custom neuron model from defs
-        creator = partial(create_custom_neuron_class, self.genn_neuron_name)
+        creator = partial(create_neuron_model, self.genn_neuron_name)
 
         # Build model
         return self.build_genn_model(self.neuron_defs, native_params,
@@ -271,7 +265,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         wum_params = {}
         heterogeneous_on_device = []
         # Loop through connection parameters
-        for n, p in iteritems(conn_params):
+        for n, p in conn_params.iteritems():
             # if parameter is of type LazyArray it means that we prevented
             # expansion via PyNN and will be generated on device
             if isinstance(p, LazyArray):
@@ -311,12 +305,12 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         genn_defs["param_names"] = param_names
 
         # Create custom model
-        genn_model = create_custom_weight_update_class(self.__class__.__name__,
-                                                       **genn_defs)
+        genn_model = create_weight_update_model(self.__class__.__name__,
+                                                **genn_defs)
 
         # Loop through GeNN variables
         wum_init = {}
-        for n, t in iteritems(vars):
+        for n, t in vars.iteritems():
             # Get type to use for variable
             var_type = (genn_to_numpy_types[t] if t in genn_to_numpy_types
                         else np.float32)
