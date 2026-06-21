@@ -98,7 +98,7 @@ class NativeRNG(NativeRNG):
     def __init__(self, host_rng, seed=None):
         # Superclass
         self.seed = seed
-        super(NativeRNG, self).__init__(self.seed)
+        super().__init__(self.seed)
 
         self._seed_generator = np.random.RandomState(seed=self.seed)
 

@@ -30,7 +30,7 @@ class PopulationView(common.PopulationView):
     def set(self, **parameters):
         # Loop through all parameters
         parent_params = self.parent._parameters
-        for n, v in parameters.iteritems():
+        for n, v in parameters.items():
             # Expand parent parameters
             param_vals = parent_params[n].evaluate(simplify=False)
 
@@ -91,8 +91,8 @@ class Population(common.Population):
         """
         Create a population of neurons all of the same type.
         """
-        super(Population, self).__init__(size, cellclass, cellparams,
-                                         structure, initial_values, label)
+        super().__init__(size, cellclass, cellparams,
+                         structure, initial_values, label)
 
         # Create empty list to hold injected currents
         self._injected_currents = []
@@ -140,7 +140,6 @@ class Population(common.Population):
         self._genn_nmodel, neuron_params, neuron_ini =\
             self.celltype.build_genn_neuron(native_parameters,
                                             self.initial_values)
-        print(neuron_params, neuron_ini)
         self._pop = simulator.state.model.add_neuron_population(
             self._genn_label, self.size, self._genn_nmodel,
             neuron_params, neuron_ini)
@@ -150,7 +149,7 @@ class Population(common.Population):
             native_parameters, self.initial_values)
 
         # Add to underlying neuron group
-        for n, v in extra_global.iteritems():
+        for n, v in extra_global.items():
             self._pop.set_extra_global_param(n, v)
 
         for label, inj_curr, inj_cells in self._injected_currents:
@@ -178,7 +177,7 @@ class Population(common.Population):
 
             extra_global = inj_curr.get_extra_global_params(inj_params)
 
-            for n, v in extra_global.iteritems():
+            for n, v in extra_global.items():
                 cs.set_extra_global_param(n, v)
 
     def _set_initial_value_array(self, variable, initial_values):

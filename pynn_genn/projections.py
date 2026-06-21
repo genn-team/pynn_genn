@@ -152,7 +152,7 @@ class Projection(common.Projection, ContextMixin):
                                         times=num_synapses))
 
         # Loop through connection _parameters
-        for p_name, p_val in connection_parameters.iteritems():
+        for p_name, p_val in connection_parameters.items():
             if isinstance(p_val, Iterable):
                 conn_params[p_name].extend(p_val)
             else:
@@ -354,7 +354,7 @@ class Projection(common.Projection, ContextMixin):
         # the parameters into a dictionary, no need to build pre/post indices
         if self._connector.connectivity_init_possible:
             _params = self._connector._parameters_from_synapse_type(self)
-            for p_name, p_val in _params.iteritems():
+            for p_name, p_val in _params.items():
                 params[p_name] = p_val
         # Build connectivity
         # **NOTE** this build connector matching shape of PROJECTION
@@ -441,8 +441,7 @@ class Projection(common.Projection, ContextMixin):
         params['connector'] = self._connector
         # Build GeNN weight update model
         wum_model, wum_params, wum_init, wum_pre_init, wum_post_init = \
-                self.synapse_type.build_genn_wum(params,
-                                             self.initial_values)
+            self.synapse_type.build_genn_wum(params, self.initial_values)
 
         # generate an on-device connectivity initializer object
         conn_init = self._connector._init_connectivity()
@@ -456,7 +455,8 @@ class Projection(common.Projection, ContextMixin):
             genn_label, matrix_type,
             self.pre._pop, self.post._pop,
             init_weight_update(wum_model, wum_params, wum_init, wum_pre_init, wum_post_init),
-            init_postsynaptic(psm_model, psm_params, psm_ini, conn_init))
+            init_postsynaptic(psm_model, psm_params, psm_ini),
+            conn_init)
     
         syn_pop.axonal_delay_steps = delay_steps
 
@@ -508,7 +508,7 @@ class Projection(common.Projection, ContextMixin):
             # NOTE: had to add a check for non-expanded params
             if self.use_sparse:
                 conn_params = {n: p[conn_mask] if not isinstance(p, LazyArray) else p
-                               for n, p in params.iteritems()}
+                               for n, p in params.items()}
             else:
                 ## GeNN stores synapses in this row-major order for dense matrices
                 ## PyNN in some cases (FromListConnector) uses column-major
@@ -518,7 +518,7 @@ class Projection(common.Projection, ContextMixin):
 
                 conn_params = {n: (p[to_row_major])[conn_mask]
                                 if not isinstance(p, LazyArray) else p
-                                    for n, p in params.iteritems()}
+                                    for n, p in params.items()}
 
             conn_params['connector']= self._connector
 

@@ -599,7 +599,7 @@ genn_postsyn_defs["ExpCurr"] = GeNNDefinitions(
             """,
 
         "vars" : [],
-        "param_name_types" : {
+        "params" : {
             "expDecay": "scalar",
             "init": "scalar"}
     },
@@ -854,8 +854,7 @@ class SpikeSourceInhGamma(cells.SpikeSourceInhGamma, GeNNStandardCellType):
 
         # Call superclass method to build 
         # neuron model from amended native parameters
-        return super(SpikeSourceInhGamma, self).build_genn_neuron(
-            amended_native_params, init_vals)
+        return super().build_genn_neuron(amended_native_params, init_vals)
 
 
 class EIF_cond_alpha_isfa_ista(cells.EIF_cond_alpha_isfa_ista, GeNNStandardCellType):

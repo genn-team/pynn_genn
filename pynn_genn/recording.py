@@ -58,7 +58,7 @@ class Monitor(object):
         """Fetch new data"""
         if timestep % self.sampling_timesteps == 0:
             self.time.append(timestep * self.recorder._simulator.state.dt)
-            for idd, i in self.id_data_idx_map.iteritems():
+            for idd, i in self.id_data_idx_map.items():
                 # **TODO** we could just stack numpy arrays
                 self.data[i].append(np.copy(self.data_view[idd]))
 
@@ -74,7 +74,7 @@ class Monitor(object):
 
 class StateMonitor(Monitor):
     def __init__(self, parent, variable):
-        super(StateMonitor, self).__init__(parent)
+        super().__init__(parent)
         parent_translations = parent.population.celltype.translations
         self.translated = (parent_translations[variable]["translated_name"])
 
@@ -84,9 +84,6 @@ class StateMonitor(Monitor):
 
 
 class SpikeMonitor(Monitor):
-    def __init__(self, parent):
-        super(SpikeMonitor, self).__init__(parent)
-
     def init_data_view(self):
         pass
 
@@ -107,7 +104,7 @@ class Recorder(recording.Recorder):
     _simulator = simulator
 
     def __init__(self, population, file=None):
-        super(Recorder, self).__init__(population, file)
+        super().__init__(population, file)
         self.monitors = {}
 
     def _record(self, variable, new_ids, sampling_interval=None):
@@ -131,7 +128,7 @@ class Recorder(recording.Recorder):
         self.monitors[variable].record(new_ids, sampling_timesteps)
 
     def init_data_views(self):
-        for monitor in itervalues(self.monitors):
+        for monitor in self.monitors.values():
             monitor.init_data_view()
 
     def _record_vars(self, t):
@@ -139,7 +136,7 @@ class Recorder(recording.Recorder):
         pop = self.population._genn_label
 
         # Loop through monitors
-        for var, monitor in self.monitors.iteritems():
+        for var, monitor in self.monitors.items():
             # If this variable is spikes, pull current spikes
             if var == "spikes":
                 assert False
@@ -187,5 +184,5 @@ class Recorder(recording.Recorder):
         super(Recorder, self).store_to_cache(annotations)
 
         # Clear out data
-        for m in itervalues(self.monitors):
+        for m in self.monitors.values():
             m.store_to_cache()

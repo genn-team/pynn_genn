@@ -135,9 +135,9 @@ class STDPMechanism(synapses.STDPMechanism, GeNNStandardSynapseType):
     def __init__(self, timing_dependence=None, weight_dependence=None,
             voltage_dependence=None, dendritic_delay_fraction=1.0,
             weight=0.0, delay=None):
-        super(STDPMechanism, self).__init__(
-            timing_dependence, weight_dependence, voltage_dependence,
-            dendritic_delay_fraction, weight, delay)
+        super().__init__(timing_dependence, weight_dependence,
+                         voltage_dependence, dendritic_delay_fraction,
+                         weight, delay)
 
         # Create a copy of the standard STDP defs
         self.wum_defs = deepcopy(self.base_defs)

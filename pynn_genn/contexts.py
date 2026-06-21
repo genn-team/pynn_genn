@@ -132,7 +132,7 @@ class ContextMixin(object):
                 # Values from the context take priority over default argument
                 # values.
                 context = self.get_context_arguments()
-                for name, val in context.iteritems():
+                for name, val in context.items():
                     if name in new_kwargs:
                         new_kwargs[name] = val
 
@@ -141,7 +141,7 @@ class ContextMixin(object):
                 new_kwargs.update(kwargs)
 
                 # Raise a TypeError if any `Required` sentinels remain
-                for k, v in new_kwargs.iteritems():
+                for k, v in new_kwargs.items():
                     if v is Required:
                         raise TypeError(
                             "{!s}: missing argument {}".format(f.__name__, k))

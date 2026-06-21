@@ -58,7 +58,11 @@ def sanitize_label(label):
 class GeNNStandardModelType(StandardModelType):
 
     genn_extra_parameters = {}
-
+    
+    def __init__(self, **parameters):
+        super().__init__(**parameters)
+        self._var_init_snippets = []
+    
     def build_genn_model(self, defs, native_params, init_vals,
                          create_custom_model, prefix=""):
 
@@ -193,6 +197,9 @@ class GeNNStandardModelType(StandardModelType):
             rng = param.base_value.rng
             dist_name = param.base_value.name
             param_init = rng.init_var_snippet(dist_name, params)
+            
+            # **YUCK** add reference
+            self._var_init_snippets.append(param_init)
             return init_var(param_init, params)
         elif param.is_homogeneous:
             return param.evaluate(simplify=simplify_homogeneous)
@@ -203,7 +210,7 @@ class GeNNStandardModelType(StandardModelType):
 class GeNNStandardCellType(GeNNStandardModelType, StandardCellType):
 
     def __init__(self, **parameters):
-        super(GeNNStandardCellType, self).__init__(**parameters)
+        super().__init__(**parameters)
 
         # If cell has a postsynaptic model i.e. it's not a spike source
         if hasattr(self, "postsyn_defs"):
@@ -265,7 +272,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
         wum_params = {}
         heterogeneous_on_device = []
         # Loop through connection parameters
-        for n, p in conn_params.iteritems():
+        for n, p in conn_params.items():
             # if parameter is of type LazyArray it means that we prevented
             # expansion via PyNN and will be generated on device
             if isinstance(p, LazyArray):
@@ -310,7 +317,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
 
         # Loop through GeNN variables
         wum_init = {}
-        for n, t in vars.iteritems():
+        for n, t in vars.items():
             # Get type to use for variable
             var_type = (genn_to_numpy_types[t] if t in genn_to_numpy_types
                         else np.float32)
@@ -331,14 +338,14 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
                                 "correctly initialised".format(n))
         # Zero all pre-synaptic variables
         # **TODO** other means of initialisation
-        wum_pre_init = (None
+        wum_pre_init = ({}
                         if "pre_var_name_types" not in genn_defs
                         else {n[0]: 0.0
                               for n in genn_defs["pre_var_name_types"]})
 
         # Zero all post-synaptic variables
         # **TODO** other means of initialisation
-        wum_post_init = (None
+        wum_post_init = ({}
                          if "post_var_name_types" not in genn_defs
                          else {n[0]: 0.0
                                for n in genn_defs["post_var_name_types"]})
@@ -348,7 +355,7 @@ class GeNNStandardSynapseType(GeNNStandardModelType):
 
 class GeNNStandardCurrentSource(GeNNStandardModelType, StandardCurrentSource):
     def __init__(self, **parameters):
-        super(GeNNStandardCurrentSource, self).__init__(**parameters)
+        super().__init__(**parameters)
         self.translations = build_translations(
             *self.currentsource_defs.translations)
 
