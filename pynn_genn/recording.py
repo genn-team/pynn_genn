@@ -79,8 +79,8 @@ class StateMonitor(Monitor):
         self.translated = (parent_translations[variable]["translated_name"])
 
     def init_data_view(self):
-        vars = self.recorder.population._pop.vars
-        self.data_view = vars[self.translated].view
+        pop = self.recorder.population._pop
+        self.data_view = pop.vars[self.translated].view
 
 
 class SpikeMonitor(Monitor):
@@ -92,13 +92,48 @@ class SpikeMonitor(Monitor):
 
     def __call__(self, timestep):
         """Fetch new data"""
-        assert False
-        if timestep % self.sampling_timesteps == 0:
-            t = timestep * self.recorder._simulator.state.dt
-            for i in self.recorder.population._pop.current_spikes:
-                if i in self.id_data_idx_map:
-                    self.data[self.id_data_idx_map[i]].append(t)
 
+        # If this is a timestep where we have a full buffer
+        sim_state = self.recorder._simulator.state
+        n = sim_state.num_recording_timesteps
+        if timestep != 0 and (timestep % n) == 0:
+            # Extract spike times and spike IDs
+            spike_times, spike_ids =\
+                self.recorder.population._pop.spike_recording_data[0]
+
+            # If a sampling timestep is specified, use to select spikes
+            if self.sampling_timesteps != 1:
+                mask = ((spike_times % self.sampling_timesteps) == 0)
+                spike_times = spike_times[mask]
+                spike_ids = spike_ids[mask]
+
+            if len(spike_times) > 0:
+                # Convert spike times to timesteps relative to recording start
+                spike_timesteps = np.round(spike_times 
+                                           / sim_state.dt).astype(int)
+
+                # Start at first spike time
+                start_ind = 0
+                start_val = spike_timesteps[start_ind]
+                while True:
+                    # Find last index with same value
+                    end_ind = np.searchsorted(spike_timesteps, start_val, "right")
+                    
+                    current_spike_ids = spike_ids[start_ind:end_ind + 1]
+                    t = spike_times[start_ind]
+                    for i in current_spike_ids:
+                        if i in self.id_data_idx_map:
+                            self.data[self.id_data_idx_map[i]].append(t)
+
+                    # Go onto next index
+                    start_ind = end_ind + 1
+
+                    # If this is within the array, keep searching
+                    if start_ind < len(spike_timesteps):
+                        start_val = spike_timesteps[start_ind]
+                    # Otherwise, stop
+                    else:
+                        break
 
 class Recorder(recording.Recorder):
     _simulator = simulator
@@ -137,12 +172,9 @@ class Recorder(recording.Recorder):
 
         # Loop through monitors
         for var, monitor in self.monitors.items():
-            # If this variable is spikes, pull current spikes
-            if var == "spikes":
-                assert False
-                #model.pull_current_spikes_from_device(label)
-            # Otherwise pull variable (using translated name cached in monitor)
-            else:
+            # If variable isn't spikes, pull variable 
+            # (using translated name cached in monitor)
+            if var != "spikes":
                 pop.vars[monitor.translated].pull_from_device()
 
             # Update monitor

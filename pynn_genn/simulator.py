@@ -26,16 +26,17 @@ class State(common.control.BaseState):
         self.dt = 0.1
         self.t = 0.0
         self.num_current_sources = 0
-        self.reuse_genn_model = False
+        self.always_rebuild = False
         self.native_rng = None
+        self.num_recording_timesteps = None
 
     @property
-    def dt( self ):
-        return self.model.dT
+    def dt(self):
+        return self.model.dt
 
     @dt.setter
-    def dt( self, _dt ):
-        self.model.dT = _dt
+    def dt(self, value):
+        self.model.dt = value
 
     @property
     def min_delay(self):
@@ -51,30 +52,43 @@ class State(common.control.BaseState):
     def min_delay(self, d):
         self._min_delay = d
 
-    def finalize(self):
+    def finalize(self, tstop):
         if not (self.native_rng is None):
             self.model.seed = (0 if self.native_rng.seed is None 
                                else self.native_rng.seed)
 
+        self._record_spikes = False
         for pop in self.populations:
             pop._create_native_population()
+
+            # If spikes are recorded from this population, 
+            # enable GeNN spike recording system
+            if "spikes" in pop.recorder.monitors:
+                self._record_spikes = True
+                pop._pop.spike_recording_enabled = True
+
         for proj in self.projections:
             proj._create_native_projection()
 
-        # Build and load GeNN model
-        # **THINK** this logic is common with mlGeNN so maybe
-        # model_filename should be a GeNNModel property?
-        if os.name == 'nt':
-            model_exists = os.path.isfile(os.path.join(self.model_path, 
-                                                       "runner_Release.dll"))
-        else:
-            model_exists = os.path.isfile(
-                os.path.join(self.model_path, 
-                             self.model.model_name + "_CODE",
-                             "librunner.so"))
-        if not self.reuse_genn_model or not model_exists:
-            self.model.build(self.model_path)
-        self.model.load(self.model_path)
+        # Build GeNN model
+        self.model.build(self.model_path, always_rebuild=self.always_rebuild)
+        
+        if self._record_spikes:
+            # Calculate number of simulation timesteps
+            timesteps = int(round((tstop - self.t) / self.dt))
+
+            # If we a number of recording timesteps isn't specified,
+            # try and record for entire simulation
+            if self.num_recording_timesteps is None:
+                self.num_recording_timesteps = timesteps - 1
+            # Otherwise, check that we're running for 
+            # a multiple of num recording timesteps
+            elif ((timesteps - 1) % self.num_recording_timesteps) != 0:
+                raise RuntimeError("Can only run for multiples of manually "
+                                   "configured number of recording timesteps")
+        # Load model
+        self.model.load(self.num_recording_timesteps if self._record_spikes
+                        else None)
 
         self._built = True
 
@@ -83,7 +97,7 @@ class State(common.control.BaseState):
 
     def run_until(self, tstop):
         if not self._built:
-            self.finalize()
+            self.finalize(tstop)
         if not self.running:
             for rec in self.recorders:
                 rec.init_data_views()
@@ -93,14 +107,22 @@ class State(common.control.BaseState):
 
         # Simulate
         self.running = True
-        while self.t < tstop:
+        while self.model.t < tstop:
             # Get time at start of step (this is correct timestamp for recorded data)
             timestep = self.model.timestep
+            self.t = self.model.t
+
+            # Pull recording buffers if spikes are being recorded and this
+            # is a timestep at which buffer is full
+            if (self._record_spikes and timestep != 0
+                and (timestep % self.num_recording_timesteps == 0)):
+                    print(timestep, "pulling spikes")
+                    self.model.pull_recording_buffers_from_device()
 
             # Record any variables being recorded
             for rec in self.recorders:
                 rec._record_vars(timestep)
-
+            
             # Advance model time
             self.model.step_time()
 
@@ -123,7 +145,7 @@ class State(common.control.BaseState):
     def reset(self):
         """Reset the state of the current network to time t = 0."""
         self.running = False
-        self.t = 0
+        self.timestep = 0
         self.t_start = 0
 
         # reinitialise model if it has already been built
