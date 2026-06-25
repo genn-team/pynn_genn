@@ -150,7 +150,7 @@ class Population(common.Population):
 
         # Add to underlying neuron group
         for n, v in extra_global.items():
-            self._pop.set_extra_global_param(n, v)
+            self._pop.extra_global_params[n].set_init_values(v)
 
         for label, inj_curr, inj_cells in self._injected_currents:
             # Take a copy of current source parameters and
@@ -178,7 +178,7 @@ class Population(common.Population):
             extra_global = inj_curr.get_extra_global_params(inj_params)
 
             for n, v in extra_global.items():
-                cs.set_extra_global_param(n, v)
+                cs.extra_global_params[n].set_init_values(v)
 
     def _set_initial_value_array(self, variable, initial_values):
         pass
